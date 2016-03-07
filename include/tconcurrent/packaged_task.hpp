@@ -92,7 +92,7 @@ private:
   friend auto package(F&& f)
       -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
 
-  explicit packaged_task(std::weak_ptr<detail::shared<R(Args...)>> p)
+  explicit packaged_task(std::shared_ptr<detail::shared<R(Args...)>> p)
     : _p(std::move(p))
   {
   }
