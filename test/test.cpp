@@ -298,7 +298,31 @@ TEST_CASE("test ready future then error", "")
   CHECK_THROWS_AS(fut2.get(), int);
 }
 
-TEST_CASE("test ready future and then", "")
+TEST_CASE("test error future then", "")
+{
+  bool called = false;
+  auto fut = make_exceptional_future<int>(21);
+  auto fut2 = fut.then([&](future<int> const& val)
+                       {
+                         called = true;
+                         try
+                         {
+                           fut.get();
+                         }
+                         catch (int i)
+                         {
+                           return i * 2;
+                         }
+                         return 0;
+                       });
+  static_assert(std::is_same<decltype(fut2)::value_type, int>::value,
+                "then can't deduce future type");
+  fut2.wait();
+  CHECK(42 == fut2.get());
+  CHECK(called);
+}
+
+TEST_CASE("test ready future and_then", "")
 {
   auto fut = make_ready_future(21);
   auto fut2 = fut.and_then([](int val){ return long(val*2); });
@@ -307,7 +331,7 @@ TEST_CASE("test ready future and then", "")
   CHECK(42 == fut2.get());
 }
 
-TEST_CASE("test error future and then", "")
+TEST_CASE("test error future and_then", "")
 {
   bool called = false;
   auto fut = make_exceptional_future<int>(21);
@@ -323,7 +347,7 @@ TEST_CASE("test error future and then", "")
   CHECK(!called);
 }
 
-TEST_CASE("test ready future and then error", "")
+TEST_CASE("test ready future and_then error", "")
 {
   auto fut = make_ready_future(21);
   auto fut2 = fut.and_then([](int val) { throw 42; });
