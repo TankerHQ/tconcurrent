@@ -93,6 +93,7 @@ public:
                          assert(p->_r.which() == 2);
                          p->get(); // rethrow to set the future to error
                          assert(false && "unreachable code");
+                         std::terminate();
                        }
                      });
   }
