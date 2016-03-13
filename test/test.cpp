@@ -378,6 +378,16 @@ TEST_CASE("test void promise", "")
   CHECK_NOTHROW(fut.get());
 }
 
+TEST_CASE("test error promise", "")
+{
+  promise<void> prom;
+  auto fut = prom.get_future();
+  CHECK(!fut.is_ready());
+  prom.set_exception(std::make_exception_ptr(42));
+  CHECK(fut.is_ready());
+  CHECK_THROWS_AS(fut.get(), int);
+}
+
 TEST_CASE("test when_all", "")
 {
   auto const NB_FUTURES = 100;

@@ -27,6 +27,10 @@ public:
   {
     _p->set(std::move(val));
   }
+  void set_exception(std::exception_ptr exc)
+  {
+    _p->set_exception(std::move(exc));
+  }
 
 private:
   std::shared_ptr<detail::shared_base<value_type>> _p;
