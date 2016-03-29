@@ -71,9 +71,10 @@ TEST_CASE("test non void packaged task", "")
   CHECK(42 == future.get());
 }
 
+const int val = 42;
+
 TEST_CASE("test reference packaged task", "")
 {
-  const int val = 42;
   auto taskfut = package<int()>([&]() -> const int& { return val; });
   auto& task = std::get<0>(taskfut);
   auto& future = std::get<1>(taskfut);
@@ -228,7 +229,6 @@ TEST_CASE("test non void async", "")
 TEST_CASE("test reference async", "")
 {
   bool hasrun = false;
-  const int val = 42;
   auto fut = async([&]() -> int const& { hasrun = true; return val; });
   static_assert(std::is_same<decltype(fut)::value_type, int>::value,
                 "async can't handle reference return type");
@@ -376,6 +376,16 @@ TEST_CASE("test void promise", "")
   prom.set_value(0);
   CHECK(fut.is_ready());
   CHECK_NOTHROW(fut.get());
+}
+
+TEST_CASE("test error promise", "")
+{
+  promise<void> prom;
+  auto fut = prom.get_future();
+  CHECK(!fut.is_ready());
+  prom.set_exception(std::make_exception_ptr(42));
+  CHECK(fut.is_ready());
+  CHECK_THROWS_AS(fut.get(), int);
 }
 
 TEST_CASE("test when_all", "")
