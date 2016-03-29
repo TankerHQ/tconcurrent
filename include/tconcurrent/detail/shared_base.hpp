@@ -27,20 +27,18 @@ public:
 
   virtual ~shared_base() = default;
 
+  void set(R const& r)
+  {
+    finish([&] { _r = v_value{r}; });
+  }
   void set(R&& r)
   {
-    finish([&]
-           {
-             _r = v_value{std::move(r)};
-           });
+    finish([&] { _r = v_value{std::move(r)}; });
   }
 
   void set_exception(std::exception_ptr exc)
   {
-    finish([&]
-           {
-             _r = v_exception{exc};
-           });
+    finish([&] { _r = v_exception{exc}; });
   }
 
   template <typename F>

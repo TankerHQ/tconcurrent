@@ -2,6 +2,7 @@
 #define TCONCURRENT_WHEN_HPP
 
 #include <iostream>
+#include <atomic>
 #include <tconcurrent/promise.hpp>
 
 namespace tconcurrent

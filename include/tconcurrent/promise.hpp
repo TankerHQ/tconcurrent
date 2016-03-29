@@ -23,10 +23,15 @@ public:
     return future<T>(_p);
   }
 
+  void set_value(value_type const& val)
+  {
+    _p->set(val);
+  }
   void set_value(value_type&& val)
   {
     _p->set(std::move(val));
   }
+
   void set_exception(std::exception_ptr exc)
   {
     _p->set_exception(std::move(exc));

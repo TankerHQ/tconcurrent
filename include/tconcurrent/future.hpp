@@ -68,7 +68,8 @@ public:
   future() = default;
 
   template <typename F>
-  auto then(F&& f) -> future<typename std::decay<decltype(f(*this))>::type>
+  auto then(F&& f) -> future<
+      typename std::decay<decltype(f(std::declval<future<R>>()))>::type>
   {
     // TODO capture by move
     auto p = _p;
@@ -113,19 +114,19 @@ public:
     _p->wait();
   }
 
-  bool is_ready() const noexcept
+  bool is_ready() const BOOST_NOEXCEPT
   {
     return _p && _p->_r.which() != 0;
   }
-  bool has_value() const noexcept
+  bool has_value() const BOOST_NOEXCEPT
   {
     return _p && _p->_r.which() == 1;
   }
-  bool has_exception() const noexcept
+  bool has_exception() const BOOST_NOEXCEPT
   {
     return _p && _p->_r.which() == 2;
   }
-  bool is_valid() const noexcept
+  bool is_valid() const BOOST_NOEXCEPT
   {
     return bool(_p);
   }
@@ -182,8 +183,12 @@ future<R> detail::future_unwrap<future<R>>::unwrap()
                              if (nested.has_exception())
                                sb->set_exception(nested.get_exception());
                              else
-                               sb->set(typename future<R>::value_type(
-                                   nested.get()));
+                               sb->set(
+// Lol, msvc does not want a typename here
+#ifndef _WIN32
+                                   typename
+#endif
+                                   future<R>::value_type(nested.get()));
                            });
              }
            });
