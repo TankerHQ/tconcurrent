@@ -46,6 +46,8 @@ void periodic_task::start(StartOption opt)
 future<void> periodic_task::stop()
 {
   scope_lock l(_mutex);
+  if (_state == State::Stopped)
+    return make_ready_future();
   if (_state != State::Running)
     return _future.then([&](future<void> const&){});
 

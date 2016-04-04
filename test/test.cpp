@@ -428,6 +428,17 @@ TEST_CASE("test when_all empty", "")
 
 // periodic task
 
+TEST_CASE("test periodic task construct", "")
+{
+  periodic_task pt;
+}
+
+TEST_CASE("test periodic task stop", "")
+{
+  periodic_task pt;
+  pt.stop();
+}
+
 TEST_CASE("test periodic task", "")
 {
   unsigned int called = 0;
