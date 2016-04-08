@@ -44,18 +44,25 @@ public:
   template <typename F>
   void then(F&& f)
   {
+    then(get_default_executor(), std::forward<F>(f));
+  }
+
+  template <typename E, typename F>
+  void then(E&& e, F&& f)
+  {
     bool resolved{false};
 
     {
       std::lock_guard<std::mutex> lock{_mutex};
       if (_r.which() == 0)
-        _then.emplace_back(std::forward<F>(f));
+        // TODO cpp14 forward
+        _then.emplace_back([&e, f]() mutable { e.post(std::move(f)); });
       else
         resolved = true;
     }
 
     if (resolved)
-      get_default_executor().post(std::move(f));
+      e.post(std::move(f));
   }
 
   R const& get()
@@ -104,7 +111,7 @@ private:
 
     _ready.notify_all();
     for (auto& f : then)
-      get_default_executor().post(std::move(f));
+      f();
   }
 };
 

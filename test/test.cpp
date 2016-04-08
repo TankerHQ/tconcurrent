@@ -210,6 +210,29 @@ TEST_CASE("test future unwrap nested error", "")
   CHECK_THROWS_AS(unfut.get(), int);
 }
 
+SCENARIO("future can be used with specific executors", "")
+{
+  GIVEN("A ready future and an executor")
+  {
+    thread_pool tp;
+    tp.start(1);
+    auto f = make_ready_future();
+
+    THEN(".then continuation is executed on the executor")
+    {
+      f.then(tp, [&](future<void> const&) {
+         CHECK(tp.is_in_this_context());
+       }).get();
+    }
+    THEN(".and_then continuation is executed on the executor")
+    {
+      f.and_then(tp, [&](void*) {
+         CHECK(tp.is_in_this_context());
+       }).get();
+    }
+  }
+}
+
 TEST_CASE("test simple async", "")
 {
   bool hasrun = false;

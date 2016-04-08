@@ -71,32 +71,43 @@ public:
   auto then(F&& f) -> future<
       typename std::decay<decltype(f(std::declval<future<R>>()))>::type>
   {
+    return then(get_default_executor(), std::forward<F>(f));
+  }
+
+  template <typename E, typename F>
+  auto then(E&& e, F&& f) -> future<
+      typename std::decay<decltype(f(std::declval<future<R>>()))>::type>
+  {
     // TODO capture by move
     auto p = _p;
-    return then_impl([p, f]() mutable
-                     {
-                       return f(future(p));
-                     });
+    return then_impl(std::forward<E>(e),
+                     [p, f]() mutable { return f(future(p)); });
   }
 
   template <typename F>
   auto and_then(F&& f) -> future<
       typename std::decay<decltype(f(std::declval<value_type>()))>::type>
   {
+    return and_then(get_default_executor(), std::forward<F>(f));
+  }
+
+  template <typename E, typename F>
+  auto and_then(E&& e, F&& f) -> future<
+      typename std::decay<decltype(f(std::declval<value_type>()))>::type>
+  {
     // TODO capture by move
     auto p = _p;
-    return then_impl([p, f]()
-                     {
-                       if (p->_r.which() == 1)
-                         return f(p->get());
-                       else
-                       {
-                         assert(p->_r.which() == 2);
-                         p->get(); // rethrow to set the future to error
-                         assert(false && "unreachable code");
-                         std::terminate();
-                       }
-                     });
+    return then_impl(std::forward<E>(e), [p, f]() {
+      if (p->_r.which() == 1)
+        return f(p->get());
+      else
+      {
+        assert(p->_r.which() == 2);
+        p->get(); // rethrow to set the future to error
+        assert(false && "unreachable code");
+        std::terminate();
+      }
+    });
   }
 
   value_type const& get() const
@@ -155,13 +166,13 @@ private:
   {
   }
 
-  template <typename F>
-  auto then_impl(F&& f) -> future<typename std::decay<decltype(f())>::type>
+  template <typename E, typename F>
+  auto then_impl(E&& e, F&& f) -> future<typename std::decay<decltype(f())>::type>
   {
     using result_type = typename std::decay<decltype(f())>::type;
 
     auto pack = package<result_type()>(std::forward<F>(f));
-    _p->then(std::move(pack.first));
+    _p->then(std::forward<E>(e), std::move(pack.first));
     return pack.second;
   }
 };
