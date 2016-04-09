@@ -79,7 +79,7 @@ private:
   std::function<void()> _cancel;
 
   // TODO very ugly design
-  thread_pool* _executor;
+  thread_pool* _executor{&get_default_executor()};
 
   void reschedule();
   future<void> do_call();

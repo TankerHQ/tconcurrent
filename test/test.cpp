@@ -538,6 +538,22 @@ TEST_CASE("test periodic task immediate", "")
   CHECK(1 == called);
 }
 
+TEST_CASE("test periodic task executor", "")
+{
+  thread_pool tp;
+  tp.start(1);
+
+  unsigned int called = 0;
+  periodic_task pt;
+  pt.set_executor(&tp);
+  pt.set_callback([&]{ CHECK(tp.is_in_this_context()); ++called; });
+  pt.set_period(std::chrono::milliseconds(100));
+  pt.start(periodic_task::start_immediately);
+  std::this_thread::sleep_for(std::chrono::milliseconds(450));
+  pt.stop().get();
+  CHECK(5 == called);
+}
+
 TEST_CASE("test periodic task stop before start", "")
 {
   unsigned int called = 0;
