@@ -68,34 +68,46 @@ public:
   future() = default;
 
   template <typename F>
-  auto then(F&& f) -> future<typename std::decay<decltype(f(*this))>::type>
+  auto then(F&& f) -> future<
+      typename std::decay<decltype(f(std::declval<future<R>>()))>::type>
+  {
+    return then(get_default_executor(), std::forward<F>(f));
+  }
+
+  template <typename E, typename F>
+  auto then(E&& e, F&& f) -> future<
+      typename std::decay<decltype(f(std::declval<future<R>>()))>::type>
   {
     // TODO capture by move
     auto p = _p;
-    return then_impl([p, f]() mutable
-                     {
-                       return f(future(p));
-                     });
+    return then_impl(std::forward<E>(e),
+                     [p, f]() mutable { return f(future(p)); });
   }
 
   template <typename F>
   auto and_then(F&& f) -> future<
       typename std::decay<decltype(f(std::declval<value_type>()))>::type>
   {
+    return and_then(get_default_executor(), std::forward<F>(f));
+  }
+
+  template <typename E, typename F>
+  auto and_then(E&& e, F&& f) -> future<
+      typename std::decay<decltype(f(std::declval<value_type>()))>::type>
+  {
     // TODO capture by move
     auto p = _p;
-    return then_impl([p, f]()
-                     {
-                       if (p->_r.which() == 1)
-                         return f(p->get());
-                       else
-                       {
-                         assert(p->_r.which() == 2);
-                         p->get(); // rethrow to set the future to error
-                         assert(false && "unreachable code");
-                         std::terminate();
-                       }
-                     });
+    return then_impl(std::forward<E>(e), [p, f]() {
+      if (p->_r.which() == 1)
+        return f(p->get());
+      else
+      {
+        assert(p->_r.which() == 2);
+        p->get(); // rethrow to set the future to error
+        assert(false && "unreachable code");
+        std::terminate();
+      }
+    });
   }
 
   value_type const& get() const
@@ -113,19 +125,19 @@ public:
     _p->wait();
   }
 
-  bool is_ready() const noexcept
+  bool is_ready() const BOOST_NOEXCEPT
   {
     return _p && _p->_r.which() != 0;
   }
-  bool has_value() const noexcept
+  bool has_value() const BOOST_NOEXCEPT
   {
     return _p && _p->_r.which() == 1;
   }
-  bool has_exception() const noexcept
+  bool has_exception() const BOOST_NOEXCEPT
   {
     return _p && _p->_r.which() == 2;
   }
-  bool is_valid() const noexcept
+  bool is_valid() const BOOST_NOEXCEPT
   {
     return bool(_p);
   }
@@ -154,13 +166,13 @@ private:
   {
   }
 
-  template <typename F>
-  auto then_impl(F&& f) -> future<typename std::decay<decltype(f())>::type>
+  template <typename E, typename F>
+  auto then_impl(E&& e, F&& f) -> future<typename std::decay<decltype(f())>::type>
   {
     using result_type = typename std::decay<decltype(f())>::type;
 
     auto pack = package<result_type()>(std::forward<F>(f));
-    _p->then(std::move(pack.first));
+    _p->then(std::forward<E>(e), std::move(pack.first));
     return pack.second;
   }
 };
@@ -182,8 +194,12 @@ future<R> detail::future_unwrap<future<R>>::unwrap()
                              if (nested.has_exception())
                                sb->set_exception(nested.get_exception());
                              else
-                               sb->set(typename future<R>::value_type(
-                                   nested.get()));
+                               sb->set(
+// Lol, msvc does not want a typename here
+#ifndef _WIN32
+                                   typename
+#endif
+                                   future<R>::value_type(nested.get()));
                            });
              }
            });

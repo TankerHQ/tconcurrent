@@ -210,6 +210,29 @@ TEST_CASE("test future unwrap nested error", "")
   CHECK_THROWS_AS(unfut.get(), int);
 }
 
+SCENARIO("future can be used with specific executors", "")
+{
+  GIVEN("A ready future and an executor")
+  {
+    thread_pool tp;
+    tp.start(1);
+    auto f = make_ready_future();
+
+    THEN(".then continuation is executed on the executor")
+    {
+      f.then(tp, [&](future<void> const&) {
+         CHECK(tp.is_in_this_context());
+       }).get();
+    }
+    THEN(".and_then continuation is executed on the executor")
+    {
+      f.and_then(tp, [&](void*) {
+         CHECK(tp.is_in_this_context());
+       }).get();
+    }
+  }
+}
+
 TEST_CASE("test simple async", "")
 {
   bool hasrun = false;
@@ -428,6 +451,17 @@ TEST_CASE("test when_all empty", "")
 
 // periodic task
 
+TEST_CASE("test periodic task construct", "")
+{
+  periodic_task pt;
+}
+
+TEST_CASE("test periodic task stop", "")
+{
+  periodic_task pt;
+  pt.stop();
+}
+
 TEST_CASE("test periodic task", "")
 {
   unsigned int called = 0;
@@ -502,6 +536,22 @@ TEST_CASE("test periodic task immediate", "")
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
   pt.stop().get();
   CHECK(1 == called);
+}
+
+TEST_CASE("test periodic task executor", "")
+{
+  thread_pool tp;
+  tp.start(1);
+
+  unsigned int called = 0;
+  periodic_task pt;
+  pt.set_executor(&tp);
+  pt.set_callback([&]{ CHECK(tp.is_in_this_context()); ++called; });
+  pt.set_period(std::chrono::milliseconds(100));
+  pt.start(periodic_task::start_immediately);
+  std::this_thread::sleep_for(std::chrono::milliseconds(450));
+  pt.stop().get();
+  CHECK(5 == called);
 }
 
 TEST_CASE("test periodic task stop before start", "")

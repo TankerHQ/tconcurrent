@@ -32,35 +32,33 @@ void periodic_task::start(StartOption opt)
   else
   {
     // post the callback immediately
-    auto pack = package<future<void>()>([this]
-                                        {
-                                          return do_call();
-                                        });
+    auto pack = package<future<void>()>([this] { return do_call(); });
     _future = std::get<1>(pack).unwrap();
     // set a dummy cancel function so that stop doesn't fail
     _cancel = []{};
-    get_default_executor().post(std::get<0>(pack));
+    _executor->post(std::get<0>(pack));
   }
 }
 
 future<void> periodic_task::stop()
 {
   scope_lock l(_mutex);
+  if (_state == State::Stopped)
+    return make_ready_future();
   if (_state != State::Running)
-    return _future.then([&](future<void> const&){});
+    return _future.then(*_executor, [&](future<void> const&) {});
 
   assert(_future.is_valid() && _cancel);
 
   _state = State::Stopping;
   _cancel();
-  return _future.then([&](future<void> const&)
-                      {
-                        scope_lock l(_mutex);
-                        // can be Stopping, or Stopped if the callback threw on
-                        // the last run
-                        assert(_state != State::Running);
-                        _state = State::Stopped;
-                      });
+  return _future.then(*_executor, [&](future<void> const&) {
+    scope_lock l(_mutex);
+    // can be Stopping, or Stopped if the callback threw on
+    // the last run
+    assert(_state != State::Running);
+    _state = State::Stopped;
+  });
 }
 
 void periodic_task::reschedule()
@@ -71,11 +69,9 @@ void periodic_task::reschedule()
   if (_state == State::Stopping)
     return;
 
-  auto bundle = async_wait(_period);
-  _future = bundle.fut.and_then([this](void*)
-                                {
-                                  return do_call();
-                                }).unwrap();
+  auto bundle = async_wait(*_executor, _period);
+  _future = bundle.fut.and_then(*_executor, [this](void*) { return do_call(); })
+                .unwrap();
   _cancel = std::move(bundle.cancel);
 }
 
@@ -111,18 +107,16 @@ future<void> periodic_task::do_call()
     return make_ready_future();
   }
 
-  return fut.then([this](decltype(fut) const& fut)
-                  {
-                    scope_lock l(_mutex);
-                    if (fut.has_value())
-                      reschedule();
-                    else
-                    {
-                      std::cout << "error in future of periodic task"
-                                << std::endl;
-                      _state = State::Stopped;
-                    }
-                  });
+  return fut.then(*_executor, [this](decltype(fut) const& fut) {
+    scope_lock l(_mutex);
+    if (fut.has_value())
+      reschedule();
+    else
+    {
+      std::cout << "error in future of periodic task" << std::endl;
+      _state = State::Stopped;
+    }
+  });
 }
 
 }

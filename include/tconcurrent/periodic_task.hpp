@@ -30,18 +30,16 @@ public:
   }
 
   template <typename C>
-  auto set_callback(C&& cb)
-      ->typename std::enable_if<
-          std::is_same<decltype(cb()), future<void>>::value>::type
+  auto set_callback(C&& cb) -> typename std::enable_if<
+      std::is_same<decltype(cb()), future<void>>::value>::type
   {
     std::lock_guard<std::mutex> l(_mutex);
     _callback = std::forward<C>(cb);
   }
 
   template <typename C>
-  auto set_callback(C&& cb)
-      ->typename std::enable_if<
-          !std::is_same<decltype(cb()), future<void>>::value>::type
+  auto set_callback(C&& cb) -> typename std::enable_if<
+      !std::is_same<decltype(cb()), future<void>>::value>::type
   {
     std::lock_guard<std::mutex> l(_mutex);
     // TODO cpp14 capture by forward
@@ -50,6 +48,11 @@ public:
       cb();
       return make_ready_future();
     };
+  }
+
+  void set_executor(thread_pool* executor)
+  {
+    _executor = executor;
   }
 
   void start(StartOption opt = no_option);
@@ -66,11 +69,17 @@ private:
   };
 
   std::mutex _mutex;
+
   State _state{State::Stopped};
-  future<void> _future;
+
   duration_type _period;
   std::function<future<void>()> _callback;
+
+  future<void> _future;
   std::function<void()> _cancel;
+
+  // TODO very ugly design
+  thread_pool* _executor{&get_default_executor()};
 
   void reschedule();
   future<void> do_call();
