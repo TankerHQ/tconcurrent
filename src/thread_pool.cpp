@@ -18,6 +18,7 @@ boost::thread_specific_ptr<void> current_executor(noopdelete);
 
 thread_pool::~thread_pool()
 {
+  _dead = true;
   stop();
 }
 

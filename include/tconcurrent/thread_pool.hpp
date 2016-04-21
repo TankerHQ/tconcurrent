@@ -38,6 +38,7 @@ public:
   template <typename F>
   void post(F&& work)
   {
+    assert(!_dead.load());
     _io.post(std::forward<F>(work));
   }
 
@@ -45,6 +46,7 @@ private:
   boost::asio::io_service _io;
   std::unique_ptr<boost::asio::io_service::work> _work;
   std::vector<std::thread> _threads;
+  std::atomic<bool> _dead{false};
 };
 
 void start_thread_pool(unsigned int thread_count);

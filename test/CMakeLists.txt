@@ -3,6 +3,7 @@ include(catch-config)
 add_executable(test_tconcurrent
   main.cpp
   test.cpp
+  test_coroutine.cpp
 )
 
 set_target_properties(test_tconcurrent PROPERTIES CXX_STANDARD 14)
