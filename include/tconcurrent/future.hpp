@@ -240,4 +240,6 @@ auto make_exceptional_future(E&& err) -> future<T>
 
 }
 
+#include <tconcurrent/packaged_task.hpp>
+
 #endif

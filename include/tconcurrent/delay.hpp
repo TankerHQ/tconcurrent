@@ -4,6 +4,7 @@
 #include <boost/asio/steady_timer.hpp>
 
 #include <tconcurrent/future.hpp>
+#include <tconcurrent/packaged_task.hpp>
 #include <tconcurrent/thread_pool.hpp>
 
 namespace tconcurrent
