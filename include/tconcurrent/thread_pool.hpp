@@ -1,6 +1,7 @@
 #ifndef TCONCURRENT_THREAD_POOL_H
 #define TCONCURRENT_THREAD_POOL_H
 
+#include <atomic>
 #include <memory>
 #include <thread>
 #include <functional>

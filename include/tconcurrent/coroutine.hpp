@@ -80,7 +80,7 @@ auto async_resumable(F&& cb)
 
     detail::coroutine_control* cs =
         new detail::coroutine_control(detail::coroutine_t(
-            [ cb = std::move(pack.first), &cs ](auto argctx, auto&&) {
+            [cb = std::move(pack.first), &cs](detail::coroutine_t argctx, detail::coroutine_controller const&) {
               auto mycs = cs;
               mycs->argctx = &argctx;
 

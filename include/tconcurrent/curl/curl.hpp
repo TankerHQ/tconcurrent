@@ -3,6 +3,7 @@
 
 #include <tconcurrent/future.hpp>
 
+#include <map>
 #include <functional>
 #include <memory>
 #include <boost/asio.hpp>
