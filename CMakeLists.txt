@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.4)
 project(tconcurrent)
 
 include(boost-config)
+include(curl-config)
 
 add_library(tconcurrent
   src/coroutine.cpp
