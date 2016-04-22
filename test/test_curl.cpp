@@ -10,7 +10,7 @@ TEST_CASE("curl simple request")
 {
   multi mul;
 
-  promise<void> finished;
+  promise<CURLcode> finished;
   long httpcode = 0;
   long expectedhttpcode = 0;
   bool dataread = false;
@@ -21,7 +21,7 @@ TEST_CASE("curl simple request")
     return size;
   });
   req.set_finish_callback(
-      [=](request&, CURLcode) mutable { finished.set_value(0); });
+      [=](request&, CURLcode c) mutable { finished.set_value(c); });
 
   SECTION("http")
   {
@@ -53,7 +53,9 @@ TEST_CASE("curl simple request")
   }
 
   mul.process(&req);
-  finished.get_future().wait();
+  auto code = finished.get_future().get();
+  CAPTURE(curl_easy_strerror(code));
+  CHECK(CURLE_OK == code);
   CHECK(dataread);
   CHECK(expectedhttpcode == httpcode);
 }
