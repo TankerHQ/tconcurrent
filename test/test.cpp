@@ -148,7 +148,6 @@ TEST_CASE("test future unwrap", "")
                 "unwrap has an incorrect return type");
   CHECK(!unfut.is_ready());
   task(21);
-  unfut.wait(); // FIXME the result is async, we must wait for it
   CHECK(unfut.is_ready());
   CHECK(42 == unfut.get());
 }
@@ -166,7 +165,6 @@ TEST_CASE("test future unwrap void", "")
                 "unwrap of void has an incorrect return type");
   CHECK(!unfut.is_ready());
   task();
-  unfut.wait(); // FIXME the result is async, we must wait for it
   CHECK(unfut.is_ready());
   CHECK_NOTHROW(unfut.get());
 }
@@ -184,7 +182,6 @@ TEST_CASE("test future unwrap error", "")
                 "unwrap has an incorrect return type");
   CHECK(!unfut.is_ready());
   task(21);
-  unfut.wait(); // FIXME the result is async, we must wait for it
   CHECK(unfut.is_ready());
   CHECK(unfut.has_exception());
   CHECK_THROWS_AS(unfut.get(), int);
@@ -204,7 +201,6 @@ TEST_CASE("test future unwrap nested error", "")
                 "unwrap has an incorrect return type");
   CHECK(!unfut.is_ready());
   task(21);
-  unfut.wait(); // FIXME the result is async, we must wait for it
   CHECK(unfut.is_ready());
   CHECK(unfut.has_exception());
   CHECK_THROWS_AS(unfut.get(), int);
@@ -282,12 +278,9 @@ TEST_CASE("test delay async", "")
 TEST_CASE("test delay async cancel", "")
 {
   std::chrono::milliseconds const delay{100};
-  auto before = std::chrono::steady_clock::now();
   auto bdl = async_wait(delay);
   bdl.cancel();
-  bdl.fut.wait();
-  auto after = std::chrono::steady_clock::now();
-  CHECK(delay > after - before);
+  CHECK(bdl.fut.is_ready());
 }
 
 TEST_CASE("test ready future then", "")
@@ -649,4 +642,33 @@ TEST_CASE("test periodic task future start stop spam", "")
 
   CHECK(false == fail.load());
   CHECK(false == call.load());
+}
+
+TEST_CASE("test periodic task stop from inside", "")
+{
+  unsigned int called = 0;
+
+  periodic_task pt;
+  pt.set_callback([&]{ ++called; pt.stop(); });
+  pt.set_period(std::chrono::milliseconds(0));
+  pt.start(periodic_task::start_immediately);
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  CHECK(!pt.is_running());
+  CHECK(1 == called);
+}
+
+TEST_CASE("test periodic single threaded task stop", "")
+{
+  thread_pool tp;
+  tp.start(1);
+  unsigned int called = 0;
+
+  periodic_task pt;
+  pt.set_executor(&tp);
+  pt.set_callback([&]{ ++called; });
+  pt.set_period(std::chrono::milliseconds(0));
+  pt.start(periodic_task::start_immediately);
+  CHECK_NOTHROW(async(tp, [&]{ pt.stop().get(); }).get());
+  CHECK(!pt.is_running());
+  CHECK(0 < called);
 }

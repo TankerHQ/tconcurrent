@@ -182,15 +182,15 @@ future<R> detail::future_unwrap<future<R>>::unwrap()
 {
   auto& fut = static_cast<future<future<R>>&>(*this);
   auto sb = std::make_shared<typename future<R>::shared_type>();
-  fut.then([sb](future<future<R>> const& fut)
-           {
+  fut.then(get_synchronous_executor(),
+           [sb](future<future<R>> const& fut) {
              if (fut.has_exception())
                sb->set_exception(fut.get_exception());
              else
              {
                auto nested = fut.get();
-               nested.then([sb](future<R> const& nested)
-                           {
+               nested.then(get_synchronous_executor(),
+                           [sb](future<R> const& nested) {
                              if (nested.has_exception())
                                sb->set_exception(nested.get_exception());
                              else

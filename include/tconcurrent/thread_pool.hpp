@@ -25,6 +25,7 @@ public:
   }
 
   bool is_in_this_context() const;
+  bool is_single_threaded() const;
 
   boost::asio::io_service& get_io_service()
   {
@@ -52,6 +53,20 @@ private:
 
 void start_thread_pool(unsigned int thread_count);
 thread_pool& get_default_executor();
+
+/// Executor that runs its work in-place
+class synchronous_executor
+{
+public:
+  template <typename F>
+  void post(F&& work)
+  {
+    work();
+  }
+};
+
+// FIXME do an abstraction so that executors can be passed by value
+synchronous_executor& get_synchronous_executor();
 
 }
 

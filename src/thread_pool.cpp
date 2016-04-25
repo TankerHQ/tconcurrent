@@ -27,6 +27,11 @@ bool thread_pool::is_in_this_context() const
   return current_executor.get() == this;
 }
 
+bool thread_pool::is_single_threaded() const
+{
+  return _threads.size() == 1;
+}
+
 void thread_pool::start(unsigned int thread_count)
 {
   if (_work)
@@ -88,6 +93,12 @@ thread_pool& get_default_executor()
 {
   start_thread_pool(std::thread::hardware_concurrency());
   return get_global_thread_pool();
+}
+
+synchronous_executor& get_synchronous_executor()
+{
+  static synchronous_executor e;
+  return e;
 }
 
 }
