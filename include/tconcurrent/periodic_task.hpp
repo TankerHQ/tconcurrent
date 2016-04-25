@@ -58,6 +58,11 @@ public:
   void start(StartOption opt = no_option);
   future<void> stop();
 
+  bool is_running() const
+  {
+    return _state == State::Running;
+  }
+
 private:
   using scope_lock = std::lock_guard<std::mutex>;
 

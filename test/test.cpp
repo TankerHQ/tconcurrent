@@ -470,8 +470,10 @@ TEST_CASE("test periodic task", "")
   pt.set_callback([&]{ ++called; });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
+  CHECK(pt.is_running());
   std::this_thread::sleep_for(std::chrono::milliseconds(450));
   pt.stop().get();
+  CHECK(!pt.is_running());
   CHECK(4 == called);
 }
 
@@ -483,8 +485,9 @@ TEST_CASE("test periodic task error stop", "")
   pt.set_callback([&]{ ++called; throw 18; });
   pt.set_period(std::chrono::milliseconds(0));
   pt.start(periodic_task::start_immediately);
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  pt.stop().get();
+  CHECK(pt.is_running());
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  CHECK(!pt.is_running());
   CHECK(1 == called);
 }
 
@@ -503,8 +506,10 @@ TEST_CASE("test periodic task future", "")
                   });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
+  CHECK(pt.is_running());
   std::this_thread::sleep_for(std::chrono::milliseconds(450));
   pt.stop().get();
+  CHECK(!pt.is_running());
   CHECK(4 == called);
 }
 
@@ -520,8 +525,9 @@ TEST_CASE("test periodic task future error stop", "")
                   });
   pt.set_period(std::chrono::milliseconds(0));
   pt.start();
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  pt.stop().get();
+  CHECK(pt.is_running());
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  CHECK(!pt.is_running());
   CHECK(1 == called);
 }
 
@@ -534,7 +540,9 @@ TEST_CASE("test periodic task immediate", "")
   pt.set_period(std::chrono::milliseconds(100));
   pt.start(periodic_task::start_immediately);
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  CHECK(pt.is_running());
   pt.stop().get();
+  CHECK(!pt.is_running());
   CHECK(1 == called);
 }
 
@@ -549,8 +557,10 @@ TEST_CASE("test periodic task executor", "")
   pt.set_callback([&]{ CHECK(tp.is_in_this_context()); ++called; });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start(periodic_task::start_immediately);
+  CHECK(pt.is_running());
   std::this_thread::sleep_for(std::chrono::milliseconds(450));
   pt.stop().get();
+  CHECK(!pt.is_running());
   CHECK(5 == called);
 }
 
@@ -562,7 +572,9 @@ TEST_CASE("test periodic task stop before start", "")
   pt.set_callback([&]{ ++called; });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
+  CHECK(pt.is_running());
   pt.stop().get();
+  CHECK(!pt.is_running());
   CHECK(0 == called);
 }
 
