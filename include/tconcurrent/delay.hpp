@@ -1,6 +1,8 @@
 #ifndef TCONCURRENT_DELAY_HPP
 #define TCONCURRENT_DELAY_HPP
 
+#include <atomic>
+
 #include <boost/asio/steady_timer.hpp>
 
 #include <tconcurrent/promise.hpp>
@@ -27,32 +29,52 @@ struct cancelable_bundle
   canceler cancel;
 };
 
+namespace detail
+{
+
+struct async_wait_data
+{
+  boost::asio::steady_timer timer;
+  promise<void> prom;
+  std::atomic<bool> fired{false};
+
+  template <typename Delay>
+  async_wait_data(boost::asio::io_service& io, Delay delay)
+    : timer(io, delay)
+  {
+  }
+};
+
+}
+
 template <typename Delay>
 cancelable_bundle async_wait(thread_pool& pool, Delay delay)
 {
-  auto const timer =
-      std::make_shared<boost::asio::steady_timer>(pool.get_io_service(), delay);
-
   if (pool.is_single_threaded())
   {
-    promise<void> prom;
+    auto const data =
+        std::make_shared<detail::async_wait_data>(pool.get_io_service(), delay);
 
-    timer->async_wait(
-        [timer, prom](boost::system::error_code const& error) mutable {
-          if (error != boost::asio::error::operation_aborted)
-            prom.set_value(0);
+    data->timer.async_wait(
+        [data](boost::system::error_code const&) mutable {
+          if (!data->fired.exchange(true))
+            data->prom.set_value(0);
         });
 
-    return {prom.get_future(), [timer, prom]() mutable {
-              if (prom.get_future().is_ready())
+    return {data->prom.get_future(), [data]() mutable {
+              if (data->fired.exchange(true))
                 return;
 
-              timer->cancel();
-              prom.set_exception(std::make_exception_ptr(operation_canceled()));
+              data->timer.cancel();
+              data->prom.set_exception(
+                  std::make_exception_ptr(operation_canceled()));
             }};
   }
   else
   {
+    auto const timer = std::make_shared<boost::asio::steady_timer>(
+        pool.get_io_service(), delay);
+
     auto taskfut = package<void(boost::system::error_code const&)>(
         [timer](boost::system::error_code const& error) {
           if (error == boost::asio::error::operation_aborted)
