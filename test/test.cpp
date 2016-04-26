@@ -278,9 +278,12 @@ TEST_CASE("test delay async", "")
 TEST_CASE("test delay async cancel", "")
 {
   std::chrono::milliseconds const delay{100};
+  auto before = std::chrono::steady_clock::now();
   auto bdl = async_wait(delay);
   bdl.cancel();
-  CHECK(bdl.fut.is_ready());
+  bdl.fut.wait();
+  auto after = std::chrono::steady_clock::now();
+  CHECK(delay > after - before);
 }
 
 TEST_CASE("test ready future then", "")
