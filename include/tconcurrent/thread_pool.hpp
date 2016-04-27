@@ -51,8 +51,9 @@ private:
   std::atomic<bool> _dead{false};
 };
 
-void start_thread_pool(unsigned int thread_count);
 thread_pool& get_default_executor();
+void start_thread_pool(unsigned int thread_count);
+thread_pool& get_background_executor();
 
 /// Executor that runs its work in-place
 class synchronous_executor
