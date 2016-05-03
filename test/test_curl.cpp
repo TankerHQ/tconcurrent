@@ -92,6 +92,17 @@ TEST_CASE("curl multiple requests")
   }
 }
 
+#define CHECK_READALL()                                                  \
+  auto fut = read_all(mul, req);                                         \
+                                                                         \
+  auto& result = fut.get();                                              \
+  long httpcode;                                                         \
+  curl_easy_getinfo(req->get_curl(), CURLINFO_RESPONSE_CODE, &httpcode); \
+                                                                         \
+  CHECK(200 == httpcode);                                                \
+  CHECK(!result.header.empty());                                         \
+  CHECK(!result.data.empty());
+
 TEST_CASE("curl read_all")
 {
   multi mul;
@@ -100,6 +111,7 @@ TEST_CASE("curl read_all")
   SECTION("simple")
   {
     req->set_url("http://httpbin.org/get?TEST=test");
+    CHECK_READALL()
   }
 
   SECTION("post continue")
@@ -111,15 +123,7 @@ TEST_CASE("curl read_all")
         req->get_curl(), CURLOPT_POSTFIELDSIZE, long(sizeof(buf) - 1));
     curl_easy_setopt(req->get_curl(), CURLOPT_POSTFIELDS, buf);
     req->add_header("Expect: 100-continue");
+    CHECK_READALL()
+    CHECK(0 == std::strcmp(buf, (char*)&result.data[0]));
   }
-
-  auto fut = read_all(mul, req);
-
-  auto& result = fut.get();
-  long httpcode;
-  curl_easy_getinfo(req->get_curl(), CURLINFO_RESPONSE_CODE, &httpcode);
-
-  CHECK(200 == httpcode);
-  CHECK(!result.header.empty());
-  CHECK(!result.data.empty());
 }
