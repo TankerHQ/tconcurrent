@@ -243,7 +243,8 @@ int multi::multi_timer_cb(CURLM* multi, long timeout_ms)
   {
     // update timer
     auto bundle = async_wait(std::chrono::milliseconds(timeout_ms));
-    _timer_future = bundle.fut.and_then([this](void*) { timer_cb(); });
+    _timer_future = bundle.fut.and_then(tconcurrent::get_synchronous_executor(),
+        [this](void*) { timer_cb(); });
     _cancel_timer = std::move(bundle.cancel);
   }
   else
