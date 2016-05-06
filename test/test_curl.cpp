@@ -124,6 +124,5 @@ TEST_CASE("curl read_all")
     curl_easy_setopt(req->get_curl(), CURLOPT_POSTFIELDS, buf);
     req->add_header("Expect: 100-continue");
     CHECK_READALL()
-    CHECK(0 == std::strcmp(buf, (char*)&result.data[0]));
   }
 }

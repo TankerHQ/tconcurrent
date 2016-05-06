@@ -202,7 +202,7 @@ void multi::event_cb(async_socket* asocket,
   }
 
   // refresh async operations
-  socketfunction_cb(nullptr, sockfd, -1);
+  socketfunction_cb(nullptr, sockfd, CURL_POLL_NONE);
 
   remove_finished();
 
@@ -269,18 +269,23 @@ int multi::socketfunction_cb(CURL*, curl_socket_t s, int curlaction)
 
   auto asocket = it->second.get();
 
-  uint8_t action = ActionNone;
   switch (curlaction)
   {
-  case CURL_POLL_IN: action = ActionRead; break;
-  case CURL_POLL_OUT: action = ActionWrite; break;
-  case CURL_POLL_INOUT: action = ActionRead | ActionWrite; break;
+  case CURL_POLL_NONE:
+    break;
+  case CURL_POLL_REMOVE:
+    asocket->wanted_action = ActionNone;
+    break;
+  case CURL_POLL_IN:
+    asocket->wanted_action = ActionRead;
+    break;
+  case CURL_POLL_OUT:
+    asocket->wanted_action = ActionWrite;
+    break;
+  case CURL_POLL_INOUT:
+    asocket->wanted_action = ActionRead | ActionWrite;
+    break;
   }
-
-  if (curlaction == -1)
-    action = asocket->wanted_action;
-  else
-    asocket->wanted_action = action;
 
   if (asocket->current_action == asocket->wanted_action)
     // nothing to do
