@@ -31,7 +31,8 @@ struct coroutine_control
   coroutine_control& operator=(coroutine_control&&) = delete;
 
   template <typename Awaitable>
-  auto operator()(Awaitable&& awaitable);
+  typename std::decay_t<Awaitable>::value_type operator()(
+      Awaitable&& awaitable);
 };
 
 detail::coroutine_control*& get_current_coroutine_ptr();
@@ -57,7 +58,8 @@ inline void run_coroutine(coroutine_control* ctrl)
 }
 
 template <typename Awaitable>
-auto coroutine_control::operator()(Awaitable&& awaitable)
+typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
+    Awaitable&& awaitable)
 {
   if (!awaitable.is_ready())
     *argctx = std::get<0>((*argctx)([&awaitable](coroutine_control* ctrl) {
@@ -73,7 +75,8 @@ using awaiter = detail::coroutine_control;
 template <typename F>
 auto async_resumable(F&& cb)
 {
-  using return_type = std::decay_t<decltype(cb(std::declval<detail::coroutine_control&>()))>;
+  using return_type =
+      std::decay_t<decltype(cb(std::declval<detail::coroutine_control&>()))>;
 
   return async([cb = std::forward<F>(cb)] {
     auto pack = package<return_type(detail::coroutine_control&)>(std::move(cb));
