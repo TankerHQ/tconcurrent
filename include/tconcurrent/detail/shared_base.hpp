@@ -136,8 +136,8 @@ public:
     {
       std::lock_guard<std::mutex> lock{_mutex};
       if (_r.which() == 0)
-        // TODO cpp14 forward
-        _then.emplace_back([&e, f]() mutable { e.post(std::move(f)); });
+        _then.emplace_back(
+            [&e, f = std::forward<F>(f)]() mutable { e.post(std::move(f)); });
       else
         resolved = true;
     }

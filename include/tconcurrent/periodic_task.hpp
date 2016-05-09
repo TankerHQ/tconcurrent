@@ -42,9 +42,7 @@ public:
       !std::is_same<decltype(cb()), future<void>>::value>::type
   {
     scope_lock l(_mutex);
-    // TODO cpp14 capture by forward
-    _callback = [cb]
-    {
+    _callback = [cb = std::forward<C>(cb)] {
       cb();
       return make_ready_future();
     };

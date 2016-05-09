@@ -78,10 +78,10 @@ public:
   auto then(E&& e, F&& f) -> future<
       typename std::decay<decltype(f(std::declval<future<R>>()))>::type>
   {
-    // TODO capture by move
     auto p = _p;
-    return then_impl(std::forward<E>(e),
-                     [p, f]() mutable { return f(future(p)); });
+    return then_impl(
+        std::forward<E>(e),
+        [p, f = std::forward<F>(f)]() mutable { return f(future(p)); });
   }
 
   template <typename F>
@@ -95,9 +95,8 @@ public:
   auto and_then(E&& e, F&& f) -> future<
       typename std::decay<decltype(f(std::declval<value_type>()))>::type>
   {
-    // TODO capture by move
     auto p = _p;
-    return then_impl(std::forward<E>(e), [p, f]() {
+    return then_impl(std::forward<E>(e), [p, f = std::forward<F>(f)]() {
       if (p->_r.which() == 1)
         return f(p->get());
       else
