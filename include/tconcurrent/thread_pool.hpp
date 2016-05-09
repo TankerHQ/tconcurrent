@@ -1,6 +1,7 @@
 #ifndef TCONCURRENT_THREAD_POOL_H
 #define TCONCURRENT_THREAD_POOL_H
 
+#include <atomic>
 #include <memory>
 #include <thread>
 #include <functional>
@@ -24,6 +25,7 @@ public:
   }
 
   bool is_in_this_context() const;
+  bool is_single_threaded() const;
 
   boost::asio::io_service& get_io_service()
   {
@@ -38,6 +40,7 @@ public:
   template <typename F>
   void post(F&& work)
   {
+    assert(!_dead.load());
     _io.post(std::forward<F>(work));
   }
 
@@ -45,10 +48,26 @@ private:
   boost::asio::io_service _io;
   std::unique_ptr<boost::asio::io_service::work> _work;
   std::vector<std::thread> _threads;
+  std::atomic<bool> _dead{false};
 };
 
-void start_thread_pool(unsigned int thread_count);
 thread_pool& get_default_executor();
+void start_thread_pool(unsigned int thread_count);
+thread_pool& get_background_executor();
+
+/// Executor that runs its work in-place
+class synchronous_executor
+{
+public:
+  template <typename F>
+  void post(F&& work)
+  {
+    work();
+  }
+};
+
+// FIXME do an abstraction so that executors can be passed by value
+synchronous_executor& get_synchronous_executor();
 
 }
 

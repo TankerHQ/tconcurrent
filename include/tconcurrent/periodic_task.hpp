@@ -25,7 +25,7 @@ public:
 
   void set_period(duration_type period)
   {
-    std::lock_guard<std::mutex> l(_mutex);
+    scope_lock l(_mutex);
     _period = period;
   }
 
@@ -33,7 +33,7 @@ public:
   auto set_callback(C&& cb) -> typename std::enable_if<
       std::is_same<decltype(cb()), future<void>>::value>::type
   {
-    std::lock_guard<std::mutex> l(_mutex);
+    scope_lock l(_mutex);
     _callback = std::forward<C>(cb);
   }
 
@@ -41,7 +41,7 @@ public:
   auto set_callback(C&& cb) -> typename std::enable_if<
       !std::is_same<decltype(cb()), future<void>>::value>::type
   {
-    std::lock_guard<std::mutex> l(_mutex);
+    scope_lock l(_mutex);
     // TODO cpp14 capture by forward
     _callback = [cb]
     {
@@ -58,8 +58,14 @@ public:
   void start(StartOption opt = no_option);
   future<void> stop();
 
+  bool is_running() const
+  {
+    return _state == State::Running;
+  }
+
 private:
-  using scope_lock = std::lock_guard<std::mutex>;
+  using mutex = std::recursive_mutex;
+  using scope_lock = std::lock_guard<mutex>;
 
   enum class State
   {
@@ -68,7 +74,7 @@ private:
     Stopping,
   };
 
-  std::mutex _mutex;
+  mutex _mutex;
 
   State _state{State::Stopped};
 

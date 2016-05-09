@@ -18,12 +18,18 @@ boost::thread_specific_ptr<void> current_executor(noopdelete);
 
 thread_pool::~thread_pool()
 {
+  _dead = true;
   stop();
 }
 
 bool thread_pool::is_in_this_context() const
 {
   return current_executor.get() == this;
+}
+
+bool thread_pool::is_single_threaded() const
+{
+  return _threads.size() == 1;
 }
 
 void thread_pool::start(unsigned int thread_count)
@@ -70,6 +76,12 @@ void thread_pool::stop()
   _threads.clear();
 }
 
+thread_pool& get_global_single_thread()
+{
+  static thread_pool tp;
+  return tp;
+}
+
 thread_pool& get_global_thread_pool()
 {
   static thread_pool tp;
@@ -83,10 +95,29 @@ void start_thread_pool(unsigned int thread_count)
     tp.start(thread_count);
 }
 
+void start_single_thread()
+{
+  auto& tp = get_global_single_thread();
+  if (!tp.is_running())
+    tp.start(1);
+}
+
 thread_pool& get_default_executor()
+{
+  start_single_thread();
+  return get_global_single_thread();
+}
+
+thread_pool& get_background_executor()
 {
   start_thread_pool(std::thread::hardware_concurrency());
   return get_global_thread_pool();
+}
+
+synchronous_executor& get_synchronous_executor()
+{
+  static synchronous_executor e;
+  return e;
 }
 
 }

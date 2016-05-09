@@ -46,13 +46,14 @@ future<void> periodic_task::stop()
   if (_state == State::Stopped)
     return make_ready_future();
   if (_state != State::Running)
-    return _future.then(*_executor, [&](future<void> const&) {});
+    return _future.then(get_synchronous_executor(),
+                        [&](future<void> const&) {});
 
   assert(_future.is_valid() && _cancel);
 
   _state = State::Stopping;
   _cancel();
-  return _future.then(*_executor, [&](future<void> const&) {
+  return _future.then(get_synchronous_executor(), [&](future<void> const&) {
     scope_lock l(_mutex);
     // can be Stopping, or Stopped if the callback threw on
     // the last run
@@ -63,14 +64,16 @@ future<void> periodic_task::stop()
 
 void periodic_task::reschedule()
 {
-  assert(!_mutex.try_lock() && "_mutex must be locked to call reschedule");
+  // _mutex must be locked
 
   assert(_state != State::Stopped);
   if (_state == State::Stopping)
     return;
 
   auto bundle = async_wait(*_executor, _period);
-  _future = bundle.fut.and_then(*_executor, [this](void*) { return do_call(); })
+  _future = bundle.fut
+                .and_then(get_synchronous_executor(),
+                          [this](void*) { return do_call(); })
                 .unwrap();
   _cancel = std::move(bundle.cancel);
 }
@@ -107,7 +110,7 @@ future<void> periodic_task::do_call()
     return make_ready_future();
   }
 
-  return fut.then(*_executor, [this](decltype(fut) const& fut) {
+  return fut.then(get_synchronous_executor(), [this](decltype(fut) const& fut) {
     scope_lock l(_mutex);
     if (fut.has_value())
       reschedule();

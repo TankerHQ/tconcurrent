@@ -27,6 +27,7 @@ struct shared<R(Args...)> : detail::shared_base<R>
   shared(F&& f)
     : _f(std::forward<F>(f))
   {
+    assert(_f);
   }
 
   template <typename... A>
