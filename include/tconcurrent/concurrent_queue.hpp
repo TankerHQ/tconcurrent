@@ -47,10 +47,16 @@ public:
     }
   }
 
+  std::size_t size() const
+  {
+    scope_lock l(_mutex);
+    return _queue.size();
+  }
+
 private:
   using mutex_t = std::mutex;
   using scope_lock = std::lock_guard<mutex_t>;
-  mutex_t _mutex;
+  mutable mutex_t _mutex;
   std::queue<promise<T>> _waiters;
   std::queue<T> _queue;
 };

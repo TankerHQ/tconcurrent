@@ -683,8 +683,9 @@ SCENARIO("test concurrent_queue", "[concurrent_queue]")
   GIVEN("an empty queue")
   {
     concurrent_queue<int> q;
-    THEN("we can do nothing")
+    THEN("it is empty")
     {
+      CHECK(0 == q.size());
     }
     THEN("we can not pop")
     {
@@ -695,6 +696,7 @@ SCENARIO("test concurrent_queue", "[concurrent_queue]")
       q.push(1);
       q.push(2);
       q.push(3);
+      CHECK(3 == q.size());
     }
     THEN("pushing unlocks a poper")
     {
@@ -705,21 +707,28 @@ SCENARIO("test concurrent_queue", "[concurrent_queue]")
       CHECK(18 == fut.get());
     }
   }
-  GIVEN("a non-empty queue")
+  GIVEN("a queue with 3 values")
   {
     concurrent_queue<int> q;
     q.push(1);
     q.push(2);
     q.push(3);
+    THEN("it holds 3 values")
+    {
+      CHECK(3 == q.size());
+    }
     THEN("we can pop")
     {
       CHECK(q.pop().is_ready());
+      CHECK(2 == q.size());
     }
     THEN("we can pop in the same order")
     {
       CHECK(1 == q.pop().get());
       CHECK(2 == q.pop().get());
       CHECK(3 == q.pop().get());
+
+      CHECK(0 == q.size());
     }
     THEN("we can push and pop in the same order")
     {
@@ -730,8 +739,74 @@ SCENARIO("test concurrent_queue", "[concurrent_queue]")
       CHECK(3 == q.pop().get());
       CHECK(4 == q.pop().get());
       CHECK(5 == q.pop().get());
+
+      CHECK(0 == q.size());
     }
   }
 }
 
-// TODO test semaphore
+SCENARIO("test semaphore", "[semaphore]")
+{
+  GIVEN("an empty semaphore")
+  {
+    semaphore sem{0};
+
+    THEN("it is null")
+    {
+      CHECK(0 == sem.count());
+    }
+
+    THEN("we can release it")
+    {
+      sem.release();
+      CHECK(1 == sem.count());
+    }
+
+    THEN("we can not acquire it")
+    {
+      auto fut = sem.acquire();
+      CHECK(!fut.is_ready());
+      CHECK(0 == sem.count());
+
+      AND_WHEN("someone releases it")
+      {
+        sem.release();
+
+        THEN("the acquire succeeds")
+        {
+          CHECK(fut.is_ready());
+          CHECK(0 == sem.count());
+        }
+      }
+    }
+  }
+
+  GIVEN("a semaphore 4-initialized")
+  {
+    semaphore sem{4};
+
+    THEN("it holds 4")
+    {
+      CHECK(4 == sem.count());
+    }
+
+    THEN("we can release it")
+    {
+      sem.release();
+      CHECK(5 == sem.count());
+    }
+
+    THEN("we can acquire it")
+    {
+      auto fut = sem.acquire();
+      CHECK(fut.is_ready());
+      CHECK(3 == sem.count());
+    }
+
+    // FIXME this is broken because future expects a copyable type
+    //THEN("we can get a scope_lock")
+    //{
+    //  auto l = sem.get_scoped_lock();
+    //}
+  }
+}

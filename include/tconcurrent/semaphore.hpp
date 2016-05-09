@@ -64,6 +64,11 @@ public:
         [this](auto const&) { return scope_lock(this); });
   }
 
+  std::size_t count() const
+  {
+    return _queue.size();
+  }
+
 private:
   struct token {};
 
