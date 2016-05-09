@@ -30,4 +30,6 @@ using result_of_t_ = typename result_of_<F>::type;
 }
 }
 
+namespace tc = tconcurrent;
+
 #endif
