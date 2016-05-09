@@ -10,10 +10,16 @@
 
 namespace tconcurrent
 {
+namespace detail
+{
+void default_error_cb(std::exception_ptr const&);
+}
 
 class thread_pool
 {
 public:
+  using error_handler_cb = std::function<void(std::exception_ptr const&)>;
+
   ~thread_pool();
 
   void start(unsigned int thread_count);
@@ -44,11 +50,23 @@ public:
     _io.post(std::forward<F>(work));
   }
 
+  void set_error_handler(error_handler_cb cb)
+  {
+    assert(cb);
+    _error_cb = std::move(cb);
+  }
+  void signal_error(std::exception_ptr const& e)
+  {
+    _error_cb(e);
+  }
+
 private:
   boost::asio::io_service _io;
   std::unique_ptr<boost::asio::io_service::work> _work;
   std::vector<std::thread> _threads;
   std::atomic<bool> _dead{false};
+
+  error_handler_cb _error_cb{detail::default_error_cb};
 };
 
 thread_pool& get_default_executor();

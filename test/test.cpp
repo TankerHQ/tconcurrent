@@ -489,20 +489,6 @@ TEST_CASE("test periodic task", "[periodic_task]")
   CHECK(4 == called);
 }
 
-TEST_CASE("test periodic task error stop", "[periodic_task]")
-{
-  unsigned int called = 0;
-
-  periodic_task pt;
-  pt.set_callback([&]{ ++called; throw 18; });
-  pt.set_period(std::chrono::milliseconds(0));
-  pt.start(periodic_task::start_immediately);
-  CHECK(pt.is_running());
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  CHECK(!pt.is_running());
-  CHECK(1 == called);
-}
-
 TEST_CASE("test periodic task future", "[periodic_task]")
 {
   unsigned int called = 0;
@@ -523,24 +509,6 @@ TEST_CASE("test periodic task future", "[periodic_task]")
   pt.stop().get();
   CHECK(!pt.is_running());
   CHECK(4 == called);
-}
-
-TEST_CASE("test periodic task future error stop", "[periodic_task]")
-{
-  unsigned int called = 0;
-
-  periodic_task pt;
-  pt.set_callback([&]
-                  {
-                    ++called;
-                    return make_exceptional_future<void>(18);
-                  });
-  pt.set_period(std::chrono::milliseconds(0));
-  pt.start();
-  CHECK(pt.is_running());
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  CHECK(!pt.is_running());
-  CHECK(1 == called);
 }
 
 TEST_CASE("test periodic task immediate", "[periodic_task]")
@@ -574,6 +542,60 @@ TEST_CASE("test periodic task executor", "[periodic_task][executor]")
   pt.stop().get();
   CHECK(!pt.is_running());
   CHECK(5 == called);
+}
+
+TEST_CASE("test periodic task error stop", "[periodic_task][executor]")
+{
+  thread_pool tp;
+  tp.start(1);
+
+  unsigned int called = 0;
+  unsigned int goterror = 0;
+
+  tp.set_error_handler([&](std::exception_ptr const& e) {
+    ++goterror;
+    CHECK_THROWS_AS(std::rethrow_exception(e), int);
+  });
+
+  periodic_task pt;
+  pt.set_executor(&tp);
+  pt.set_callback([&]{ ++called; throw 18; });
+  pt.set_period(std::chrono::milliseconds(0));
+  pt.start(periodic_task::start_immediately);
+  CHECK(pt.is_running());
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  CHECK(!pt.is_running());
+  CHECK(1 == called);
+  CHECK(1 == goterror);
+}
+
+TEST_CASE("test periodic task future error stop", "[periodic_task][executor]")
+{
+  thread_pool tp;
+  tp.start(1);
+
+  unsigned int called = 0;
+  unsigned int goterror = 0;
+
+  tp.set_error_handler([&](std::exception_ptr const& e) {
+    ++goterror;
+    CHECK_THROWS_AS(std::rethrow_exception(e), int);
+  });
+
+  periodic_task pt;
+  pt.set_executor(&tp);
+  pt.set_callback([&]
+                  {
+                    ++called;
+                    return make_exceptional_future<void>(18);
+                  });
+  pt.set_period(std::chrono::milliseconds(0));
+  pt.start();
+  CHECK(pt.is_running());
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  CHECK(!pt.is_running());
+  CHECK(1 == called);
+  CHECK(1 == goterror);
 }
 
 TEST_CASE("test periodic task stop before start", "[periodic_task]")
@@ -823,4 +845,44 @@ SCENARIO("test semaphore", "[semaphore]")
     //  auto l = sem.get_scoped_lock();
     //}
   }
+}
+
+TEST_CASE("test thread_pool do nothing", "[thread_pool]")
+{
+  thread_pool tp;
+  tp.run_thread();
+}
+
+TEST_CASE("test thread_pool start stop", "[thread_pool]")
+{
+  thread_pool tp;
+  tp.start(1);
+  tp.stop();
+}
+
+TEST_CASE("test thread_pool run work", "[thread_pool]")
+{
+  bool called = false;
+
+  thread_pool tp;
+  tp.start(1);
+  tp.post([&]{ called = true; });
+  tp.stop();
+  CHECK(called);
+}
+
+TEST_CASE("test thread_pool error work", "[thread_pool]")
+{
+  bool called = false;
+
+  thread_pool tp;
+  tp.set_error_handler([&](std::exception_ptr const& e) {
+    called = true;
+    CHECK_THROWS_AS(std::rethrow_exception(e), int);
+  });
+
+  tp.start(1);
+  tp.post([&]{ throw 18; });
+  tp.stop();
+  CHECK(called);
 }

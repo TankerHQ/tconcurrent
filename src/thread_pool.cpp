@@ -7,6 +7,15 @@
 
 namespace tconcurrent
 {
+namespace detail
+{
+void default_error_cb(std::exception_ptr const&)
+{
+  std::cerr << "An error occured in threadpool" << std::endl;
+  assert(false &&
+         "An error occured in threadpool and no error handler was provided");
+}
+}
 
 namespace
 {
@@ -56,14 +65,17 @@ void thread_pool::run_thread()
       current_executor.reset(nullptr);
       return;
     }
-    catch (std::exception &e)
-    {
-      // TODO replace these by error handlers
-      std::cerr << "Error caught in threadpool: " << e.what() << std::endl;
-    }
     catch (...)
     {
-      std::cerr << "Unknown error caught in threadpool" << std::endl;
+      try
+      {
+        _error_cb(std::current_exception());
+      }
+      catch (...)
+      {
+        std::cerr << "exception thrown in error handler" << std::endl;
+        assert(false && "exception thrown in error handler");
+      }
     }
   }
 }

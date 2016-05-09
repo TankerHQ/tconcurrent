@@ -93,14 +93,9 @@ future<void> periodic_task::do_call()
     fut = cb();
     success = true;
   }
-  catch (std::exception& e)
-  {
-    // TODO proper error reporting (x3)
-    std::cout << "error in periodic_task: " << e.what() << std::endl;
-  }
   catch (...)
   {
-    std::cout << "unknown error in periodic_task" << std::endl;
+    _executor->signal_error(std::current_exception());
   }
 
   scope_lock l(_mutex);
@@ -116,7 +111,7 @@ future<void> periodic_task::do_call()
       reschedule();
     else
     {
-      std::cout << "error in future of periodic task" << std::endl;
+      _executor->signal_error(fut.get_exception());
       _state = State::Stopped;
     }
   });
