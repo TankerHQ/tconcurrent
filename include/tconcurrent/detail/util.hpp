@@ -8,13 +8,6 @@ namespace tconcurrent
 namespace detail
 {
 
-/// C++11 standard doesn't provide make_unique
-template <typename T, typename... Args>
-std::unique_ptr<T> make_unique(Args&&... args)
-{
-  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-}
-
 template <typename>
 struct result_of_; // not defined
 

@@ -46,7 +46,7 @@ void thread_pool::start(unsigned int thread_count)
   if (_work)
     throw std::runtime_error("the threadpool is already running");
 
-  _work = detail::make_unique<boost::asio::io_service::work>(_io);
+  _work = std::make_unique<boost::asio::io_service::work>(_io);
   for (unsigned int i = 0; i < thread_count; ++i)
     _threads.emplace_back(
         [this]{
