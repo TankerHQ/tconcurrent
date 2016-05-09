@@ -11,7 +11,7 @@
 
 using namespace tconcurrent;
 
-TEST_CASE("test ready future", "")
+TEST_CASE("test ready future", "[future]")
 {
   auto future = make_ready_future(42);
   static_assert(std::is_same<decltype(future)::value_type, int>::value,
@@ -21,7 +21,7 @@ TEST_CASE("test ready future", "")
   CHECK(42 == future.get());
 }
 
-TEST_CASE("test void ready future", "")
+TEST_CASE("test void ready future", "[future]")
 {
   auto future = make_ready_future();
   static_assert(std::is_same<decltype(future)::value_type, void*>::value,
@@ -30,7 +30,7 @@ TEST_CASE("test void ready future", "")
   CHECK(future.has_value());
 }
 
-TEST_CASE("test exceptional ready future", "")
+TEST_CASE("test exceptional ready future", "[future]")
 {
   auto future = make_exceptional_future<int>("FAIL");
   CHECK(future.is_ready());
@@ -38,7 +38,7 @@ TEST_CASE("test exceptional ready future", "")
   CHECK_THROWS_AS(future.get(), char const*);
 }
 
-TEST_CASE("test exceptional ready future void", "")
+TEST_CASE("test exceptional ready future void", "[future]")
 {
   auto future = make_exceptional_future<void>("FAIL");
   CHECK(future.is_ready());
@@ -46,7 +46,7 @@ TEST_CASE("test exceptional ready future void", "")
   CHECK_THROWS_AS(future.get(), char const*);
 }
 
-TEST_CASE("test simple packaged task", "")
+TEST_CASE("test simple packaged task", "[packaged_task]")
 {
   auto taskfut = package<void()>([]{});
   auto& task = std::get<0>(taskfut);
@@ -59,7 +59,7 @@ TEST_CASE("test simple packaged task", "")
   CHECK(!future.has_exception());
 }
 
-TEST_CASE("test non void packaged task", "")
+TEST_CASE("test non void packaged task", "[packaged_task]")
 {
   auto taskfut = package<int()>([]{ return 42; });
   auto& task = std::get<0>(taskfut);
@@ -75,7 +75,7 @@ TEST_CASE("test non void packaged task", "")
 
 const int val = 42;
 
-TEST_CASE("test reference packaged task", "")
+TEST_CASE("test reference packaged task", "[packaged_task]")
 {
   auto taskfut = package<int()>([&]() -> const int& { return val; });
   auto& task = std::get<0>(taskfut);
@@ -93,7 +93,7 @@ TEST_CASE("test reference packaged task", "")
   CHECK(42 == future.get());
 }
 
-TEST_CASE("test arguments packaged task", "")
+TEST_CASE("test arguments packaged task", "[packaged_task]")
 {
   auto taskfut = package<int(int)>([](int i){ return i*2; });
   auto& task = std::get<0>(taskfut);
@@ -107,7 +107,7 @@ TEST_CASE("test arguments packaged task", "")
   CHECK(42 == future.get());
 }
 
-TEST_CASE("test exception packaged task", "")
+TEST_CASE("test exception packaged task", "[packaged_task]")
 {
   auto taskfut = package<void(int)>([](int i){ throw 42; });
   auto& task = std::get<0>(taskfut);
@@ -122,7 +122,7 @@ TEST_CASE("test exception packaged task", "")
   CHECK_THROWS_AS(future.get(), int);
 }
 
-TEST_CASE("test delayed packaged task", "")
+TEST_CASE("test delayed packaged task", "[packaged_task]")
 {
   auto taskfut = package<int(int)>([](int i){ return i*2; });
   auto& task = std::get<0>(taskfut);
@@ -137,7 +137,7 @@ TEST_CASE("test delayed packaged task", "")
   th.join();
 }
 
-TEST_CASE("test future unwrap", "")
+TEST_CASE("test future unwrap", "[future]")
 {
   auto taskfut = package<future<int>(int)>([](int i)
                                            {
@@ -154,7 +154,7 @@ TEST_CASE("test future unwrap", "")
   CHECK(42 == unfut.get());
 }
 
-TEST_CASE("test future unwrap void", "")
+TEST_CASE("test future unwrap void", "[future]")
 {
   auto taskfut = package<future<void>()>([]
                                          {
@@ -171,7 +171,7 @@ TEST_CASE("test future unwrap void", "")
   CHECK_NOTHROW(unfut.get());
 }
 
-TEST_CASE("test future unwrap error", "")
+TEST_CASE("test future unwrap error", "[future]")
 {
   auto taskfut = package<future<int>(int)>([](int i) -> future<int>
                                            {
@@ -189,7 +189,7 @@ TEST_CASE("test future unwrap error", "")
   CHECK_THROWS_AS(unfut.get(), int);
 }
 
-TEST_CASE("test future unwrap nested error", "")
+TEST_CASE("test future unwrap nested error", "[future]")
 {
   auto taskfut =
       package<future<int>(int)>([](int i)
@@ -208,7 +208,7 @@ TEST_CASE("test future unwrap nested error", "")
   CHECK_THROWS_AS(unfut.get(), int);
 }
 
-SCENARIO("future can be used with specific executors", "")
+SCENARIO("future can be used with specific executors", "[future][executor]")
 {
   GIVEN("A ready future and an executor")
   {
@@ -231,7 +231,7 @@ SCENARIO("future can be used with specific executors", "")
   }
 }
 
-TEST_CASE("test simple async", "")
+TEST_CASE("test simple async", "[async]")
 {
   bool hasrun = false;
   auto fut = async([&]{ hasrun = true; });
@@ -239,7 +239,7 @@ TEST_CASE("test simple async", "")
   CHECK(hasrun);
 }
 
-TEST_CASE("test non void async", "")
+TEST_CASE("test non void async", "[async]")
 {
   bool hasrun = false;
   auto fut = async([&]{ hasrun = true; return 42; });
@@ -247,7 +247,7 @@ TEST_CASE("test non void async", "")
   CHECK(hasrun);
 }
 
-TEST_CASE("test reference async", "")
+TEST_CASE("test reference async", "[async]")
 {
   bool hasrun = false;
   auto fut = async([&]() -> int const& { hasrun = true; return val; });
@@ -257,7 +257,7 @@ TEST_CASE("test reference async", "")
   CHECK(hasrun);
 }
 
-TEST_CASE("test is_in_this_context", "")
+TEST_CASE("test is_in_this_context", "[executor]")
 {
   auto fut = async([&]
                    {
@@ -267,7 +267,7 @@ TEST_CASE("test is_in_this_context", "")
   CHECK_FALSE(get_default_executor().is_in_this_context());
 }
 
-TEST_CASE("test delay async", "")
+TEST_CASE("test delay async", "[async_wait]")
 {
   std::chrono::milliseconds const delay{100};
   auto before = std::chrono::steady_clock::now();
@@ -277,7 +277,7 @@ TEST_CASE("test delay async", "")
   CHECK(delay < after - before);
 }
 
-TEST_CASE("test delay async cancel", "")
+TEST_CASE("test delay async cancel", "[async_wait]")
 {
   std::chrono::milliseconds const delay{100};
   auto before = std::chrono::steady_clock::now();
@@ -288,7 +288,7 @@ TEST_CASE("test delay async cancel", "")
   CHECK(delay > after - before);
 }
 
-TEST_CASE("test ready future then", "")
+TEST_CASE("test ready future then", "[future][then]")
 {
   auto fut = make_ready_future(21);
   auto fut2 = fut.then([](future<int> val){ return long(val.get()*2); });
@@ -297,7 +297,7 @@ TEST_CASE("test ready future then", "")
   CHECK(42 == fut2.get());
 }
 
-TEST_CASE("test not ready future then", "")
+TEST_CASE("test not ready future then", "[future][then]")
 {
   auto taskfut = package<int()>([]{ return 21; });
   auto& task = std::get<0>(taskfut);
@@ -312,14 +312,14 @@ TEST_CASE("test not ready future then", "")
   th.join();
 }
 
-TEST_CASE("test ready future then error", "")
+TEST_CASE("test ready future then error", "[future][then]")
 {
   auto fut = make_ready_future(21);
   auto fut2 = fut.then([](future<int> val) { throw 42; });
   CHECK_THROWS_AS(fut2.get(), int);
 }
 
-TEST_CASE("test error future then", "")
+TEST_CASE("test error future then", "[future][then]")
 {
   bool called = false;
   auto fut = make_exceptional_future<int>(21);
@@ -343,7 +343,7 @@ TEST_CASE("test error future then", "")
   CHECK(called);
 }
 
-TEST_CASE("test ready future and_then", "")
+TEST_CASE("test ready future and_then", "[future][then]")
 {
   auto fut = make_ready_future(21);
   auto fut2 = fut.and_then([](int val){ return long(val*2); });
@@ -352,7 +352,7 @@ TEST_CASE("test ready future and_then", "")
   CHECK(42 == fut2.get());
 }
 
-TEST_CASE("test error future and_then", "")
+TEST_CASE("test error future and_then", "[future][then]")
 {
   bool called = false;
   auto fut = make_exceptional_future<int>(21);
@@ -368,14 +368,14 @@ TEST_CASE("test error future and_then", "")
   CHECK(!called);
 }
 
-TEST_CASE("test ready future and_then error", "")
+TEST_CASE("test ready future and_then error", "[future][then]")
 {
   auto fut = make_ready_future(21);
   auto fut2 = fut.and_then([](int val) { throw 42; });
   CHECK_THROWS_AS(fut2.get(), int);
 }
 
-TEST_CASE("test promise", "")
+TEST_CASE("test promise", "[promise]")
 {
   promise<int> prom;
   auto fut = prom.get_future();
@@ -387,7 +387,7 @@ TEST_CASE("test promise", "")
   CHECK(42 == fut.get());
 }
 
-TEST_CASE("test void promise", "")
+TEST_CASE("test void promise", "[promise]")
 {
   promise<void> prom;
   auto fut = prom.get_future();
@@ -399,7 +399,7 @@ TEST_CASE("test void promise", "")
   CHECK_NOTHROW(fut.get());
 }
 
-TEST_CASE("test error promise", "")
+TEST_CASE("test error promise", "[promise]")
 {
   promise<void> prom;
   auto fut = prom.get_future();
@@ -409,7 +409,7 @@ TEST_CASE("test error promise", "")
   CHECK_THROWS_AS(fut.get(), int);
 }
 
-TEST_CASE("test when_all", "")
+TEST_CASE("test when_all", "[when_all]")
 {
   auto const NB_FUTURES = 100;
 
@@ -438,7 +438,7 @@ TEST_CASE("test when_all", "")
   }
 }
 
-TEST_CASE("test when_all empty", "")
+TEST_CASE("test when_all empty", "[when_all]")
 {
   std::vector<future<int>> futures;
   auto all = when_all(futures.begin(), futures.end());
@@ -449,18 +449,18 @@ TEST_CASE("test when_all empty", "")
 
 // periodic task
 
-TEST_CASE("test periodic task construct", "")
+TEST_CASE("test periodic task construct", "[periodic_task]")
 {
   periodic_task pt;
 }
 
-TEST_CASE("test periodic task stop", "")
+TEST_CASE("test periodic task stop", "[periodic_task]")
 {
   periodic_task pt;
   pt.stop();
 }
 
-TEST_CASE("test periodic task", "")
+TEST_CASE("test periodic task", "[periodic_task]")
 {
   unsigned int called = 0;
 
@@ -475,7 +475,7 @@ TEST_CASE("test periodic task", "")
   CHECK(4 == called);
 }
 
-TEST_CASE("test periodic task error stop", "")
+TEST_CASE("test periodic task error stop", "[periodic_task]")
 {
   unsigned int called = 0;
 
@@ -489,7 +489,7 @@ TEST_CASE("test periodic task error stop", "")
   CHECK(1 == called);
 }
 
-TEST_CASE("test periodic task future", "")
+TEST_CASE("test periodic task future", "[periodic_task]")
 {
   unsigned int called = 0;
 
@@ -511,7 +511,7 @@ TEST_CASE("test periodic task future", "")
   CHECK(4 == called);
 }
 
-TEST_CASE("test periodic task future error stop", "")
+TEST_CASE("test periodic task future error stop", "[periodic_task]")
 {
   unsigned int called = 0;
 
@@ -529,7 +529,7 @@ TEST_CASE("test periodic task future error stop", "")
   CHECK(1 == called);
 }
 
-TEST_CASE("test periodic task immediate", "")
+TEST_CASE("test periodic task immediate", "[periodic_task]")
 {
   unsigned int called = 0;
 
@@ -544,7 +544,7 @@ TEST_CASE("test periodic task immediate", "")
   CHECK(1 == called);
 }
 
-TEST_CASE("test periodic task executor", "")
+TEST_CASE("test periodic task executor", "[periodic_task][executor]")
 {
   thread_pool tp;
   tp.start(1);
@@ -562,7 +562,7 @@ TEST_CASE("test periodic task executor", "")
   CHECK(5 == called);
 }
 
-TEST_CASE("test periodic task stop before start", "")
+TEST_CASE("test periodic task stop before start", "[periodic_task]")
 {
   unsigned int called = 0;
 
@@ -606,7 +606,7 @@ void test_periodic_task_start_stop_spam(C&& cb)
   pt.stop().get();
 }
 
-TEST_CASE("test periodic task start stop spam", "")
+TEST_CASE("test periodic task start stop spam", "[periodic_task]")
 {
   // can't use catch in other threads...
   std::atomic<bool> call{false};
@@ -626,7 +626,7 @@ TEST_CASE("test periodic task start stop spam", "")
   CHECK(false == call.load());
 }
 
-TEST_CASE("test periodic task future start stop spam", "")
+TEST_CASE("test periodic task future start stop spam", "[periodic_task]")
 {
   // can't use catch in other threads...
   std::atomic<bool> call{false};
@@ -649,7 +649,7 @@ TEST_CASE("test periodic task future start stop spam", "")
   CHECK(false == call.load());
 }
 
-TEST_CASE("test periodic task stop from inside", "")
+TEST_CASE("test periodic task stop from inside", "[periodic_task]")
 {
   unsigned int called = 0;
 
@@ -662,7 +662,7 @@ TEST_CASE("test periodic task stop from inside", "")
   CHECK(1 == called);
 }
 
-TEST_CASE("test periodic single threaded task stop", "")
+TEST_CASE("test periodic single threaded task stop", "[periodic_task]")
 {
   thread_pool tp;
   tp.start(1);
@@ -678,7 +678,7 @@ TEST_CASE("test periodic single threaded task stop", "")
   CHECK(0 < called);
 }
 
-SCENARIO("test concurrent_queue")
+SCENARIO("test concurrent_queue", "[concurrent_queue]")
 {
   GIVEN("an empty queue")
   {
