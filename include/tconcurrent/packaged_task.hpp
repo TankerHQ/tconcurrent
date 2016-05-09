@@ -48,9 +48,9 @@ struct shared<R(Args...)> : detail::shared_base<R>
 };
 
 template <typename... Args>
-struct shared<void(Args...)> : detail::shared_base<void*>
+struct shared<void(Args...)> : detail::shared_base<tvoid>
 {
-  using base_type = detail::shared_base<void*>;
+  using base_type = detail::shared_base<tvoid>;
 
   std::function<void(Args...)> _f;
 
@@ -66,7 +66,7 @@ struct shared<void(Args...)> : detail::shared_base<void*>
     try
     {
       _f(std::forward<A>(args)...);
-      this->set(0);
+      this->set({});
     }
     catch (...)
     {

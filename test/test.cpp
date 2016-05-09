@@ -24,7 +24,7 @@ TEST_CASE("test ready future", "[future]")
 TEST_CASE("test void ready future", "[future]")
 {
   auto future = make_ready_future();
-  static_assert(std::is_same<decltype(future)::value_type, void*>::value,
+  static_assert(std::is_same<decltype(future)::value_type, tvoid>::value,
                 "make_ready_future can't deduce void future type");
   CHECK(future.is_ready());
   CHECK(future.has_value());
@@ -170,7 +170,7 @@ TEST_CASE("test future unwrap void", "[future]")
   auto& task = std::get<0>(taskfut);
   auto& future = std::get<1>(taskfut);
   auto unfut = future.unwrap();
-  static_assert(std::is_same<decltype(unfut)::value_type, void*>::value,
+  static_assert(std::is_same<decltype(unfut)::value_type, tvoid>::value,
                 "unwrap of void has an incorrect return type");
   CHECK(!unfut.is_ready());
   task();
@@ -231,7 +231,7 @@ SCENARIO("future can be used with specific executors", "[future][executor]")
     }
     THEN(".and_then continuation is executed on the executor")
     {
-      f.and_then(tp, [&](void*) {
+      f.and_then(tp, [&](tvoid) {
          CHECK(tp.is_in_this_context());
        }).get();
     }
@@ -398,10 +398,10 @@ TEST_CASE("test void promise", "[promise]")
 {
   promise<void> prom;
   auto fut = prom.get_future();
-  static_assert(std::is_same<decltype(fut)::value_type, void*>::value,
+  static_assert(std::is_same<decltype(fut)::value_type, tvoid>::value,
                 "promise and future don't have the same type");
   CHECK(!fut.is_ready());
-  prom.set_value(0);
+  prom.set_value({});
   CHECK(fut.is_ready());
   CHECK_NOTHROW(fut.get());
 }
@@ -434,14 +434,14 @@ TEST_CASE("test when_all", "[when_all]")
 
   for (unsigned int i = 0; i < NB_FUTURES; ++i)
     if (i % 2)
-      promises[i].set_value(0);
+      promises[i].set_value({});
 
   auto all = when_all(futures.begin(), futures.end());
   CHECK(!all.is_ready());
 
   for (unsigned int i = 0; i < NB_FUTURES; ++i)
     if (!(i % 2))
-      promises[i].set_value(0);
+      promises[i].set_value({});
 
   auto& futs = all.get();
   CHECK(futures.size() == futs.size());
@@ -497,7 +497,7 @@ TEST_CASE("test periodic task future", "[periodic_task]")
   pt.set_callback([&]
                   {
                     return async_wait(std::chrono::milliseconds(10))
-                        .fut.and_then([&](void*)
+                        .fut.and_then([&](tvoid)
                                       {
                                         ++called;
                                       });
@@ -674,7 +674,7 @@ TEST_CASE("test periodic task future start stop spam", "[periodic_task]")
         if (call.exchange(true))
           fail = true;
         return async_wait(std::chrono::milliseconds(1))
-            .fut.and_then([&](void*)
+            .fut.and_then([&](tvoid)
                           {
                             if (!call.exchange(false))
                               fail = true;

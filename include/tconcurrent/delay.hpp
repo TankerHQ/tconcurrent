@@ -58,7 +58,7 @@ cancelable_bundle async_wait(thread_pool& pool, Delay delay)
     data->timer.async_wait(
         [data](boost::system::error_code const&) mutable {
           if (!data->fired.exchange(true))
-            data->prom.set_value(0);
+            data->prom.set_value({});
         });
 
     return {data->prom.get_future(), [data]() mutable {

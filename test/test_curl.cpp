@@ -78,7 +78,7 @@ TEST_CASE("curl multiple requests")
         });
     promise<void> finish = finished[i];
     req[i].set_finish_callback(
-        [finish](request&, CURLcode) mutable { finish.set_value(0); });
+        [finish](request&, CURLcode) mutable { finish.set_value({}); });
     req[i].set_url("http://httpbin.org/drip?numbytes=100&duration=1");
   }
 

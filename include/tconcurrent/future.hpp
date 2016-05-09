@@ -8,6 +8,21 @@
 namespace tconcurrent
 {
 
+struct tvoid
+{
+  tvoid() = default;
+
+  [[deprecated("do not construct tvoid from void*, use {}")]]
+  tvoid(void*)
+  {
+  }
+
+  [[deprecated("use tvoid instead of void*")]] operator void*() const
+  {
+    return nullptr;
+  }
+};
+
 template <typename R>
 class future;
 
@@ -32,7 +47,7 @@ struct future_value_type
 template <>
 struct future_value_type<void>
 {
-  using type = void*;
+  using type = tvoid;
 };
 
 }
@@ -218,10 +233,10 @@ auto make_ready_future(T&& val) -> future<typename std::decay<T>::type>
 
 inline auto make_ready_future() -> future<void>
 {
-  using shared_base_type = detail::shared_base<void*>;
+  using shared_base_type = future<void>::shared_type;
 
   auto sb = std::make_shared<shared_base_type>();
-  sb->_r = shared_base_type::v_value{nullptr};
+  sb->_r = shared_base_type::v_value{};
   return future<void>(std::move(sb));
 }
 

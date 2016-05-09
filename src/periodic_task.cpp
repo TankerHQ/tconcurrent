@@ -73,7 +73,7 @@ void periodic_task::reschedule()
   auto bundle = async_wait(*_executor, _period);
   _future = bundle.fut
                 .and_then(get_synchronous_executor(),
-                          [this](void*) { return do_call(); })
+                          [this](tvoid) { return do_call(); })
                 .unwrap();
   _cancel = std::move(bundle.cancel);
 }

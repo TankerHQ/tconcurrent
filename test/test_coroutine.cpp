@@ -60,7 +60,7 @@ TEST_CASE("coroutine wait", "")
     await(prom.get_future());
     return 42;
   });
-  prom.set_value(0);
+  prom.set_value({});
   CHECK(42 == f.get());
 }
 
@@ -82,7 +82,7 @@ TEST_CASE("coroutine wait and throw", "")
     await(prom.get_future());
     throw 42;
   });
-  prom.set_value(0);
+  prom.set_value({});
   CHECK_THROWS_AS(f.get(), int);
 }
 
