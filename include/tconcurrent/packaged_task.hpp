@@ -21,6 +21,8 @@ struct shared; // not defined
 template <typename R, typename... Args>
 struct shared<R(Args...)> : detail::shared_base<R>
 {
+  using base_type = detail::shared_base<R>;
+
   std::function<R(Args...)> _f;
 
   template <typename F>
@@ -48,6 +50,8 @@ struct shared<R(Args...)> : detail::shared_base<R>
 template <typename... Args>
 struct shared<void(Args...)> : detail::shared_base<void*>
 {
+  using base_type = detail::shared_base<void*>;
+
   std::function<void(Args...)> _f;
 
   template <typename F>
@@ -78,8 +82,6 @@ template <typename R, typename... Args>
 class packaged_task<R(Args...)>
 {
 public:
-  packaged_task() = default;
-
   template <typename... A>
   void operator()(A&&... args) const
   {
@@ -87,7 +89,9 @@ public:
   }
 
 private:
-  std::shared_ptr<detail::shared<R(Args...)>> _p;
+  using shared_type = detail::shared<R(Args...)>;
+
+  detail::promise_ptr<shared_type> _p;
 
   template <typename S, typename F>
   friend auto package(F&& f)

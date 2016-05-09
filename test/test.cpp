@@ -122,6 +122,13 @@ TEST_CASE("test exception packaged task", "[packaged_task]")
   CHECK_THROWS_AS(future.get(), int);
 }
 
+TEST_CASE("test unrun packaged task", "[packaged_task]")
+{
+  auto future = package<void()>([]{}).second;
+  REQUIRE(future.is_ready());
+  CHECK_THROWS_AS(future.get(), broken_promise);
+}
+
 TEST_CASE("test delayed packaged task", "[packaged_task]")
 {
   auto taskfut = package<int(int)>([](int i){ return i*2; });
@@ -407,6 +414,13 @@ TEST_CASE("test error promise", "[promise]")
   prom.set_exception(std::make_exception_ptr(42));
   CHECK(fut.is_ready());
   CHECK_THROWS_AS(fut.get(), int);
+}
+
+TEST_CASE("test broken promise", "[promise]")
+{
+  auto fut = promise<void>().get_future();
+  REQUIRE(fut.is_ready());
+  CHECK_THROWS_AS(fut.get(), broken_promise);
 }
 
 TEST_CASE("test when_all", "[when_all]")

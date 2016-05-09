@@ -38,7 +38,9 @@ public:
   }
 
 private:
-  std::shared_ptr<detail::shared_base<value_type>> _p;
+  using shared_type = detail::shared_base<value_type>;
+
+  detail::promise_ptr<shared_type> _p;
 };
 
 }

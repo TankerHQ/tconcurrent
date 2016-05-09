@@ -1,6 +1,7 @@
 #ifndef TCONCURRENT_DETAIL_SHARED_BASE_HPP
 #define TCONCURRENT_DETAIL_SHARED_BASE_HPP
 
+#include <stdexcept>
 #include <mutex>
 #include <condition_variable>
 #include <vector>
@@ -12,8 +13,84 @@
 
 namespace tconcurrent
 {
+
+struct broken_promise : std::runtime_error
+{
+  broken_promise() : runtime_error("promise is broken")
+  {}
+};
+
 namespace detail
 {
+
+template <typename S>
+class promise_ptr
+{
+public:
+  promise_ptr() = default;
+
+  template <typename P>
+  promise_ptr(P&& p) : _ptr(std::forward<P>(p))
+  {
+    _ptr->increment_promise();
+  }
+
+  promise_ptr(promise_ptr const& r) : _ptr(r._ptr)
+  {
+    _ptr->increment_promise();
+  }
+  promise_ptr& operator=(promise_ptr const& r)
+  {
+    if (_ptr != r._ptr)
+    {
+      finish();
+      _ptr = r._ptr;
+      _ptr->increment_promise();
+    }
+    return *this;
+  }
+
+  promise_ptr(promise_ptr&& r) : _ptr(std::move(r._ptr))
+  {
+  }
+  promise_ptr& operator=(promise_ptr&& r)
+  {
+    if (_ptr != r._ptr)
+    {
+      finish();
+      _ptr = std::move(r._ptr);
+    }
+    return *this;
+  }
+
+  ~promise_ptr()
+  {
+    finish();
+  }
+
+  decltype(auto) operator->() const
+  {
+    return _ptr.operator->();
+  }
+  decltype(auto) operator*() const
+  {
+    return _ptr.operator*();
+  }
+
+  operator std::shared_ptr<S> const&() const
+  {
+    return _ptr;
+  }
+
+private:
+  std::shared_ptr<S> _ptr;
+
+  void finish()
+  {
+    if (_ptr)
+      _ptr->decrement_promise();
+  }
+};
 
 template <typename R>
 class shared_base
@@ -25,7 +102,11 @@ public:
 
   boost::variant<v_none, v_value, v_exception> _r;
 
-  virtual ~shared_base() = default;
+  virtual ~shared_base()
+  {
+    assert(_promise_count.load() == 0);
+    assert(_r.which() != 0);
+  }
 
   void set(R const& r)
   {
@@ -97,6 +178,24 @@ private:
   mutable std::condition_variable _ready;
   std::vector<std::function<void()>> _then;
 
+  /** Counts the number of promises (or anything that can set the shared state)
+   *
+   * This count is used to set an error state when all promises are destroyed.
+   */
+  std::atomic<unsigned int> _promise_count{0};
+
+  void increment_promise()
+  {
+    ++_promise_count;
+  }
+
+  void decrement_promise()
+  {
+    assert(_promise_count.load() > 0);
+    if (--_promise_count == 0 && _r.which() == 0)
+      set_exception(std::make_exception_ptr(broken_promise{}));
+  }
+
   template <typename F>
   void finish(F&& setval)
   {
@@ -113,6 +212,9 @@ private:
     for (auto& f : then)
       f();
   }
+
+  template <typename S>
+  friend class promise_ptr;
 };
 
 }
