@@ -125,19 +125,19 @@ public:
     _p->wait();
   }
 
-  bool is_ready() const BOOST_NOEXCEPT
+  bool is_ready() const noexcept
   {
     return _p && _p->_r.which() != 0;
   }
-  bool has_value() const BOOST_NOEXCEPT
+  bool has_value() const noexcept
   {
     return _p && _p->_r.which() == 1;
   }
-  bool has_exception() const BOOST_NOEXCEPT
+  bool has_exception() const noexcept
   {
     return _p && _p->_r.which() == 2;
   }
-  bool is_valid() const BOOST_NOEXCEPT
+  bool is_valid() const noexcept
   {
     return bool(_p);
   }

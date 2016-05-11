@@ -15,7 +15,7 @@ namespace tconcurrent
 
 struct operation_canceled : std::exception
 {
-  const char* what() const BOOST_NOEXCEPT override
+  const char* what() const noexcept override
   {
     return "operation was canceled";
   }
