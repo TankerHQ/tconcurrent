@@ -10,17 +10,6 @@ namespace tconcurrent
 
 struct tvoid
 {
-  tvoid() = default;
-
-  [[deprecated("do not construct tvoid from void*, use {}")]]
-  tvoid(void*)
-  {
-  }
-
-  [[deprecated("use tvoid instead of void*")]] operator void*() const
-  {
-    return nullptr;
-  }
 };
 
 template <typename R>
