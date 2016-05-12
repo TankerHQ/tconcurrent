@@ -43,7 +43,10 @@ struct shared<R(Args...)> : detail::shared_base<R>
     {
       this->set_exception(std::current_exception());
     }
-    _f = nullptr;
+    _f = [f = std::move(_f)](auto&&... args) -> R {
+      assert(false && "packaged task called twice");
+      std::terminate();
+    };
   }
 };
 
@@ -58,6 +61,7 @@ struct shared<void(Args...)> : detail::shared_base<tvoid>
   shared(F&& f)
     : _f(std::forward<F>(f))
   {
+    assert(_f);
   }
 
   template <typename... A>
@@ -72,7 +76,10 @@ struct shared<void(Args...)> : detail::shared_base<tvoid>
     {
       this->set_exception(std::current_exception());
     }
-    _f = nullptr;
+    _f = [f = std::move(_f)](auto&&... args) {
+      assert(false && "packaged task called twice");
+      std::terminate();
+    };
   }
 };
 
