@@ -589,7 +589,7 @@ TEST_CASE("test periodic task future error stop", "[periodic_task][executor]")
                     ++called;
                     return make_exceptional_future<void>(18);
                   });
-  pt.set_period(std::chrono::milliseconds(0));
+  pt.set_period(std::chrono::milliseconds(1));
   pt.start();
   CHECK(pt.is_running());
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
