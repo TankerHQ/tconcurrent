@@ -58,6 +58,7 @@ struct shared<void(Args...)> : detail::shared_base<tvoid>
   shared(F&& f)
     : _f(std::forward<F>(f))
   {
+    assert(_f);
   }
 
   template <typename... A>
