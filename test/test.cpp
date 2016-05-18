@@ -464,6 +464,18 @@ TEST_CASE("test future promise cancel callback", "[future][cancel]")
   CHECK_THROWS_AS(fut.get(), operation_canceled);
 }
 
+TEST_CASE("test future promise cancel propagation", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<void> prom;
+  auto fut = prom.get_future();
+  promise<int> prom2(fut);
+  auto fut2 = prom2.get_future();
+
+  fut2.request_cancel();
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+}
+
 TEST_CASE("test future promise continuation cancel", "[future][cancel]")
 {
   unsigned called = 0;
