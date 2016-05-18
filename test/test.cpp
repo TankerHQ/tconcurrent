@@ -278,8 +278,8 @@ TEST_CASE("test delay async", "[async_wait]")
 {
   std::chrono::milliseconds const delay{100};
   auto before = std::chrono::steady_clock::now();
-  auto bdl = async_wait(delay);
-  bdl.fut.wait();
+  auto fut = async_wait(delay);
+  fut.wait();
   auto after = std::chrono::steady_clock::now();
   CHECK(delay < after - before);
 }
@@ -288,9 +288,9 @@ TEST_CASE("test delay async cancel", "[async_wait]")
 {
   std::chrono::milliseconds const delay{100};
   auto before = std::chrono::steady_clock::now();
-  auto bdl = async_wait(delay);
-  bdl.cancel();
-  bdl.fut.wait();
+  auto fut = async_wait(delay);
+  fut.request_cancel();
+  fut.wait();
   auto after = std::chrono::steady_clock::now();
   CHECK(delay > after - before);
 }
@@ -670,14 +670,11 @@ TEST_CASE("test periodic task future", "[periodic_task]")
   unsigned int called = 0;
 
   periodic_task pt;
-  pt.set_callback([&]
-                  {
-                    return async_wait(std::chrono::milliseconds(10))
-                        .fut.and_then([&](tvoid)
-                                      {
-                                        ++called;
-                                      });
-                  });
+  pt.set_callback([&] {
+    return async_wait(std::chrono::milliseconds(10)).and_then([&](tvoid) {
+      ++called;
+    });
+  });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
   CHECK(pt.is_running());
@@ -850,11 +847,10 @@ TEST_CASE("test periodic task future start stop spam", "[periodic_task]")
         if (call.exchange(true))
           fail = true;
         return async_wait(std::chrono::milliseconds(1))
-            .fut.and_then([&](tvoid)
-                          {
-                            if (!call.exchange(false))
-                              fail = true;
-                          });
+            .then([&](future<void> const&) {
+              if (!call.exchange(false))
+                fail = true;
+            });
       });
 
   CHECK(false == fail.load());

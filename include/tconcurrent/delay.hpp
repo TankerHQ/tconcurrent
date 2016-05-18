@@ -13,14 +13,6 @@
 namespace tconcurrent
 {
 
-struct cancelable_bundle
-{
-  using canceler = std::function<void()>;
-
-  future<void> fut;
-  canceler cancel;
-};
-
 namespace detail
 {
 
@@ -40,7 +32,7 @@ struct async_wait_data
 }
 
 template <typename Delay>
-cancelable_bundle async_wait(thread_pool& pool, Delay delay)
+future<void> async_wait(thread_pool& pool, Delay delay)
 {
   if (pool.is_single_threaded())
   {
@@ -53,17 +45,20 @@ cancelable_bundle async_wait(thread_pool& pool, Delay delay)
             data->prom.set_value({});
         });
 
-    return {data->prom.get_future(), [data]() mutable {
-              if (data->fired.exchange(true))
-                return;
+    data->prom.get_cancelation_token().set_cancelation_callback([data] {
+      if (data->fired.exchange(true))
+        return;
 
-              data->timer.cancel();
-              data->prom.set_exception(
-                  std::make_exception_ptr(operation_canceled()));
-            }};
+      data->timer.cancel();
+      data->prom.set_exception(std::make_exception_ptr(operation_canceled()));
+    });
+
+    return data->prom.get_future();
   }
   else
   {
+    auto token = std::make_shared<cancelation_token>();
+
     auto const timer = std::make_shared<boost::asio::steady_timer>(
         pool.get_io_service(), delay);
 
@@ -72,19 +67,22 @@ cancelable_bundle async_wait(thread_pool& pool, Delay delay)
           if (error == boost::asio::error::operation_aborted)
             // ugly throw, bad performance :(
             throw operation_canceled();
-        });
+        },
+        token);
 
     auto& task = std::get<0>(taskfut);
     auto& fut = std::get<1>(taskfut);
 
     timer->async_wait(task);
 
-    return {fut, [timer] { timer->cancel(); }};
+    token->set_cancelation_callback([timer] { timer->cancel(); });
+
+    return fut;
   }
 }
 
 template <typename Delay>
-cancelable_bundle async_wait(Delay delay)
+future<void> async_wait(Delay delay)
 {
   return async_wait(get_default_executor(), delay);
 }

@@ -89,7 +89,6 @@ private:
   boost::asio::io_service& _io_service;
   std::map<curl_socket_t, std::unique_ptr<async_socket>> _sockets;
   future<void> _timer_future;
-  std::function<void()> _cancel_timer;
   detail::CURLM_unique_ptr _multi;
 
   // Check for completed transfers, and remove their easy handles

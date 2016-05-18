@@ -80,7 +80,6 @@ private:
   std::function<future<void>()> _callback;
 
   future<void> _future;
-  std::function<void()> _cancel;
 
   // TODO very ugly design
   thread_pool* _executor{&get_default_executor()};
