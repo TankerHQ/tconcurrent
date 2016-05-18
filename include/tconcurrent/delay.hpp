@@ -13,14 +13,6 @@
 namespace tconcurrent
 {
 
-struct operation_canceled : std::exception
-{
-  const char* what() const noexcept override
-  {
-    return "operation was canceled";
-  }
-};
-
 struct cancelable_bundle
 {
   using canceler = std::function<void()>;

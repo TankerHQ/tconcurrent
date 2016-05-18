@@ -10,6 +10,7 @@
 #include <boost/variant.hpp>
 
 #include <tconcurrent/thread_pool.hpp>
+#include <tconcurrent/cancelation_token.hpp>
 
 namespace tconcurrent
 {
@@ -102,6 +103,13 @@ public:
 
   boost::variant<v_none, v_value, v_exception> _r;
 
+  shared_base(
+      cancelation_token_ptr token = std::make_shared<cancelation_token>())
+    : _cancelation_token(std::move(token))
+  {
+    assert(_cancelation_token);
+  }
+
   virtual ~shared_base()
   {
     assert(_promise_count.load() == 0);
@@ -120,12 +128,6 @@ public:
   void set_exception(std::exception_ptr exc)
   {
     finish([&] { _r = v_exception{exc}; });
-  }
-
-  template <typename F>
-  void then(F&& f)
-  {
-    then(get_default_executor(), std::forward<F>(f));
   }
 
   template <typename E, typename F>
@@ -173,10 +175,17 @@ public:
       _ready.wait(lock);
   }
 
+  std::shared_ptr<cancelation_token> get_cancelation_token()
+  {
+    return _cancelation_token;
+  }
+
 private:
   mutable std::mutex _mutex;
   mutable std::condition_variable _ready;
   std::vector<std::function<void()>> _then;
+
+  cancelation_token_ptr _cancelation_token;
 
   /** Counts the number of promises (or anything that can set the shared state)
    *

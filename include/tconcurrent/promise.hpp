@@ -37,6 +37,11 @@ public:
     _p->set_exception(std::move(exc));
   }
 
+  cancelation_token& get_cancelation_token()
+  {
+    return *_p->get_cancelation_token();
+  }
+
 private:
   using shared_type = detail::shared_base<value_type>;
 

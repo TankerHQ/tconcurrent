@@ -26,8 +26,8 @@ struct shared<R(Args...)> : detail::shared_base<R>
   std::function<R(Args...)> _f;
 
   template <typename F>
-  shared(F&& f)
-    : _f(std::forward<F>(f))
+  shared(cancelation_token_ptr token, F&& f)
+    : base_type(std::move(token)), _f(std::forward<F>(f))
   {
     assert(_f);
   }
@@ -58,8 +58,8 @@ struct shared<void(Args...)> : detail::shared_base<tvoid>
   std::function<void(Args...)> _f;
 
   template <typename F>
-  shared(F&& f)
-    : _f(std::forward<F>(f))
+  shared(cancelation_token_ptr token, F&& f)
+    : base_type(std::move(token)), _f(std::forward<F>(f))
   {
     assert(_f);
   }
@@ -101,7 +101,7 @@ private:
   detail::promise_ptr<shared_type> _p;
 
   template <typename S, typename F>
-  friend auto package(F&& f)
+  friend auto package(F&& f, cancelation_token_ptr token)
       -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
 
   explicit packaged_task(std::shared_ptr<detail::shared<R(Args...)>> p)
@@ -111,12 +111,19 @@ private:
 };
 
 template <typename S, typename F>
-auto package(F&& f)
+auto package(F&& f, cancelation_token_ptr token)
     -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>
 {
-  auto p = std::make_shared<detail::shared<S>>(std::forward<F>(f));
+  auto p =
+      std::make_shared<detail::shared<S>>(std::move(token), std::forward<F>(f));
   return std::make_pair(packaged_task<S>(p),
                         future<detail::result_of_t_<S>>(p));
+}
+
+template <typename S, typename F>
+auto package(F&& f)
+{
+  return package<S>(std::forward<F>(f), std::make_shared<cancelation_token>());
 }
 
 }

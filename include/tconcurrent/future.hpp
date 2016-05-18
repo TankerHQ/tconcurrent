@@ -22,7 +22,9 @@ template <typename>
 class packaged_task;
 
 template <typename S, typename F>
-auto package(F&& f)
+auto package(F&& f);
+template <typename S, typename F>
+auto package(F&& f, cancelation_token_ptr token)
     -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
 
 namespace detail
@@ -67,13 +69,13 @@ template <typename R>
 class future : public detail::future_unwrap<R>
 {
 public:
+  using this_type = future<R>;
   using value_type = typename detail::future_value_type<R>::type;
 
   future() = default;
 
   template <typename F>
-  auto then(F&& f) -> future<
-      typename std::decay<decltype(f(std::declval<future<R>>()))>::type>
+  auto then(F&& f)
   {
     return then(get_default_executor(), std::forward<F>(f));
   }
@@ -88,9 +90,19 @@ public:
         [p, f = std::forward<F>(f)]() mutable { return f(future(p)); });
   }
 
+  template <typename E, typename F>
+  auto then(E&& e, F&& f) -> future<typename std::decay<decltype(
+      f(std::declval<cancelation_token&>(), std::declval<future<R>>()))>::type>
+  {
+    auto p = _p;
+    return then_impl(std::forward<E>(e),
+                     [p, f = std::forward<F>(f)]() mutable {
+                       return f(*p->get_cancelation_token(), future(p));
+                     });
+  }
+
   template <typename F>
-  auto and_then(F&& f) -> future<
-      typename std::decay<decltype(f(std::declval<value_type>()))>::type>
+  auto and_then(F&& f)
   {
     return and_then(get_default_executor(), std::forward<F>(f));
   }
@@ -99,18 +111,23 @@ public:
   auto and_then(E&& e, F&& f) -> future<
       typename std::decay<decltype(f(std::declval<value_type>()))>::type>
   {
-    auto p = _p;
-    return then_impl(std::forward<E>(e), [p, f = std::forward<F>(f)]() {
-      if (p->_r.which() == 1)
-        return f(p->get());
-      else
-      {
-        assert(p->_r.which() == 2);
-        p->get(); // rethrow to set the future to error
-        assert(false && "unreachable code");
-        std::terminate();
-      }
+    return then_impl(std::forward<E>(e), [p = _p, f = std::forward<F>(f)]() {
+      return this_type::do_and_then_callback(*p, [&] { return f(p->get()); });
     });
+  }
+  template <typename E, typename F>
+  auto and_then(E&& e, F&& f) -> future<typename std::decay<decltype(
+      f(std::declval<cancelation_token&>(), std::declval<value_type>()))>::type>
+  {
+    return then_impl(std::forward<E>(e), [p = _p, f = std::forward<F>(f)]() {
+      return this_type::do_and_then_callback(
+          *p, [&] { return f(*p->get_cancelation_token(), p->get()); });
+    });
+  }
+
+  void request_cancel()
+  {
+    _p->get_cancelation_token()->request_cancel();
   }
 
   value_type const& get() const
@@ -154,7 +171,7 @@ private:
   template <typename T>
   friend struct detail::future_unwrap;
   template <typename S, typename F>
-  friend auto package(F&& f)
+  friend auto package(F&& f, cancelation_token_ptr token)
       -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
   template <typename T>
   friend class promise;
@@ -174,9 +191,30 @@ private:
   {
     using result_type = typename std::decay<decltype(f())>::type;
 
-    auto pack = package<result_type()>(std::forward<F>(f));
+    auto pack =
+        package<result_type()>(std::forward<F>(f), _p->get_cancelation_token());
     _p->then(std::forward<E>(e), std::move(pack.first));
     return pack.second;
+  }
+
+  template <typename F>
+  static auto do_and_then_callback(shared_type& p, F&& cb)
+  {
+    assert(p._r.which() != 0);
+    if (p._r.which() == 1)
+    {
+      if (p.get_cancelation_token()->is_cancel_requested())
+        throw operation_canceled();
+      else
+        return cb();
+    }
+    else
+    {
+      assert(p._r.which() == 2);
+      p.get(); // rethrow to set the future to error
+      assert(false && "unreachable code");
+      std::terminate();
+    }
   }
 };
 
