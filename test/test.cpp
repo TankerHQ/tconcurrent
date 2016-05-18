@@ -569,6 +569,36 @@ TEST_CASE("test future promise continuation cancel", "[future][cancel]")
   }
 }
 
+TEST_CASE("test future promise unwrap cancel", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<future<int>> prom;
+  auto fut = prom.get_future();
+  auto fut2 = fut.unwrap();
+
+  fut2.request_cancel();
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+
+  promise<int> prom2;
+  prom.set_value(prom2.get_future());
+  CHECK(prom2.get_cancelation_token().is_cancel_requested());
+}
+
+TEST_CASE("test future promise unwrap late cancel", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<future<int>> prom;
+  auto fut = prom.get_future();
+  auto fut2 = fut.unwrap();
+
+  CHECK(!prom.get_cancelation_token().is_cancel_requested());
+
+  promise<int> prom2;
+  prom.set_value(prom2.get_future());
+  fut2.request_cancel();
+  CHECK(prom2.get_cancelation_token().is_cancel_requested());
+}
+
 TEST_CASE("test when_all", "[when_all]")
 {
   auto const NB_FUTURES = 100;
