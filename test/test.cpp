@@ -448,6 +448,22 @@ TEST_CASE("test future promise cancel callback", "[future][cancel]")
   promise<void> prom;
   auto fut = prom.get_future();
 
+  prom.get_cancelation_token().set_cancelation_callback([&] { ++called; });
+  fut.request_cancel();
+  CHECK(1 == called);
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+
+  CHECK(!fut.is_ready());
+  prom.set_exception(std::make_exception_ptr(operation_canceled{}));
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+}
+
+TEST_CASE("test future promise cancel scope callback", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<void> prom;
+  auto fut = prom.get_future();
+
   {
     auto scope = prom.get_cancelation_token().make_scope_canceler(
         [&] { ++called; });
@@ -458,6 +474,13 @@ TEST_CASE("test future promise cancel callback", "[future][cancel]")
 
   fut.request_cancel();
   CHECK(1 == called);
+
+  {
+    auto scope = prom.get_cancelation_token().make_scope_canceler(
+        [&] { ++called; });
+    CHECK(2 == called);
+    CHECK(prom.get_cancelation_token().is_cancel_requested());
+  }
 
   CHECK(!fut.is_ready());
   prom.set_exception(std::make_exception_ptr(operation_canceled{}));
