@@ -46,9 +46,6 @@ namespace detail
 template <typename...>
 using void_t = void;
 
-template <typename>
-struct shared; // not defined
-
 template <typename R>
 struct package_caller
 {
@@ -69,6 +66,9 @@ struct package_caller<void>
     s.set({});
   }
 };
+
+template <typename>
+struct shared; // not defined
 
 template <typename R, typename... Args>
 struct shared<R(Args...)> : shared_base<shared_base_type<R>>

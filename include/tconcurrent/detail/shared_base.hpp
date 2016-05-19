@@ -97,6 +97,10 @@ private:
   }
 };
 
+struct nocancel_tag
+{
+};
+
 template <typename R>
 class shared_base
 {
@@ -107,11 +111,14 @@ public:
 
   boost::variant<v_none, v_value, v_exception> _r;
 
-  shared_base(
-      cancelation_token_ptr token = std::make_shared<cancelation_token>())
-    : _cancelation_token(std::move(token))
+  shared_base(nocancel_tag)
   {
-    assert(_cancelation_token);
+  }
+
+  shared_base(cancelation_token_ptr token = nullptr)
+    : _cancelation_token(token ? std::move(token) :
+                                 std::make_shared<cancelation_token>())
+  {
   }
 
   virtual ~shared_base()
@@ -181,6 +188,7 @@ public:
 
   std::shared_ptr<cancelation_token> get_cancelation_token()
   {
+    std::unique_lock<std::mutex> lock{_mutex};
     return _cancelation_token;
   }
 
@@ -221,6 +229,7 @@ private:
       std::lock_guard<std::mutex> lock{_mutex};
       setval();
       std::swap(_then, then);
+      _cancelation_token = nullptr;
     }
 
     _ready.notify_all();

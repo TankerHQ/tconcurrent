@@ -623,7 +623,6 @@ TEST_CASE("test future promise continuation cancel", "[future][cancel]")
   {
     auto fut2 = fut.then([&](cancelation_token& token, future<int> const& fut) {
       ++called;
-      CHECK(&token == &prom.get_cancelation_token());
       CHECK(!token.is_cancel_requested());
     });
     prom.set_value(18);
@@ -635,7 +634,6 @@ TEST_CASE("test future promise continuation cancel", "[future][cancel]")
   {
     auto fut2 = fut.then([&](cancelation_token& token, future<int> const& fut) {
       ++called;
-      CHECK(&token == &prom.get_cancelation_token());
       CHECK(token.is_cancel_requested());
     });
     fut2.request_cancel();
@@ -649,7 +647,6 @@ TEST_CASE("test future promise continuation cancel", "[future][cancel]")
     auto fut2 =
         fut.and_then([&](cancelation_token& token, int) {
           ++called;
-          CHECK(&token == &prom.get_cancelation_token());
           CHECK(!token.is_cancel_requested());
         });
     prom.set_value(18);
@@ -662,7 +659,6 @@ TEST_CASE("test future promise continuation cancel", "[future][cancel]")
     future<void> fut2 =
         fut.and_then([&](cancelation_token& token, int) {
           ++called;
-          CHECK(&token == &prom.get_cancelation_token());
           CHECK(!token.is_cancel_requested());
           fut2.request_cancel();
           CHECK(token.is_cancel_requested());
@@ -681,6 +677,34 @@ TEST_CASE("test future promise continuation cancel", "[future][cancel]")
     CHECK_THROWS_AS(fut2.get(), operation_canceled);
     CHECK(0 == called);
   }
+}
+
+TEST_CASE("test future promise continuation complex cancel", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<void> prom;
+  auto fut = prom.get_future().then([&](future<void> fut) {
+    fut.then([&](cancelation_token& token, future<void> fut) {
+      ++called;
+      CHECK(token.is_cancel_requested());
+    });
+  });
+  fut.request_cancel();
+  prom.set_value({});
+  fut.get();
+  CHECK(1 == called);
+}
+
+TEST_CASE("test future ready continuation cancel token", "[future][cancel]")
+{
+  unsigned called = 0;
+  auto fut =
+      make_ready_future().then([&](cancelation_token& token, future<void> fut) {
+        ++called;
+        CHECK(!token.is_cancel_requested());
+      });
+  fut.get();
+  CHECK(1 == called);
 }
 
 TEST_CASE("test future promise unwrap cancel", "[future][cancel]")
