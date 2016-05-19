@@ -32,7 +32,8 @@ void periodic_task::start(StartOption opt)
   else
   {
     // post the callback immediately
-    auto pack = package<future<void>()>([this] { return do_call(); });
+    auto pack = package<future<void>()>(
+        [this](cancelation_token& token) { return do_call(token); });
     _future = std::get<1>(pack).unwrap();
     _executor->post(std::get<0>(pack));
   }
@@ -53,8 +54,7 @@ future<void> periodic_task::stop()
   _future.request_cancel();
   return _future.then(get_synchronous_executor(), [&](future<void> const&) {
     scope_lock l(_mutex);
-    // can be Stopping, or Stopped if the callback threw on
-    // the last run
+    // can be Stopping, or Stopped if the callback threw on the last run
     assert(_state != State::Running);
     _state = State::Stopped;
   });
@@ -70,15 +70,15 @@ void periodic_task::reschedule()
 
   _future = async_wait(*_executor, _period)
                 .and_then(get_synchronous_executor(),
-                          [this](tvoid) { return do_call(); })
-                .unwrap()
-                .then([](future<void> const& fut) {});
+                          [this](cancelation_token& token, tvoid) {
+                            return do_call(token);
+                          })
+                .unwrap();
 }
 
-future<void> periodic_task::do_call()
+future<void> periodic_task::do_call(cancelation_token& token)
 {
-  auto const cb = [&]
-  {
+  auto const cb = [&] {
     scope_lock l(_mutex);
     return _callback;
   }();
@@ -88,6 +88,7 @@ future<void> periodic_task::do_call()
   try
   {
     fut = cb();
+    token.propagate_cancel_to(fut);
     success = true;
   }
   catch (...)

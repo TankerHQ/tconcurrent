@@ -85,7 +85,7 @@ private:
   thread_pool* _executor{&get_default_executor()};
 
   void reschedule();
-  future<void> do_call();
+  future<void> do_call(cancelation_token& token);
 };
 
 }

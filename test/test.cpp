@@ -1030,6 +1030,24 @@ TEST_CASE("test periodic single threaded task stop", "[periodic_task]")
   CHECK(0 < called);
 }
 
+TEST_CASE("test periodic task cancel", "[periodic_task][cancel]")
+{
+  promise<void> prom;
+
+  periodic_task pt;
+  pt.set_callback([&]{ return prom.get_future(); });
+  pt.set_period(std::chrono::milliseconds(0));
+  pt.start(periodic_task::start_immediately);
+  CHECK(!prom.get_cancelation_token().is_cancel_requested());
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  auto stopfut = pt.stop();
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+  CHECK(!stopfut.is_ready());
+  prom.set_exception(std::make_exception_ptr(operation_canceled{}));
+  stopfut.get();
+  CHECK(!pt.is_running());
+}
+
 SCENARIO("test concurrent_queue", "[concurrent_queue]")
 {
   GIVEN("an empty queue")
