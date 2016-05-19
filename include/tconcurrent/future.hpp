@@ -8,10 +8,6 @@
 namespace tconcurrent
 {
 
-struct tvoid
-{
-};
-
 template <typename R>
 class future;
 
