@@ -43,10 +43,7 @@ struct shared<R(Args...)> : detail::shared_base<R>
     {
       this->set_exception(std::current_exception());
     }
-    _f = [f = std::move(_f)](auto&&... args) -> R {
-      assert(false && "packaged task called twice");
-      std::terminate();
-    };
+    _f = nullptr;
   }
 };
 
@@ -76,10 +73,7 @@ struct shared<void(Args...)> : detail::shared_base<tvoid>
     {
       this->set_exception(std::current_exception());
     }
-    _f = [f = std::move(_f)](auto&&... args) {
-      assert(false && "packaged task called twice");
-      std::terminate();
-    };
+    _f = nullptr;
   }
 };
 
