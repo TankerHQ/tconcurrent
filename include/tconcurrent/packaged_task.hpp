@@ -15,6 +15,34 @@ namespace tconcurrent
 namespace detail
 {
 
+struct packaged_task_result_type_2
+{
+  template <typename F, typename... Args>
+  static decltype(std::declval<F>()(std::declval<Args>()...)) f(long);
+  template <typename F, typename... Args>
+  static decltype(std::declval<F>()(std::declval<cancelation_token&>(),
+                                    std::declval<Args>()...))
+  f(int);
+};
+
+template <typename Call>
+struct packaged_task_result_type_; // not defined
+
+template <typename F, typename... Args>
+struct packaged_task_result_type_<F(Args...)>
+{
+  using type = decltype(packaged_task_result_type_2::f<F, Args...>(0));
+};
+
+}
+
+template <typename Call>
+using packaged_task_result_type =
+    typename detail::packaged_task_result_type_<Call>::type;
+
+namespace detail
+{
+
 template <typename...>
 using void_t = void;
 

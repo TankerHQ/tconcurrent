@@ -171,6 +171,43 @@ TEST_CASE("test packaged task cancel", "[packaged_task][cancel]")
   }
 }
 
+TEST_CASE("test packaged task packaged_task_result_type", "[packaged_task]")
+{
+  {
+    auto f = []() -> int { return {}; };
+    static_assert(
+        std::is_same<packaged_task_result_type<decltype(f)()>, int>::value,
+        "packaged_task_result_type deduction error");
+  }
+  {
+    auto f = []() -> void { return {}; };
+    static_assert(
+        std::is_same<packaged_task_result_type<decltype(f)()>, void>::value,
+        "packaged_task_result_type deduction error");
+  }
+  {
+    auto f = [](int, char*) -> float { return {}; };
+    static_assert(
+        std::is_same<packaged_task_result_type<decltype(f)(int, char*)>,
+                     float>::value,
+        "packaged_task_result_type deduction error");
+  }
+  {
+    auto f = [](cancelation_token&) -> float { return {}; };
+    static_assert(
+        std::is_same<packaged_task_result_type<decltype(f)()>,
+                     float>::value,
+        "packaged_task_result_type deduction error");
+  }
+  {
+    auto f = [](cancelation_token&, int, char*) -> float { return {}; };
+    static_assert(
+        std::is_same<packaged_task_result_type<decltype(f)(int, char*)>,
+                     float>::value,
+        "packaged_task_result_type deduction error");
+  }
+}
+
 TEST_CASE("test future unwrap", "[future]")
 {
   auto taskfut = package<future<int>(int)>([](int i)
@@ -289,6 +326,23 @@ TEST_CASE("test reference async", "[async]")
                 "async can't handle reference return type");
   CHECK(42 == fut.get());
   CHECK(hasrun);
+}
+
+TEST_CASE("test async cancelation_token not canceled", "[async][cancel]")
+{
+  auto fut = async(
+      [&](cancelation_token& token) { CHECK(!token.is_cancel_requested()); });
+  fut.get();
+}
+
+TEST_CASE("test async cancelation_token canceled", "[async][cancel]")
+{
+  auto fut = async([&](cancelation_token& token) {
+    while (!token.is_cancel_requested())
+      ;
+  });
+  fut.request_cancel();
+  fut.get();
 }
 
 TEST_CASE("test is_in_this_context", "[executor]")
