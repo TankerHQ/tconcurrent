@@ -463,23 +463,57 @@ TEST_CASE("test future promise cancel scope callback", "[future][cancel]")
   unsigned called = 0;
   promise<void> prom;
   auto fut = prom.get_future();
+  auto& token = prom.get_cancelation_token();
 
   {
-    auto scope = prom.get_cancelation_token().make_scope_canceler(
-        [&] { ++called; });
+    auto scope = token.make_scope_canceler([&] { ++called; });
     fut.request_cancel();
     CHECK(1 == called);
-    CHECK(prom.get_cancelation_token().is_cancel_requested());
+    CHECK(token.is_cancel_requested());
   }
 
   fut.request_cancel();
   CHECK(1 == called);
 
   {
-    auto scope = prom.get_cancelation_token().make_scope_canceler(
-        [&] { ++called; });
+    auto scope = token.make_scope_canceler([&] { ++called; });
     CHECK(2 == called);
-    CHECK(prom.get_cancelation_token().is_cancel_requested());
+    CHECK(token.is_cancel_requested());
+  }
+
+  CHECK(!fut.is_ready());
+  prom.set_exception(std::make_exception_ptr(operation_canceled{}));
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+}
+
+TEST_CASE("test future promise cancel nested scope callback",
+          "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<void> prom;
+  auto fut = prom.get_future();
+  auto& token = prom.get_cancelation_token();
+
+  SECTION("cancel inner")
+  {
+    auto scope = token.make_scope_canceler([&] { CHECK(1 == called); });
+    {
+      auto scope = token.make_scope_canceler([&] { ++called; });
+      fut.request_cancel();
+      CHECK(1 == called);
+      CHECK(token.is_cancel_requested());
+    }
+  }
+
+  SECTION("cancel outer")
+  {
+    auto scope = token.make_scope_canceler([&] { ++called; });
+    {
+      auto scope = token.make_scope_canceler([&] { CHECK(false); });
+    }
+    fut.request_cancel();
+    CHECK(1 == called);
+    CHECK(token.is_cancel_requested());
   }
 
   CHECK(!fut.is_ready());

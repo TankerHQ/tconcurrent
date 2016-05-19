@@ -32,11 +32,12 @@ public:
       : _token(token)
     {
       assert(cb);
-      _token->set_cancelation_callback(std::move(cb));
+      _previous = _token->exchange_cancelation_callback(std::move(cb));
     }
     ~scope_canceler()
     {
-      _token->set_cancelation_callback({});
+      if (_token)
+        _token->set_cancelation_callback(std::move(_previous));
     }
 
     scope_canceler(scope_canceler&&) = default;
@@ -44,6 +45,7 @@ public:
 
   private:
     std::unique_ptr<cancelation_token, boost::null_deleter> _token;
+    cancelation_callback _previous;
   };
 
   bool is_cancel_requested() const
@@ -90,6 +92,21 @@ private:
 
   bool _is_cancel_requested{false};
   std::function<void()> _do_cancel;
+
+  cancelation_callback exchange_cancelation_callback(cancelation_callback cb)
+  {
+    cancelation_callback previous, current;
+    std::tie(previous, current) = [&] {
+      scope_lock l(_mutex);
+      return std::make_tuple(std::exchange(_do_cancel, std::move(cb)),
+                             _do_cancel && _is_cancel_requested ?
+                                 _do_cancel :
+                                 cancelation_callback{});
+    }();
+    if (current)
+      current();
+    return previous;
+  }
 };
 
 using cancelation_token_ptr = std::shared_ptr<cancelation_token>;
