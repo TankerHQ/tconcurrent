@@ -818,10 +818,15 @@ TEST_CASE("test periodic task executor", "[periodic_task][executor]")
   thread_pool tp;
   tp.start(1);
 
+  bool fail{false};
   unsigned int called = 0;
   periodic_task pt;
   pt.set_executor(&tp);
-  pt.set_callback([&]{ CHECK(tp.is_in_this_context()); ++called; });
+  pt.set_callback([&] {
+    if (!tp.is_in_this_context())
+      fail = true;
+    ++called;
+  });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start(periodic_task::start_immediately);
   CHECK(pt.is_running());
@@ -829,6 +834,7 @@ TEST_CASE("test periodic task executor", "[periodic_task][executor]")
   pt.stop().get();
   CHECK(!pt.is_running());
   CHECK(5 == called);
+  CHECK(!fail);
 }
 
 TEST_CASE("test periodic task error stop", "[periodic_task][executor]")
