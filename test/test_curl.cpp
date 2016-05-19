@@ -69,7 +69,7 @@ TEST_CASE("curl cancel request")
       [](request&, void const*, std::size_t size) { return size; });
   req.set_finish_callback(
       [](request&, CURLcode c) { CHECK(false); });
-  req.set_url("http://httpbin.org/delay");
+  req.set_url("http://httpbin.org/delay/10");
 
   auto before = std::chrono::steady_clock::now();
   mul.process(&req);
@@ -150,7 +150,7 @@ TEST_CASE("curl read_all cancel")
 {
   multi mul;
   auto req = std::make_shared<request>();
-  req->set_url("http://httpbin.org/delay");
+  req->set_url("http://httpbin.org/delay/10");
 
   auto fut = read_all(mul, req);
   fut.request_cancel();
