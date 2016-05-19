@@ -1,7 +1,6 @@
 #ifndef TCONCURRENT_WHEN_HPP
 #define TCONCURRENT_WHEN_HPP
 
-#include <iostream>
 #include <atomic>
 #include <tconcurrent/promise.hpp>
 

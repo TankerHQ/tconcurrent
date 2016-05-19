@@ -1,7 +1,6 @@
 #include <catch.hpp>
 
 #include <tconcurrent/coroutine.hpp>
-#include <iostream>
 #include <tconcurrent/delay.hpp>
 #include <tconcurrent/promise.hpp>
 #include <tconcurrent/thread_pool.hpp>
@@ -40,7 +39,7 @@ TEST_CASE("coroutine global wait ready", "[coroutine]")
 {
   auto ready = make_ready_future();
   auto f = async_resumable([&](auto& await) {
-    tconcurrent::await(ready);
+    await(ready);
     return 42;
   });
   CHECK(42 == f.get());
@@ -55,7 +54,7 @@ TEST_CASE("coroutine wait ready value", "[coroutine]")
 
 TEST_CASE("coroutine wait", "[coroutine]")
 {
-  tconcurrent::promise<void> prom;
+  promise<void> prom;
   auto f = async_resumable([&](auto& await) {
     await(prom.get_future());
     return 42;
@@ -66,7 +65,7 @@ TEST_CASE("coroutine wait", "[coroutine]")
 
 TEST_CASE("coroutine nested", "[coroutine]")
 {
-  tconcurrent::promise<int> prom;
+  promise<int> prom;
   auto f = async_resumable([&](auto& await) {
     return await(
         async_resumable([&](auto& await) { return await(prom.get_future()); }));
@@ -77,7 +76,7 @@ TEST_CASE("coroutine nested", "[coroutine]")
 
 TEST_CASE("coroutine wait and throw", "[coroutine]")
 {
-  tconcurrent::promise<void> prom;
+  promise<void> prom;
   auto f = async_resumable([&](auto& await) {
     await(prom.get_future());
     throw 42;
@@ -88,11 +87,25 @@ TEST_CASE("coroutine wait and throw", "[coroutine]")
 
 TEST_CASE("coroutine wait error", "[coroutine]")
 {
-  tconcurrent::promise<void> prom;
+  promise<void> prom;
   auto f = async_resumable([&](auto& await) {
     await(prom.get_future());
     return 42;
   });
   prom.set_exception(std::make_exception_ptr(42));
   CHECK_THROWS_AS(f.get(), int);
+}
+
+TEST_CASE("coroutine cancel propagation", "[coroutine][cancel]")
+{
+  promise<void> prom;
+  auto f = async_resumable([&](auto& await) {
+    await(prom.get_future());
+    return 42;
+  });
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  f.request_cancel();
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+  prom.set_value({});
+  CHECK_THROWS_AS(f.get(), operation_canceled);
 }

@@ -221,14 +221,12 @@ future<R> detail::future_unwrap<future<R>>::unwrap()
   auto sb = std::make_shared<typename future<R>::shared_type>(
       fut._p->get_cancelation_token());
   fut.then(get_synchronous_executor(),
-           [sb](cancelation_token& token, future<future<R>> const& fut) {
+           [sb](future<future<R>> const& fut) {
              if (fut.has_exception())
                sb->set_exception(fut.get_exception());
              else
              {
                auto nested = fut.get();
-               token.set_cancelation_callback(
-                   [nested]() mutable { nested.request_cancel(); });
                nested.then(get_synchronous_executor(),
                            [sb](future<R> const& nested) {
                              if (nested.has_exception())

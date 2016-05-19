@@ -693,7 +693,7 @@ TEST_CASE("test future promise unwrap cancel", "[future][cancel]")
   fut2.request_cancel();
   CHECK(prom.get_cancelation_token().is_cancel_requested());
 
-  promise<int> prom2;
+  promise<int> prom2(fut);
   prom.set_value(prom2.get_future());
   CHECK(prom2.get_cancelation_token().is_cancel_requested());
 }
@@ -707,7 +707,7 @@ TEST_CASE("test future promise unwrap late cancel", "[future][cancel]")
 
   CHECK(!prom.get_cancelation_token().is_cancel_requested());
 
-  promise<int> prom2;
+  promise<int> prom2(fut);
   prom.set_value(prom2.get_future());
   fut2.request_cancel();
   CHECK(prom2.get_cancelation_token().is_cancel_requested());

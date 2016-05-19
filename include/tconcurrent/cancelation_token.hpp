@@ -68,6 +68,14 @@ public:
       f();
   }
 
+  template <typename Future>
+  void propagate_cancel_to(Future fut)
+  {
+    set_cancelation_callback([fut = std::move(fut)]() mutable {
+      fut.request_cancel();
+    });
+  }
+
   scope_canceler make_scope_canceler(cancelation_callback cb)
   {
     return scope_canceler(this, std::move(cb));

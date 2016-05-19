@@ -22,8 +22,10 @@ struct coroutine_control
   coroutine_t ctx;
   coroutine_t* argctx;
 
-  coroutine_control(coroutine_t ctx)
-    : ctx(std::move(ctx)), argctx(nullptr)
+  cancelation_token& token;
+
+  coroutine_control(coroutine_t ctx, cancelation_token& token)
+    : ctx(std::move(ctx)), argctx(nullptr), token(token)
   {}
   coroutine_control(coroutine_control const&) = delete;
   coroutine_control(coroutine_control&&) = delete;
@@ -61,10 +63,18 @@ template <typename Awaitable>
 typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
     Awaitable&& awaitable)
 {
+  if (token.is_cancel_requested())
+    throw operation_canceled{};
   if (!awaitable.is_ready())
+  {
+    auto canceler =
+        token.make_scope_canceler([&] { awaitable.request_cancel(); });
     *argctx = std::get<0>((*argctx)([&awaitable](coroutine_control* ctrl) {
       awaitable.then([ctrl](auto const& f) { run_coroutine(ctrl); });
     }));
+  }
+  if (token.is_cancel_requested())
+    throw operation_canceled{};
   return awaitable.get();
 }
 
@@ -78,15 +88,16 @@ auto async_resumable(F&& cb)
   using return_type =
       std::decay_t<decltype(cb(std::declval<detail::coroutine_control&>()))>;
 
-  return async([cb = std::forward<F>(cb)] {
+  return async([cb = std::forward<F>(cb)](cancelation_token& token) {
     auto pack = package<return_type(detail::coroutine_control&)>(std::move(cb));
+    token.propagate_cancel_to(pack.second);
 
-    detail::coroutine_control* cs =
-        new detail::coroutine_control(detail::coroutine_t(
+    detail::coroutine_control* cs = new detail::coroutine_control(
+        detail::coroutine_t(
             std::allocator_arg,
             boost::context::fixedsize_stack(
                 boost::context::stack_traits::default_size() * 2),
-            [ cb = std::move(pack.first), &cs ](
+            [cb = std::move(pack.first), &cs](
                 detail::coroutine_t argctx,
                 detail::coroutine_controller const&) {
               auto mycs = cs;
@@ -98,7 +109,8 @@ auto async_resumable(F&& cb)
               cb(*mycs);
 
               return argctx;
-            }));
+            }),
+        token);
 
     detail::coroutine_controller f;
     std::tie(cs->ctx, f) = cs->ctx({});
