@@ -87,6 +87,8 @@ future<read_all_result> read_all(multi& multi, std::shared_ptr<request> req)
 
     ra->_multi.cancel(ra->_req.get());
     ra->_promise.set_exception(std::make_exception_ptr(operation_canceled{}));
+    ra->_promise = {};
+    ra->_req = nullptr;
   });
 
   multi.process(ra->_req.get());
