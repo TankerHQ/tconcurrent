@@ -61,6 +61,7 @@ public:
   multi& operator=(multi&&) = delete;
 
   void process(request* req);
+  void cancel(request* req);
 
   CURLM* get_multi()
   {
@@ -193,14 +194,7 @@ struct read_all_result
   data_type data;
 };
 
-future<read_all_result> read_all(request_ptr req);
-
-inline future<read_all_result> read_all(multi& multi, request_ptr const& req)
-{
-  auto fut = read_all(req);
-  multi.process(&*req);
-  return fut;
-}
+future<read_all_result> read_all(multi& multi, request_ptr req);
 
 }
 }

@@ -489,7 +489,6 @@ TEST_CASE("test future promise cancel scope callback", "[future][cancel]")
 
 TEST_CASE("test future promise cancel propagation", "[future][cancel]")
 {
-  unsigned called = 0;
   promise<void> prom;
   auto fut = prom.get_future();
   promise<int> prom2(fut);

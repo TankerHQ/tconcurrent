@@ -104,6 +104,11 @@ void multi::process(request* req)
                              curl_multi_strerror(rc));
 }
 
+void multi::cancel(request* req)
+{
+  curl_multi_remove_handle(_multi.get(), req->_easy.get());
+}
+
 void multi::remove_finished()
 {
   CURLMsg* msg;
