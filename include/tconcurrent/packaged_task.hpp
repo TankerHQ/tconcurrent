@@ -15,6 +15,9 @@ namespace tconcurrent
 namespace detail
 {
 
+template <typename...>
+using void_t = void;
+
 template <typename>
 struct shared; // not defined
 
@@ -44,10 +47,26 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
 {
   using base_type = shared_base<shared_base_type<R>>;
 
-  std::function<R(Args...)> _f;
+  std::function<R(cancelation_token&, Args...)> _f;
 
   template <typename F>
-  shared(cancelation_token_ptr token, F&& f)
+  shared(
+      cancelation_token_ptr token,
+      F&& f,
+      void_t<decltype(std::declval<F>()(std::declval<Args>()...))>* = nullptr)
+    : base_type(std::move(token)),
+      _f([f = std::forward<F>(f)](cancelation_token&, auto&&... args) mutable {
+        return f(std::forward<decltype(args)>(args)...);
+      })
+  {
+  }
+
+  template <typename F>
+  shared(
+      cancelation_token_ptr token,
+      F&& f,
+      void_t<decltype(std::declval<F>()(std::declval<cancelation_token&>(),
+                                        std::declval<Args>()...))>** = nullptr)
     : base_type(std::move(token)), _f(std::forward<F>(f))
   {
     assert(_f);
@@ -58,7 +77,8 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
   {
     try
     {
-      package_caller<R>::do_call(*this, _f, std::forward<A>(args)...);
+      package_caller<R>::do_call(
+          *this, _f, *this->_cancelation_token, std::forward<A>(args)...);
     }
     catch (...)
     {

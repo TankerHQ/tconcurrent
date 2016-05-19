@@ -144,6 +144,33 @@ TEST_CASE("test delayed packaged task", "[packaged_task]")
   th.join();
 }
 
+TEST_CASE("test packaged task cancel", "[packaged_task][cancel]")
+{
+  bool cancelreq;
+  auto taskfut = package<int(int)>([&](cancelation_token& token, int i) {
+    cancelreq = token.is_cancel_requested();
+    return i * 2;
+  });
+  auto& task = std::get<0>(taskfut);
+  auto& future = std::get<1>(taskfut);
+  CHECK(!future.is_ready());
+
+  SECTION("not canceled")
+  {
+    task(21);
+    CHECK(42 == future.get());
+    CHECK(!cancelreq);
+  }
+
+  SECTION("canceled")
+  {
+    future.request_cancel();
+    task(21);
+    CHECK(42 == future.get());
+    CHECK(cancelreq);
+  }
+}
+
 TEST_CASE("test future unwrap", "[future]")
 {
   auto taskfut = package<future<int>(int)>([](int i)
@@ -284,7 +311,7 @@ TEST_CASE("test delay async", "[async_wait]")
   CHECK(delay < after - before);
 }
 
-TEST_CASE("test delay async cancel", "[async_wait]")
+TEST_CASE("test delay async cancel", "[async_wait][cancel]")
 {
   std::chrono::milliseconds const delay{100};
   auto before = std::chrono::steady_clock::now();

@@ -189,8 +189,10 @@ private:
   mutable std::condition_variable _ready;
   std::vector<std::function<void()>> _then;
 
+protected:
   cancelation_token_ptr _cancelation_token;
 
+private:
   /** Counts the number of promises (or anything that can set the shared state)
    *
    * This count is used to set an error state when all promises are destroyed.
