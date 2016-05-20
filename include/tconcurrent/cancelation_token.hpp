@@ -7,8 +7,6 @@
 #include <stdexcept>
 #include <cassert>
 
-#include <boost/core/null_deleter.hpp>
-
 namespace tconcurrent
 {
 
@@ -28,24 +26,27 @@ public:
   class scope_canceler
   {
   public:
+    scope_canceler() = default;
     scope_canceler(cancelation_token* token, cancelation_callback cb)
       : _token(token)
     {
       assert(cb);
-      _previous = _token->exchange_cancelation_callback(std::move(cb));
-    }
-    ~scope_canceler()
-    {
-      if (_token)
-        _token->set_cancelation_callback(std::move(_previous));
+      _token->push_cancelation_callback(std::move(cb));
     }
 
     scope_canceler(scope_canceler&&) = default;
     scope_canceler& operator=(scope_canceler&&) = default;
 
   private:
-    std::unique_ptr<cancelation_token, boost::null_deleter> _token;
-    cancelation_callback _previous;
+    struct deleter
+    {
+      void operator()(cancelation_token* token) const
+      {
+        token->pop_cancelation_callback();
+      }
+    };
+
+    std::unique_ptr<cancelation_token, deleter> _token;
   };
 
   bool is_cancel_requested() const
