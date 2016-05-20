@@ -25,6 +25,9 @@ public:
     : _p(std::make_shared<shared>(std::move(futures)))
   {
     assert(!_p->futurelist.empty());
+
+    _p->prom.get_cancelation_token().set_cancelation_callback(
+        [p = _p] { p->request_cancel(); });
   }
 
   void operator()(F const&)
@@ -49,6 +52,12 @@ private:
     shared(std::vector<F> futlist)
       : futurelist(std::move(futlist)), count(0), total(futurelist.size())
     {}
+
+    void request_cancel()
+    {
+      for (auto& f : futurelist)
+        f.request_cancel();
+    }
   };
 
   std::shared_ptr<shared> _p;

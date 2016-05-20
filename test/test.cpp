@@ -803,6 +803,27 @@ TEST_CASE("test when_all empty", "[when_all]")
   CHECK(0 == futs.size());
 }
 
+TEST_CASE("test when_all cancel", "[when_all][cancel]")
+{
+  auto const NB_FUTURES = 100;
+
+  std::vector<promise<void>> promises(NB_FUTURES);
+  std::vector<future<void>> futures;
+  for (auto const& prom : promises)
+    futures.push_back(prom.get_future());
+
+  auto all = when_all(futures.begin(), futures.end());
+  all.request_cancel();
+
+  for (unsigned int i = 0; i < NB_FUTURES; ++i)
+    CHECK(promises[i].get_cancelation_token().is_cancel_requested());
+
+  for (unsigned int i = 0; i < NB_FUTURES; ++i)
+    promises[i].set_value({});
+
+  all.get();
+}
+
 // periodic task
 
 TEST_CASE("test periodic task construct", "[periodic_task]")
