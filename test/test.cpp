@@ -630,13 +630,28 @@ TEST_CASE("test future promise continuation cancel", "[future][cancel]")
     CHECK(1 == called);
   }
 
-  SECTION("then cancel")
+  SECTION("then cancel first")
   {
     auto fut2 = fut.then([&](cancelation_token& token, future<int> const& fut) {
       ++called;
       CHECK(token.is_cancel_requested());
     });
     fut2.request_cancel();
+    CHECK(prom.get_cancelation_token().is_cancel_requested());
+    prom.set_value(18);
+    fut2.get();
+    CHECK(1 == called);
+  }
+
+  SECTION("then cancel second")
+  {
+    future<void> fut2 =
+        fut.then([&](cancelation_token& token, future<int> const& fut) {
+          ++called;
+          CHECK(!token.is_cancel_requested());
+          fut2.request_cancel();
+          CHECK(token.is_cancel_requested());
+        });
     prom.set_value(18);
     fut2.get();
     CHECK(1 == called);
@@ -654,7 +669,20 @@ TEST_CASE("test future promise continuation cancel", "[future][cancel]")
     CHECK(1 == called);
   }
 
-  SECTION("and_then cancel")
+  SECTION("and_then cancel first")
+  {
+    future<void> fut2 =
+        fut.and_then([&](cancelation_token& token, int) {
+          ++called;
+        });
+    fut2.request_cancel();
+    CHECK(prom.get_cancelation_token().is_cancel_requested());
+    prom.set_value(18);
+    CHECK_THROWS_AS(fut2.get(), operation_canceled);
+    CHECK(0 == called);
+  }
+
+  SECTION("and_then cancel second")
   {
     future<void> fut2 =
         fut.and_then([&](cancelation_token& token, int) {

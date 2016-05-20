@@ -98,7 +98,9 @@ TEST_CASE("coroutine wait error", "[coroutine]")
 
 TEST_CASE("coroutine cancel propagation", "[coroutine][cancel]")
 {
+  unsigned called = 0;
   promise<void> prom;
+  prom.get_cancelation_token().set_cancelation_callback([&] { ++called; });
   auto f = async_resumable([&](auto& await) {
     await(prom.get_future());
     return 42;
@@ -106,6 +108,7 @@ TEST_CASE("coroutine cancel propagation", "[coroutine][cancel]")
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
   f.request_cancel();
   CHECK(prom.get_cancelation_token().is_cancel_requested());
+  CHECK(1 == called);
   prom.set_value({});
   CHECK_THROWS_AS(f.get(), operation_canceled);
 }
