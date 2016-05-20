@@ -2,6 +2,7 @@
 
 #include <tconcurrent/curl/curl.hpp>
 #include <tconcurrent/promise.hpp>
+#include <tconcurrent/async.hpp>
 
 using namespace tconcurrent;
 using namespace tconcurrent::curl;
@@ -73,7 +74,7 @@ TEST_CASE("curl cancel request")
 
   auto before = std::chrono::steady_clock::now();
   mul.process(&req);
-  mul.cancel(&req);
+  async([&] { mul.cancel(&req); }).get();
   auto after = std::chrono::steady_clock::now();
 
   CHECK(std::chrono::seconds(1) > after - before);
@@ -153,7 +154,7 @@ TEST_CASE("curl read_all cancel")
   req->set_url("http://httpbin.org/delay/10");
 
   auto fut = read_all(mul, req);
-  fut.request_cancel();
+  async([&] { fut.request_cancel(); }).get();
   auto before = std::chrono::steady_clock::now();
   CHECK_THROWS_AS(fut.get(), operation_canceled);
   auto after = std::chrono::steady_clock::now();
