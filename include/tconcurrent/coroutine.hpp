@@ -90,7 +90,6 @@ auto async_resumable(F&& cb)
 
   return async([cb = std::forward<F>(cb)](cancelation_token& token) {
     auto pack = package<return_type(detail::coroutine_control&)>(std::move(cb));
-    token.propagate_cancel_to(pack.second);
 
     detail::coroutine_control* cs = new detail::coroutine_control(
         detail::coroutine_t(

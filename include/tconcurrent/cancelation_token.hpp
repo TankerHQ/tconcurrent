@@ -1,6 +1,7 @@
 #ifndef TCONCURRENT_CANCELATION_TOKEN_HPP
 #define TCONCURRENT_CANCELATION_TOKEN_HPP
 
+#include <deque>
 #include <functional>
 #include <mutex>
 #include <memory>
@@ -55,26 +56,41 @@ public:
     return _is_cancel_requested;
   }
 
-  void set_cancelation_callback(cancelation_callback cb)
+  void push_cancelation_callback(cancelation_callback cb)
   {
-    auto f = [&] {
+    auto current = [&] {
       scope_lock l(_mutex);
-      _do_cancel = std::move(cb);
-      if (_do_cancel && _is_cancel_requested)
-        return _do_cancel;
-      else
-        return cancelation_callback{};
+      _do_cancels.push_back(std::move(cb));
+      return _is_cancel_requested ? _do_cancels.back() : cancelation_callback{};
     }();
-    if (f)
-      f();
+    if (current)
+      current();
   }
 
-  template <typename Future>
-  void propagate_cancel_to(Future fut)
+  void push_last_cancelation_callback(cancelation_callback cb)
   {
-    set_cancelation_callback([fut = std::move(fut)]() mutable {
-      fut.request_cancel();
-    });
+    auto current = [&] {
+      scope_lock l(_mutex);
+      _do_cancels.push_front(std::move(cb));
+      return _is_cancel_requested && _do_cancels.size() == 1 ?
+                 _do_cancels.back() :
+                 cancelation_callback{};
+    }();
+    if (current)
+      current();
+  }
+
+  void pop_cancelation_callback()
+  {
+    auto current = [&] {
+      scope_lock l(_mutex);
+      _do_cancels.pop_back();
+      return _is_cancel_requested && !_do_cancels.empty() ?
+                 _do_cancels.back() :
+                 cancelation_callback{};
+    }();
+    if (current)
+      current();
   }
 
   scope_canceler make_scope_canceler(cancelation_callback cb)
@@ -87,7 +103,8 @@ public:
     auto f = [&] {
       scope_lock l(_mutex);
       _is_cancel_requested = true;
-      return _do_cancel;
+      return !_do_cancels.empty() ? _do_cancels.back() :
+                                    cancelation_callback{};
     }();
     if (f)
       f();
@@ -100,22 +117,7 @@ private:
   mutable mutex _mutex;
 
   bool _is_cancel_requested{false};
-  std::function<void()> _do_cancel;
-
-  cancelation_callback exchange_cancelation_callback(cancelation_callback cb)
-  {
-    cancelation_callback previous, current;
-    std::tie(previous, current) = [&] {
-      scope_lock l(_mutex);
-      return std::make_tuple(std::exchange(_do_cancel, std::move(cb)),
-                             _do_cancel && _is_cancel_requested ?
-                                 _do_cancel :
-                                 cancelation_callback{});
-    }();
-    if (current)
-      current();
-    return previous;
-  }
+  std::deque<cancelation_callback> _do_cancels;
 };
 
 using cancelation_token_ptr = std::shared_ptr<cancelation_token>;

@@ -42,14 +42,18 @@ future<void> async_wait(thread_pool& pool, Delay delay)
     data->timer.async_wait(
         [data](boost::system::error_code const&) mutable {
           if (!data->fired.exchange(true))
+          {
+            data->prom.get_cancelation_token().pop_cancelation_callback();
             data->prom.set_value({});
+          }
         });
 
-    data->prom.get_cancelation_token().set_cancelation_callback([data] {
+    data->prom.get_cancelation_token().push_cancelation_callback([data] {
       if (data->fired.exchange(true))
         return;
 
       data->timer.cancel();
+      data->prom.get_cancelation_token().pop_cancelation_callback();
       data->prom.set_exception(std::make_exception_ptr(operation_canceled()));
     });
 
@@ -63,9 +67,10 @@ future<void> async_wait(thread_pool& pool, Delay delay)
         pool.get_io_service(), delay);
 
     auto taskfut = package<void(boost::system::error_code const&)>(
-        [timer](boost::system::error_code const& error) {
+        [timer, token](boost::system::error_code const& error) {
+          token->pop_cancelation_callback();
           if (error == boost::asio::error::operation_aborted)
-            // ugly throw, bad performance :(
+            // TODO ugly throw, bad performance :(
             throw operation_canceled();
         },
         token);
@@ -73,9 +78,9 @@ future<void> async_wait(thread_pool& pool, Delay delay)
     auto& task = std::get<0>(taskfut);
     auto& fut = std::get<1>(taskfut);
 
-    timer->async_wait(task);
+    token->push_cancelation_callback([timer] { timer->cancel(); });
 
-    token->set_cancelation_callback([timer] { timer->cancel(); });
+    timer->async_wait(task);
 
     return fut;
   }

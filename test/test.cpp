@@ -529,7 +529,7 @@ TEST_CASE("test future promise cancel callback", "[future][cancel]")
   promise<void> prom;
   auto fut = prom.get_future();
 
-  prom.get_cancelation_token().set_cancelation_callback([&] { ++called; });
+  prom.get_cancelation_token().push_cancelation_callback([&] { ++called; });
   fut.request_cancel();
   CHECK(1 == called);
   CHECK(prom.get_cancelation_token().is_cancel_requested());

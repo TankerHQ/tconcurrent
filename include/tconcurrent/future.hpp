@@ -252,6 +252,10 @@ future<R> detail::future_unwrap<future<R>>::unwrap()
              else
              {
                auto nested = fut.get();
+               if (sb->get_cancelation_token() !=
+                   nested._p->get_cancelation_token())
+                 sb->get_cancelation_token()->push_last_cancelation_callback(
+                     [nested]() mutable { nested.request_cancel(); });
                nested.then(get_synchronous_executor(),
                            [sb](future<R> const& nested) {
                              if (nested.has_exception())

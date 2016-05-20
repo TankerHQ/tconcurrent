@@ -88,7 +88,6 @@ future<void> periodic_task::do_call(cancelation_token& token)
   try
   {
     fut = cb();
-    token.propagate_cancel_to(fut);
     success = true;
   }
   catch (...)

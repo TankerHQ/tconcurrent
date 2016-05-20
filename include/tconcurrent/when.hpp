@@ -26,14 +26,17 @@ public:
   {
     assert(!_p->futurelist.empty());
 
-    _p->prom.get_cancelation_token().set_cancelation_callback(
+    _p->canceler = _p->prom.get_cancelation_token().make_scope_canceler(
         [p = _p] { p->request_cancel(); });
   }
 
   void operator()(F const&)
   {
     if (++_p->count == _p->total)
+    {
+      _p->canceler = {};
       _p->prom.set_value(std::move(_p->futurelist));
+    }
   };
 
   future<std::vector<F>> get_future()
@@ -48,6 +51,7 @@ private:
     std::atomic<unsigned int> count;
     unsigned int const total;
     promise<std::vector<F>> prom;
+    cancelation_token::scope_canceler canceler;
 
     shared(std::vector<F> futlist)
       : futurelist(std::move(futlist)), count(0), total(futurelist.size())
