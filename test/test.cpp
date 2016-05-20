@@ -785,6 +785,7 @@ TEST_CASE("test when_all", "[when_all]")
     if (!(i % 2))
       promises[i].set_value({});
 
+  CHECK(all.is_ready());
   auto& futs = all.get();
   CHECK(futures.size() == futs.size());
   for (auto const& fut : futs)

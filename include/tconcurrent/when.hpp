@@ -84,7 +84,7 @@ future<std::vector<typename InputIterator::value_type>> when_all(
   detail::when_all_callback<value_type> cb{futlist};
 
   for (auto& fut : futlist)
-    fut.then(cb);
+    fut.then(get_synchronous_executor(), cb);
 
   return cb.get_future();
 }
