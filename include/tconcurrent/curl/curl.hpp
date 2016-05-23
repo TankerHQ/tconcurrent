@@ -61,6 +61,7 @@ public:
   multi& operator=(multi&&) = delete;
 
   void process(request* req);
+  void cancel(request* req);
 
   CURLM* get_multi()
   {
@@ -89,7 +90,6 @@ private:
   boost::asio::io_service& _io_service;
   std::map<curl_socket_t, std::unique_ptr<async_socket>> _sockets;
   future<void> _timer_future;
-  std::function<void()> _cancel_timer;
   detail::CURLM_unique_ptr _multi;
 
   // Check for completed transfers, and remove their easy handles
@@ -194,14 +194,7 @@ struct read_all_result
   data_type data;
 };
 
-future<read_all_result> read_all(request_ptr req);
-
-inline future<read_all_result> read_all(multi& multi, request_ptr const& req)
-{
-  auto fut = read_all(req);
-  multi.process(&*req);
-  return fut;
-}
+future<read_all_result> read_all(multi& multi, request_ptr req);
 
 }
 }

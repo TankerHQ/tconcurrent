@@ -13,16 +13,21 @@ namespace
 {
 struct read_all_helper
 {
+  multi& _multi;
   std::shared_ptr<request> _req;
   read_all_result::header_type _header;
   read_all_result::data_type _data;
   promise<read_all_result> _promise;
+
+  read_all_helper(multi& multi) : _multi(multi)
+  {
+  }
 };
 }
 
-future<read_all_result> read_all(std::shared_ptr<request> req)
+future<read_all_result> read_all(multi& multi, std::shared_ptr<request> req)
 {
-  auto ra = std::make_shared<read_all_helper>();
+  auto ra = std::make_shared<read_all_helper>(multi);
   // creates a cycle, but it will be broken when the request finishes
   ra->_req = std::move(req);
 
@@ -74,6 +79,19 @@ future<read_all_result> read_all(std::shared_ptr<request> req)
     ra->_promise = {};
     ra->_req = nullptr;
   });
+
+  ra->_promise.get_cancelation_token().push_cancelation_callback([ra] {
+    // if query is already finished
+    if (!ra->_req)
+      return;
+
+    ra->_multi.cancel(ra->_req.get());
+    ra->_promise.set_exception(std::make_exception_ptr(operation_canceled{}));
+    ra->_promise = {};
+    ra->_req = nullptr;
+  });
+
+  multi.process(ra->_req.get());
 
   return ra->_promise.get_future();
 }

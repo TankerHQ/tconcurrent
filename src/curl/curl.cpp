@@ -76,17 +76,15 @@ multi::multi(boost::asio::io_service& io_service)
 multi::~multi()
 {
   future<void> fut;
-  std::function<void()> cancel;
   {
     scope_lock l{_mutex};
     _dying = true;
-    cancel = _cancel_timer;
     fut = _timer_future;
   }
 
-  if (cancel)
+  if (fut.is_valid())
   {
-    cancel();
+    fut.request_cancel();
     fut.wait();
   }
 }
@@ -104,6 +102,11 @@ void multi::process(request* req)
   if (CURLM_OK != rc)
     throw std::runtime_error(std::string("curl_multi_add_handle failed: ") +
                              curl_multi_strerror(rc));
+}
+
+void multi::cancel(request* req)
+{
+  curl_multi_remove_handle(_multi.get(), req->_easy.get());
 }
 
 void multi::remove_finished()
@@ -206,9 +209,9 @@ void multi::event_cb(async_socket* asocket,
 
   remove_finished();
 
-  if (still_running <= 0 && _cancel_timer)
+  if (still_running <= 0 && _timer_future.is_valid())
     // last transfer done, kill timeout
-    _cancel_timer();
+    _timer_future.request_cancel();
 }
 
 // Called by asio when our timeout expires
@@ -236,16 +239,15 @@ int multi::multi_timer_cb(CURLM* multi, long timeout_ms)
     return 0;
 
   // cancel running timer
-  if (_cancel_timer)
-    _cancel_timer();
+  if (_timer_future.is_valid())
+    _timer_future.request_cancel();
 
   if (timeout_ms > 0)
   {
     // update timer
-    auto bundle = async_wait(std::chrono::milliseconds(timeout_ms));
-    _timer_future = bundle.fut.and_then(tconcurrent::get_synchronous_executor(),
-        [this](tvoid) { timer_cb(); });
-    _cancel_timer = std::move(bundle.cancel);
+    _timer_future = async_wait(std::chrono::milliseconds(timeout_ms))
+                        .and_then(tconcurrent::get_synchronous_executor(),
+                                  [this](tvoid) { timer_cb(); });
   }
   else
   {

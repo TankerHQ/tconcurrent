@@ -19,10 +19,17 @@ void default_error_cb(std::exception_ptr const&)
 
 namespace
 {
+#if TCONCURRENT_USE_THREAD_LOCAL
+thread_local void* current_executor;
+#define SET_THREAD_LOCAL(tl, val) tl = val
+#define GET_THREAD_LOCAL(tl) tl
+#else
 void noopdelete(void*)
 {}
-// can't use c++11 thread_local because of osx and windoz \o/
 boost::thread_specific_ptr<void> current_executor(noopdelete);
+#define SET_THREAD_LOCAL(tl, val) tl.reset(val)
+#define GET_THREAD_LOCAL(tl) tl.get()
+#endif
 }
 
 thread_pool::~thread_pool()
@@ -33,7 +40,7 @@ thread_pool::~thread_pool()
 
 bool thread_pool::is_in_this_context() const
 {
-  return current_executor.get() == this;
+  return GET_THREAD_LOCAL(current_executor) == this;
 }
 
 bool thread_pool::is_single_threaded() const
@@ -56,13 +63,13 @@ void thread_pool::start(unsigned int thread_count)
 
 void thread_pool::run_thread()
 {
-  current_executor.reset(this);
+  SET_THREAD_LOCAL(current_executor, this);
   while (true)
   {
     try
     {
       _io.run();
-      current_executor.reset(nullptr);
+      SET_THREAD_LOCAL(current_executor, nullptr);
       return;
     }
     catch (...)

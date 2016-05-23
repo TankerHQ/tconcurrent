@@ -10,6 +10,7 @@
 #include <boost/variant.hpp>
 
 #include <tconcurrent/thread_pool.hpp>
+#include <tconcurrent/cancelation_token.hpp>
 
 namespace tconcurrent
 {
@@ -18,6 +19,10 @@ struct broken_promise : std::runtime_error
 {
   broken_promise() : runtime_error("promise is broken")
   {}
+};
+
+struct tvoid
+{
 };
 
 namespace detail
@@ -92,6 +97,10 @@ private:
   }
 };
 
+struct nocancel_tag
+{
+};
+
 template <typename R>
 class shared_base
 {
@@ -101,6 +110,16 @@ public:
   struct v_exception { std::exception_ptr exc; };
 
   boost::variant<v_none, v_value, v_exception> _r;
+
+  shared_base(nocancel_tag)
+  {
+  }
+
+  shared_base(cancelation_token_ptr token = nullptr)
+    : _cancelation_token(token ? std::move(token) :
+                                 std::make_shared<cancelation_token>())
+  {
+  }
 
   virtual ~shared_base()
   {
@@ -120,12 +139,6 @@ public:
   void set_exception(std::exception_ptr exc)
   {
     finish([&] { _r = v_exception{exc}; });
-  }
-
-  template <typename F>
-  void then(F&& f)
-  {
-    then(get_default_executor(), std::forward<F>(f));
   }
 
   template <typename E, typename F>
@@ -173,11 +186,21 @@ public:
       _ready.wait(lock);
   }
 
+  std::shared_ptr<cancelation_token> get_cancelation_token()
+  {
+    std::unique_lock<std::mutex> lock{_mutex};
+    return _cancelation_token;
+  }
+
 private:
   mutable std::mutex _mutex;
   mutable std::condition_variable _ready;
   std::vector<std::function<void()>> _then;
 
+protected:
+  cancelation_token_ptr _cancelation_token;
+
+private:
   /** Counts the number of promises (or anything that can set the shared state)
    *
    * This count is used to set an error state when all promises are destroyed.
@@ -206,6 +229,7 @@ private:
       std::lock_guard<std::mutex> lock{_mutex};
       setval();
       std::swap(_then, then);
+      _cancelation_token = nullptr;
     }
 
     _ready.notify_all();
@@ -216,6 +240,20 @@ private:
   template <typename S>
   friend class promise_ptr;
 };
+
+template <typename T>
+struct shared_base_type_
+{
+  using type = T;
+};
+template <>
+struct shared_base_type_<void>
+{
+  using type = tvoid;
+};
+
+template <typename T>
+using shared_base_type = typename shared_base_type_<T>::type;
 
 }
 }
