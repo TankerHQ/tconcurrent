@@ -180,7 +180,7 @@ TEST_CASE("test packaged task packaged_task_result_type", "[packaged_task]")
         "packaged_task_result_type deduction error");
   }
   {
-    auto f = []() -> void { return {}; };
+    auto f = []() -> void {};
     static_assert(
         std::is_same<packaged_task_result_type<decltype(f)()>, void>::value,
         "packaged_task_result_type deduction error");

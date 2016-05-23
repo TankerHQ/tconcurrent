@@ -83,7 +83,8 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
       F&& f,
       void_t<decltype(std::declval<F>()(std::declval<Args>()...))>* = nullptr)
     : base_type(std::move(token)),
-      _f([f = std::forward<F>(f)](cancelation_token&, auto&&... args) mutable {
+      // TODO vs2015 doesn't accept a forward for f here...
+      _f([f](cancelation_token&, auto&&... args) mutable {
         return f(std::forward<decltype(args)>(args)...);
       })
   {

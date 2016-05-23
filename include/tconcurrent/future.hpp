@@ -76,9 +76,11 @@ public:
     return then(get_default_executor(), std::forward<F>(f));
   }
 
+  // TODO replace this result_of and the others by decltype the day microsoft
+  // makes a real compiler
   template <typename E, typename F>
   auto then(E&& e, F&& f) -> future<
-      typename std::decay<decltype(f(std::declval<future<R>>()))>::type>
+      std::decay_t<std::result_of_t<F(future<R>)>>>
   {
     return then_impl(std::forward<E>(e), [
       p = _p,
@@ -92,8 +94,8 @@ public:
   }
 
   template <typename E, typename F>
-  auto then(E&& e, F&& f) -> future<typename std::decay<decltype(
-      f(std::declval<cancelation_token&>(), std::declval<future<R>>()))>::type>
+  auto then(E&& e, F&& f) -> future<std::decay_t<
+      std::result_of_t<F(cancelation_token&, future<R>)>>>
   {
     return then_impl(std::forward<E>(e), [
       p = _p,
@@ -114,7 +116,7 @@ public:
 
   template <typename E, typename F>
   auto and_then(E&& e, F&& f) -> future<
-      typename std::decay<decltype(f(std::declval<value_type>()))>::type>
+      std::decay_t<std::result_of_t<F(value_type)>>>
   {
     return then_impl(std::forward<E>(e), [
       p = _p,
@@ -126,8 +128,8 @@ public:
     });
   }
   template <typename E, typename F>
-  auto and_then(E&& e, F&& f) -> future<typename std::decay<decltype(
-      f(std::declval<cancelation_token&>(), std::declval<value_type>()))>::type>
+  auto and_then(E&& e, F&& f) -> future<
+      std::decay_t<std::result_of_t<F(cancelation_token&, value_type)>>>
   {
     return then_impl(std::forward<E>(e), [
       p = _p,
