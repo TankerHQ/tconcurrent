@@ -13,22 +13,6 @@
 namespace tconcurrent
 {
 
-struct operation_canceled : std::exception
-{
-  const char* what() const BOOST_NOEXCEPT override
-  {
-    return "operation was canceled";
-  }
-};
-
-struct cancelable_bundle
-{
-  using canceler = std::function<void()>;
-
-  future<void> fut;
-  canceler cancel;
-};
-
 namespace detail
 {
 
@@ -48,7 +32,7 @@ struct async_wait_data
 }
 
 template <typename Delay>
-cancelable_bundle async_wait(thread_pool& pool, Delay delay)
+future<void> async_wait(thread_pool& pool, Delay delay)
 {
   if (pool.is_single_threaded())
   {
@@ -58,41 +42,52 @@ cancelable_bundle async_wait(thread_pool& pool, Delay delay)
     data->timer.async_wait(
         [data](boost::system::error_code const&) mutable {
           if (!data->fired.exchange(true))
-            data->prom.set_value(0);
+          {
+            data->prom.get_cancelation_token().pop_cancelation_callback();
+            data->prom.set_value({});
+          }
         });
 
-    return {data->prom.get_future(), [data]() mutable {
-              if (data->fired.exchange(true))
-                return;
+    data->prom.get_cancelation_token().push_cancelation_callback([data] {
+      if (data->fired.exchange(true))
+        return;
 
-              data->timer.cancel();
-              data->prom.set_exception(
-                  std::make_exception_ptr(operation_canceled()));
-            }};
+      data->timer.cancel();
+      data->prom.get_cancelation_token().pop_cancelation_callback();
+      data->prom.set_exception(std::make_exception_ptr(operation_canceled()));
+    });
+
+    return data->prom.get_future();
   }
   else
   {
+    auto token = std::make_shared<cancelation_token>();
+
     auto const timer = std::make_shared<boost::asio::steady_timer>(
         pool.get_io_service(), delay);
 
     auto taskfut = package<void(boost::system::error_code const&)>(
-        [timer](boost::system::error_code const& error) {
+        [timer, token](boost::system::error_code const& error) {
+          token->pop_cancelation_callback();
           if (error == boost::asio::error::operation_aborted)
-            // ugly throw, bad performance :(
+            // TODO ugly throw, bad performance :(
             throw operation_canceled();
-        });
+        },
+        token);
 
     auto& task = std::get<0>(taskfut);
     auto& fut = std::get<1>(taskfut);
 
+    token->push_cancelation_callback([timer] { timer->cancel(); });
+
     timer->async_wait(task);
 
-    return {fut, [timer] { timer->cancel(); }};
+    return fut;
   }
 }
 
 template <typename Delay>
-cancelable_bundle async_wait(Delay delay)
+future<void> async_wait(Delay delay)
 {
   return async_wait(get_default_executor(), delay);
 }

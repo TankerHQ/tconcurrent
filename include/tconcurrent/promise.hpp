@@ -18,6 +18,13 @@ public:
   {
   }
 
+  template <typename F>
+  promise(tc::future<F> const& prev)
+    : _p(std::make_shared<detail::shared_base<value_type>>(
+          prev._p->get_cancelation_token()))
+  {
+  }
+
   future<T> get_future() const
   {
     return future<T>(_p);
@@ -37,8 +44,15 @@ public:
     _p->set_exception(std::move(exc));
   }
 
+  cancelation_token& get_cancelation_token()
+  {
+    return *_p->get_cancelation_token();
+  }
+
 private:
-  std::shared_ptr<detail::shared_base<value_type>> _p;
+  using shared_type = detail::shared_base<value_type>;
+
+  detail::promise_ptr<shared_type> _p;
 };
 
 }

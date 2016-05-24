@@ -24,7 +24,7 @@ TEST_CASE("test ready future", "[future]")
 TEST_CASE("test void ready future", "[future]")
 {
   auto future = make_ready_future();
-  static_assert(std::is_same<decltype(future)::value_type, void*>::value,
+  static_assert(std::is_same<decltype(future)::value_type, tvoid>::value,
                 "make_ready_future can't deduce void future type");
   CHECK(future.is_ready());
   CHECK(future.has_value());
@@ -122,6 +122,13 @@ TEST_CASE("test exception packaged task", "[packaged_task]")
   CHECK_THROWS_AS(future.get(), int);
 }
 
+TEST_CASE("test unrun packaged task", "[packaged_task]")
+{
+  auto future = package<void()>([]{}).second;
+  REQUIRE(future.is_ready());
+  CHECK_THROWS_AS(future.get(), broken_promise);
+}
+
 TEST_CASE("test delayed packaged task", "[packaged_task]")
 {
   auto taskfut = package<int(int)>([](int i){ return i*2; });
@@ -135,6 +142,70 @@ TEST_CASE("test delayed packaged task", "[packaged_task]")
   CHECK(future.is_ready());
   CHECK(!future.has_exception());
   th.join();
+}
+
+TEST_CASE("test packaged task cancel", "[packaged_task][cancel]")
+{
+  bool cancelreq;
+  auto taskfut = package<int(int)>([&](cancelation_token& token, int i) {
+    cancelreq = token.is_cancel_requested();
+    return i * 2;
+  });
+  auto& task = std::get<0>(taskfut);
+  auto& future = std::get<1>(taskfut);
+  CHECK(!future.is_ready());
+
+  SECTION("not canceled")
+  {
+    task(21);
+    CHECK(42 == future.get());
+    CHECK(!cancelreq);
+  }
+
+  SECTION("canceled")
+  {
+    future.request_cancel();
+    task(21);
+    CHECK(42 == future.get());
+    CHECK(cancelreq);
+  }
+}
+
+TEST_CASE("test packaged task packaged_task_result_type", "[packaged_task]")
+{
+  {
+    auto f = []() -> int { return {}; };
+    static_assert(
+        std::is_same<packaged_task_result_type<decltype(f)()>, int>::value,
+        "packaged_task_result_type deduction error");
+  }
+  {
+    auto f = []() -> void {};
+    static_assert(
+        std::is_same<packaged_task_result_type<decltype(f)()>, void>::value,
+        "packaged_task_result_type deduction error");
+  }
+  {
+    auto f = [](int, char*) -> float { return {}; };
+    static_assert(
+        std::is_same<packaged_task_result_type<decltype(f)(int, char*)>,
+                     float>::value,
+        "packaged_task_result_type deduction error");
+  }
+  {
+    auto f = [](cancelation_token&) -> float { return {}; };
+    static_assert(
+        std::is_same<packaged_task_result_type<decltype(f)()>,
+                     float>::value,
+        "packaged_task_result_type deduction error");
+  }
+  {
+    auto f = [](cancelation_token&, int, char*) -> float { return {}; };
+    static_assert(
+        std::is_same<packaged_task_result_type<decltype(f)(int, char*)>,
+                     float>::value,
+        "packaged_task_result_type deduction error");
+  }
 }
 
 TEST_CASE("test future unwrap", "[future]")
@@ -163,7 +234,7 @@ TEST_CASE("test future unwrap void", "[future]")
   auto& task = std::get<0>(taskfut);
   auto& future = std::get<1>(taskfut);
   auto unfut = future.unwrap();
-  static_assert(std::is_same<decltype(unfut)::value_type, void*>::value,
+  static_assert(std::is_same<decltype(unfut)::value_type, tvoid>::value,
                 "unwrap of void has an incorrect return type");
   CHECK(!unfut.is_ready());
   task();
@@ -224,7 +295,7 @@ SCENARIO("future can be used with specific executors", "[future][executor]")
     }
     THEN(".and_then continuation is executed on the executor")
     {
-      f.and_then(tp, [&](void*) {
+      f.and_then(tp, [&](tvoid) {
          CHECK(tp.is_in_this_context());
        }).get();
     }
@@ -257,6 +328,23 @@ TEST_CASE("test reference async", "[async]")
   CHECK(hasrun);
 }
 
+TEST_CASE("test async cancelation_token not canceled", "[async][cancel]")
+{
+  auto fut = async(
+      [&](cancelation_token& token) { CHECK(!token.is_cancel_requested()); });
+  fut.get();
+}
+
+TEST_CASE("test async cancelation_token canceled", "[async][cancel]")
+{
+  auto fut = async([&](cancelation_token& token) {
+    while (!token.is_cancel_requested())
+      ;
+  });
+  fut.request_cancel();
+  fut.get();
+}
+
 TEST_CASE("test is_in_this_context", "[executor]")
 {
   auto fut = async([&]
@@ -271,19 +359,19 @@ TEST_CASE("test delay async", "[async_wait]")
 {
   std::chrono::milliseconds const delay{100};
   auto before = std::chrono::steady_clock::now();
-  auto bdl = async_wait(delay);
-  bdl.fut.wait();
+  auto fut = async_wait(delay);
+  fut.wait();
   auto after = std::chrono::steady_clock::now();
   CHECK(delay < after - before);
 }
 
-TEST_CASE("test delay async cancel", "[async_wait]")
+TEST_CASE("test delay async cancel", "[async_wait][cancel]")
 {
   std::chrono::milliseconds const delay{100};
   auto before = std::chrono::steady_clock::now();
-  auto bdl = async_wait(delay);
-  bdl.cancel();
-  bdl.fut.wait();
+  auto fut = async_wait(delay);
+  fut.request_cancel();
+  fut.wait();
   auto after = std::chrono::steady_clock::now();
   CHECK(delay > after - before);
 }
@@ -391,10 +479,10 @@ TEST_CASE("test void promise", "[promise]")
 {
   promise<void> prom;
   auto fut = prom.get_future();
-  static_assert(std::is_same<decltype(fut)::value_type, void*>::value,
+  static_assert(std::is_same<decltype(fut)::value_type, tvoid>::value,
                 "promise and future don't have the same type");
   CHECK(!fut.is_ready());
-  prom.set_value(0);
+  prom.set_value({});
   CHECK(fut.is_ready());
   CHECK_NOTHROW(fut.get());
 }
@@ -409,6 +497,274 @@ TEST_CASE("test error promise", "[promise]")
   CHECK_THROWS_AS(fut.get(), int);
 }
 
+TEST_CASE("test broken promise", "[promise]")
+{
+  auto fut = promise<void>().get_future();
+  REQUIRE(fut.is_ready());
+  CHECK_THROWS_AS(fut.get(), broken_promise);
+}
+
+TEST_CASE("test future cancel ready", "[future][cancel]")
+{
+  auto fut = make_ready_future(18);
+  // does nothing
+  fut.request_cancel();
+  CHECK(fut.has_value());
+}
+
+TEST_CASE("test future promise cancel", "[future][cancel]")
+{
+  promise<void> prom;
+  auto fut = prom.get_future();
+  fut.request_cancel();
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+  CHECK(!fut.is_ready());
+  prom.set_exception(std::make_exception_ptr(operation_canceled{}));
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+}
+
+TEST_CASE("test future promise cancel callback", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<void> prom;
+  auto fut = prom.get_future();
+
+  prom.get_cancelation_token().push_cancelation_callback([&] { ++called; });
+  fut.request_cancel();
+  CHECK(1 == called);
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+
+  CHECK(!fut.is_ready());
+  prom.set_exception(std::make_exception_ptr(operation_canceled{}));
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+}
+
+TEST_CASE("test future promise cancel scope callback", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<void> prom;
+  auto fut = prom.get_future();
+  auto& token = prom.get_cancelation_token();
+
+  {
+    auto scope = token.make_scope_canceler([&] { ++called; });
+    fut.request_cancel();
+    CHECK(1 == called);
+    CHECK(token.is_cancel_requested());
+  }
+
+  fut.request_cancel();
+  CHECK(1 == called);
+
+  {
+    auto scope = token.make_scope_canceler([&] { ++called; });
+    CHECK(2 == called);
+    CHECK(token.is_cancel_requested());
+  }
+
+  CHECK(!fut.is_ready());
+  prom.set_exception(std::make_exception_ptr(operation_canceled{}));
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+}
+
+TEST_CASE("test future promise cancel nested scope callback",
+          "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<void> prom;
+  auto fut = prom.get_future();
+  auto& token = prom.get_cancelation_token();
+
+  SECTION("cancel inner")
+  {
+    auto scope = token.make_scope_canceler([&] { CHECK(1 == called); });
+    {
+      auto scope = token.make_scope_canceler([&] { ++called; });
+      fut.request_cancel();
+      CHECK(1 == called);
+      CHECK(token.is_cancel_requested());
+    }
+  }
+
+  SECTION("cancel outer")
+  {
+    auto scope = token.make_scope_canceler([&] { ++called; });
+    {
+      auto scope = token.make_scope_canceler([&] { CHECK(false); });
+    }
+    fut.request_cancel();
+    CHECK(1 == called);
+    CHECK(token.is_cancel_requested());
+  }
+
+  CHECK(!fut.is_ready());
+  prom.set_exception(std::make_exception_ptr(operation_canceled{}));
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+}
+
+TEST_CASE("test future promise cancel propagation", "[future][cancel]")
+{
+  promise<void> prom;
+  auto fut = prom.get_future();
+  promise<int> prom2(fut);
+  auto fut2 = prom2.get_future();
+
+  fut2.request_cancel();
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+}
+
+TEST_CASE("test future promise continuation cancel", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<int> prom;
+  auto fut = prom.get_future();
+
+  SECTION("then no cancel")
+  {
+    auto fut2 = fut.then([&](cancelation_token& token, future<int> const& fut) {
+      ++called;
+      CHECK(!token.is_cancel_requested());
+    });
+    prom.set_value(18);
+    fut2.get();
+    CHECK(1 == called);
+  }
+
+  SECTION("then cancel first")
+  {
+    auto fut2 = fut.then([&](cancelation_token& token, future<int> const& fut) {
+      ++called;
+      CHECK(token.is_cancel_requested());
+    });
+    fut2.request_cancel();
+    CHECK(prom.get_cancelation_token().is_cancel_requested());
+    prom.set_value(18);
+    fut2.get();
+    CHECK(1 == called);
+  }
+
+  SECTION("then cancel second")
+  {
+    future<void> fut2 =
+        fut.then([&](cancelation_token& token, future<int> const& fut) {
+          ++called;
+          CHECK(!token.is_cancel_requested());
+          fut2.request_cancel();
+          CHECK(token.is_cancel_requested());
+        });
+    prom.set_value(18);
+    fut2.get();
+    CHECK(1 == called);
+  }
+
+  SECTION("and_then no cancel")
+  {
+    auto fut2 =
+        fut.and_then([&](cancelation_token& token, int) {
+          ++called;
+          CHECK(!token.is_cancel_requested());
+        });
+    prom.set_value(18);
+    fut2.get();
+    CHECK(1 == called);
+  }
+
+  SECTION("and_then cancel first")
+  {
+    future<void> fut2 =
+        fut.and_then([&](cancelation_token& token, int) {
+          ++called;
+        });
+    fut2.request_cancel();
+    CHECK(prom.get_cancelation_token().is_cancel_requested());
+    prom.set_value(18);
+    CHECK_THROWS_AS(fut2.get(), operation_canceled);
+    CHECK(0 == called);
+  }
+
+  SECTION("and_then cancel second")
+  {
+    future<void> fut2 =
+        fut.and_then([&](cancelation_token& token, int) {
+          ++called;
+          CHECK(!token.is_cancel_requested());
+          fut2.request_cancel();
+          CHECK(token.is_cancel_requested());
+        });
+    prom.set_value(18);
+    fut2.get();
+    CHECK(1 == called);
+  }
+
+  SECTION("and_then prevented on cancel")
+  {
+    future<void> fut2 =
+        fut.and_then([&](cancelation_token& token, int) { ++called; });
+    fut2.request_cancel();
+    prom.set_value(18);
+    CHECK_THROWS_AS(fut2.get(), operation_canceled);
+    CHECK(0 == called);
+  }
+}
+
+TEST_CASE("test future promise continuation complex cancel", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<void> prom;
+  auto fut = prom.get_future().then([&](future<void> fut) {
+    fut.then([&](cancelation_token& token, future<void> fut) {
+      ++called;
+      CHECK(token.is_cancel_requested());
+    });
+  });
+  fut.request_cancel();
+  prom.set_value({});
+  fut.get();
+  CHECK(1 == called);
+}
+
+TEST_CASE("test future ready continuation cancel token", "[future][cancel]")
+{
+  unsigned called = 0;
+  auto fut =
+      make_ready_future().then([&](cancelation_token& token, future<void> fut) {
+        ++called;
+        CHECK(!token.is_cancel_requested());
+      });
+  fut.get();
+  CHECK(1 == called);
+}
+
+TEST_CASE("test future promise unwrap cancel", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<future<int>> prom;
+  auto fut = prom.get_future();
+  auto fut2 = fut.unwrap();
+
+  fut2.request_cancel();
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+
+  promise<int> prom2(fut);
+  prom.set_value(prom2.get_future());
+  CHECK(prom2.get_cancelation_token().is_cancel_requested());
+}
+
+TEST_CASE("test future promise unwrap late cancel", "[future][cancel]")
+{
+  unsigned called = 0;
+  promise<future<int>> prom;
+  auto fut = prom.get_future();
+  auto fut2 = fut.unwrap();
+
+  CHECK(!prom.get_cancelation_token().is_cancel_requested());
+
+  promise<int> prom2(fut);
+  prom.set_value(prom2.get_future());
+  fut2.request_cancel();
+  CHECK(prom2.get_cancelation_token().is_cancel_requested());
+}
+
 TEST_CASE("test when_all", "[when_all]")
 {
   auto const NB_FUTURES = 100;
@@ -420,15 +776,16 @@ TEST_CASE("test when_all", "[when_all]")
 
   for (unsigned int i = 0; i < NB_FUTURES; ++i)
     if (i % 2)
-      promises[i].set_value(0);
+      promises[i].set_value({});
 
   auto all = when_all(futures.begin(), futures.end());
   CHECK(!all.is_ready());
 
   for (unsigned int i = 0; i < NB_FUTURES; ++i)
     if (!(i % 2))
-      promises[i].set_value(0);
+      promises[i].set_value({});
 
+  CHECK(all.is_ready());
   auto& futs = all.get();
   CHECK(futures.size() == futs.size());
   for (auto const& fut : futs)
@@ -445,6 +802,27 @@ TEST_CASE("test when_all empty", "[when_all]")
   CHECK(all.is_ready());
   auto& futs = all.get();
   CHECK(0 == futs.size());
+}
+
+TEST_CASE("test when_all cancel", "[when_all][cancel]")
+{
+  auto const NB_FUTURES = 100;
+
+  std::vector<promise<void>> promises(NB_FUTURES);
+  std::vector<future<void>> futures;
+  for (auto const& prom : promises)
+    futures.push_back(prom.get_future());
+
+  auto all = when_all(futures.begin(), futures.end());
+  all.request_cancel();
+
+  for (unsigned int i = 0; i < NB_FUTURES; ++i)
+    CHECK(promises[i].get_cancelation_token().is_cancel_requested());
+
+  for (unsigned int i = 0; i < NB_FUTURES; ++i)
+    promises[i].set_value({});
+
+  all.get();
 }
 
 // periodic task
@@ -475,33 +853,16 @@ TEST_CASE("test periodic task", "[periodic_task]")
   CHECK(4 == called);
 }
 
-TEST_CASE("test periodic task error stop", "[periodic_task]")
-{
-  unsigned int called = 0;
-
-  periodic_task pt;
-  pt.set_callback([&]{ ++called; throw 18; });
-  pt.set_period(std::chrono::milliseconds(0));
-  pt.start(periodic_task::start_immediately);
-  CHECK(pt.is_running());
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  CHECK(!pt.is_running());
-  CHECK(1 == called);
-}
-
 TEST_CASE("test periodic task future", "[periodic_task]")
 {
   unsigned int called = 0;
 
   periodic_task pt;
-  pt.set_callback([&]
-                  {
-                    return async_wait(std::chrono::milliseconds(10))
-                        .fut.and_then([&](void*)
-                                      {
-                                        ++called;
-                                      });
-                  });
+  pt.set_callback([&] {
+    return async_wait(std::chrono::milliseconds(10)).and_then([&](tvoid) {
+      ++called;
+    });
+  });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
   CHECK(pt.is_running());
@@ -509,24 +870,6 @@ TEST_CASE("test periodic task future", "[periodic_task]")
   pt.stop().get();
   CHECK(!pt.is_running());
   CHECK(4 == called);
-}
-
-TEST_CASE("test periodic task future error stop", "[periodic_task]")
-{
-  unsigned int called = 0;
-
-  periodic_task pt;
-  pt.set_callback([&]
-                  {
-                    ++called;
-                    return make_exceptional_future<void>(18);
-                  });
-  pt.set_period(std::chrono::milliseconds(0));
-  pt.start();
-  CHECK(pt.is_running());
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  CHECK(!pt.is_running());
-  CHECK(1 == called);
 }
 
 TEST_CASE("test periodic task immediate", "[periodic_task]")
@@ -549,10 +892,15 @@ TEST_CASE("test periodic task executor", "[periodic_task][executor]")
   thread_pool tp;
   tp.start(1);
 
+  bool fail{false};
   unsigned int called = 0;
   periodic_task pt;
   pt.set_executor(&tp);
-  pt.set_callback([&]{ CHECK(tp.is_in_this_context()); ++called; });
+  pt.set_callback([&] {
+    if (!tp.is_in_this_context())
+      fail = true;
+    ++called;
+  });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start(periodic_task::start_immediately);
   CHECK(pt.is_running());
@@ -560,6 +908,61 @@ TEST_CASE("test periodic task executor", "[periodic_task][executor]")
   pt.stop().get();
   CHECK(!pt.is_running());
   CHECK(5 == called);
+  CHECK(!fail);
+}
+
+TEST_CASE("test periodic task error stop", "[periodic_task][executor]")
+{
+  thread_pool tp;
+  tp.start(1);
+
+  unsigned int called = 0;
+  unsigned int goterror = 0;
+
+  tp.set_error_handler([&](std::exception_ptr const& e) {
+    ++goterror;
+    CHECK_THROWS_AS(std::rethrow_exception(e), int);
+  });
+
+  periodic_task pt;
+  pt.set_executor(&tp);
+  pt.set_callback([&]{ ++called; throw 18; });
+  pt.set_period(std::chrono::milliseconds(0));
+  pt.start(periodic_task::start_immediately);
+  CHECK(pt.is_running());
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  CHECK(!pt.is_running());
+  CHECK(1 == called);
+  CHECK(1 == goterror);
+}
+
+TEST_CASE("test periodic task future error stop", "[periodic_task][executor]")
+{
+  thread_pool tp;
+  tp.start(1);
+
+  unsigned int called = 0;
+  unsigned int goterror = 0;
+
+  tp.set_error_handler([&](std::exception_ptr const& e) {
+    ++goterror;
+    CHECK_THROWS_AS(std::rethrow_exception(e), int);
+  });
+
+  periodic_task pt;
+  pt.set_executor(&tp);
+  pt.set_callback([&]
+                  {
+                    ++called;
+                    return make_exceptional_future<void>(18);
+                  });
+  pt.set_period(std::chrono::milliseconds(1));
+  pt.start();
+  CHECK(pt.is_running());
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  CHECK(!pt.is_running());
+  CHECK(1 == called);
+  CHECK(1 == goterror);
 }
 
 TEST_CASE("test periodic task stop before start", "[periodic_task]")
@@ -638,11 +1041,10 @@ TEST_CASE("test periodic task future start stop spam", "[periodic_task]")
         if (call.exchange(true))
           fail = true;
         return async_wait(std::chrono::milliseconds(1))
-            .fut.and_then([&](void*)
-                          {
-                            if (!call.exchange(false))
-                              fail = true;
-                          });
+            .then([&](future<void> const&) {
+              if (!call.exchange(false))
+                fail = true;
+            });
       });
 
   CHECK(false == fail.load());
@@ -676,6 +1078,24 @@ TEST_CASE("test periodic single threaded task stop", "[periodic_task]")
   CHECK_NOTHROW(async(tp, [&]{ pt.stop().get(); }).get());
   CHECK(!pt.is_running());
   CHECK(0 < called);
+}
+
+TEST_CASE("test periodic task cancel", "[periodic_task][cancel]")
+{
+  promise<void> prom;
+
+  periodic_task pt;
+  pt.set_callback([&]{ return prom.get_future(); });
+  pt.set_period(std::chrono::milliseconds(0));
+  pt.start(periodic_task::start_immediately);
+  CHECK(!prom.get_cancelation_token().is_cancel_requested());
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  auto stopfut = pt.stop();
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+  CHECK(!stopfut.is_ready());
+  prom.set_exception(std::make_exception_ptr(operation_canceled{}));
+  stopfut.get();
+  CHECK(!pt.is_running());
 }
 
 SCENARIO("test concurrent_queue", "[concurrent_queue]")
@@ -809,4 +1229,44 @@ SCENARIO("test semaphore", "[semaphore]")
     //  auto l = sem.get_scoped_lock();
     //}
   }
+}
+
+TEST_CASE("test thread_pool do nothing", "[thread_pool]")
+{
+  thread_pool tp;
+  tp.run_thread();
+}
+
+TEST_CASE("test thread_pool start stop", "[thread_pool]")
+{
+  thread_pool tp;
+  tp.start(1);
+  tp.stop();
+}
+
+TEST_CASE("test thread_pool run work", "[thread_pool]")
+{
+  bool called = false;
+
+  thread_pool tp;
+  tp.start(1);
+  tp.post([&]{ called = true; });
+  tp.stop();
+  CHECK(called);
+}
+
+TEST_CASE("test thread_pool error work", "[thread_pool]")
+{
+  bool called = false;
+
+  thread_pool tp;
+  tp.set_error_handler([&](std::exception_ptr const& e) {
+    called = true;
+    CHECK_THROWS_AS(std::rethrow_exception(e), int);
+  });
+
+  tp.start(1);
+  tp.post([&]{ throw 18; });
+  tp.stop();
+  CHECK(called);
 }

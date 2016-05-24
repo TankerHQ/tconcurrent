@@ -17,6 +17,9 @@ set_property(TARGET tconcurrent PROPERTY CXX_STANDARD 14)
 set_property(TARGET tconcurrent PROPERTY CXX_EXTENSIONS OFF)
 target_include_directories(tconcurrent PUBLIC include)
 target_link_libraries(tconcurrent PUBLIC boost_system boost_thread boost_context curl)
+target_compile_definitions(tconcurrent PRIVATE
+  TCONCURRENT_USE_THREAD_LOCAL=$<COMPILE_FEATURES:cxx_thread_local>
+)
 
 if(BUILD_TESTS)
   add_subdirectory(test)

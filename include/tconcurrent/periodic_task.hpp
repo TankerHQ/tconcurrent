@@ -42,9 +42,7 @@ public:
       !std::is_same<decltype(cb()), future<void>>::value>::type
   {
     scope_lock l(_mutex);
-    // TODO cpp14 capture by forward
-    _callback = [cb]
-    {
+    _callback = [cb = std::forward<C>(cb)] {
       cb();
       return make_ready_future();
     };
@@ -82,13 +80,12 @@ private:
   std::function<future<void>()> _callback;
 
   future<void> _future;
-  std::function<void()> _cancel;
 
   // TODO very ugly design
   thread_pool* _executor{&get_default_executor()};
 
   void reschedule();
-  future<void> do_call();
+  future<void> do_call(cancelation_token& token);
 };
 
 }

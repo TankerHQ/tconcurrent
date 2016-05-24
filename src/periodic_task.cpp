@@ -32,10 +32,9 @@ void periodic_task::start(StartOption opt)
   else
   {
     // post the callback immediately
-    auto pack = package<future<void>()>([this] { return do_call(); });
+    auto pack = package<future<void>()>(
+        [this](cancelation_token& token) { return do_call(token); });
     _future = std::get<1>(pack).unwrap();
-    // set a dummy cancel function so that stop doesn't fail
-    _cancel = []{};
     _executor->post(std::get<0>(pack));
   }
 }
@@ -49,14 +48,13 @@ future<void> periodic_task::stop()
     return _future.then(get_synchronous_executor(),
                         [&](future<void> const&) {});
 
-  assert(_future.is_valid() && _cancel);
+  assert(_future.is_valid());
 
   _state = State::Stopping;
-  _cancel();
+  _future.request_cancel();
   return _future.then(get_synchronous_executor(), [&](future<void> const&) {
     scope_lock l(_mutex);
-    // can be Stopping, or Stopped if the callback threw on
-    // the last run
+    // can be Stopping, or Stopped if the callback threw on the last run
     assert(_state != State::Running);
     _state = State::Stopped;
   });
@@ -70,18 +68,17 @@ void periodic_task::reschedule()
   if (_state == State::Stopping)
     return;
 
-  auto bundle = async_wait(*_executor, _period);
-  _future = bundle.fut
+  _future = async_wait(*_executor, _period)
                 .and_then(get_synchronous_executor(),
-                          [this](void*) { return do_call(); })
+                          [this](cancelation_token& token, tvoid) {
+                            return do_call(token);
+                          })
                 .unwrap();
-  _cancel = std::move(bundle.cancel);
 }
 
-future<void> periodic_task::do_call()
+future<void> periodic_task::do_call(cancelation_token& token)
 {
-  auto const cb = [&]
-  {
+  auto const cb = [&] {
     scope_lock l(_mutex);
     return _callback;
   }();
@@ -93,14 +90,9 @@ future<void> periodic_task::do_call()
     fut = cb();
     success = true;
   }
-  catch (std::exception& e)
-  {
-    // TODO proper error reporting (x3)
-    std::cout << "error in periodic_task: " << e.what() << std::endl;
-  }
   catch (...)
   {
-    std::cout << "unknown error in periodic_task" << std::endl;
+    _executor->signal_error(std::current_exception());
   }
 
   scope_lock l(_mutex);
@@ -115,10 +107,18 @@ future<void> periodic_task::do_call()
     if (fut.has_value())
       reschedule();
     else
-    {
-      std::cout << "error in future of periodic task" << std::endl;
-      _state = State::Stopped;
-    }
+      try
+      {
+        fut.get();
+      }
+      catch (operation_canceled const&)
+      {
+      }
+      catch (...)
+      {
+        _executor->signal_error(std::current_exception());
+        _state = State::Stopped;
+      }
   });
 }
 

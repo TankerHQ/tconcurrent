@@ -2,6 +2,7 @@
 
 #include <tconcurrent/curl/curl.hpp>
 #include <tconcurrent/promise.hpp>
+#include <tconcurrent/async.hpp>
 
 using namespace tconcurrent;
 using namespace tconcurrent::curl;
@@ -60,6 +61,25 @@ TEST_CASE("curl simple request")
   CHECK(expectedhttpcode == httpcode);
 }
 
+TEST_CASE("curl cancel request")
+{
+  multi mul;
+
+  request req;
+  req.set_read_callback(
+      [](request&, void const*, std::size_t size) { return size; });
+  req.set_finish_callback(
+      [](request&, CURLcode c) { CHECK(false); });
+  req.set_url("http://httpbin.org/delay/10");
+
+  auto before = std::chrono::steady_clock::now();
+  mul.process(&req);
+  async([&] { mul.cancel(&req); }).get();
+  auto after = std::chrono::steady_clock::now();
+
+  CHECK(std::chrono::seconds(1) > after - before);
+}
+
 TEST_CASE("curl multiple requests")
 {
   static auto const NB = 5;
@@ -78,7 +98,7 @@ TEST_CASE("curl multiple requests")
         });
     promise<void> finish = finished[i];
     req[i].set_finish_callback(
-        [finish](request&, CURLcode) mutable { finish.set_value(0); });
+        [finish](request&, CURLcode) mutable { finish.set_value({}); });
     req[i].set_url("http://httpbin.org/drip?numbytes=100&duration=1");
   }
 
@@ -125,4 +145,19 @@ TEST_CASE("curl read_all")
     req->add_header("Expect: 100-continue");
     CHECK_READALL()
   }
+}
+
+TEST_CASE("curl read_all cancel")
+{
+  multi mul;
+  auto req = std::make_shared<request>();
+  req->set_url("http://httpbin.org/delay/10");
+
+  auto fut = read_all(mul, req);
+  async([&] { fut.request_cancel(); }).get();
+  auto before = std::chrono::steady_clock::now();
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+  auto after = std::chrono::steady_clock::now();
+
+  CHECK(std::chrono::seconds(1) > after - before);
 }

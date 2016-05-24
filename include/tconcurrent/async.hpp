@@ -9,9 +9,8 @@ namespace tconcurrent
 
 template <typename E, typename F>
 auto async(E&& executor, F&& f)
-    -> future<typename std::decay<decltype(f())>::type>
 {
-  using result_type = typename std::decay<decltype(f())>::type;
+  using result_type = std::decay_t<packaged_task_result_type<F()>>;
 
   auto pack = package<result_type()>(std::forward<F>(f));
 
@@ -20,7 +19,7 @@ auto async(E&& executor, F&& f)
 }
 
 template <typename F>
-auto async(F&& f) -> decltype(async(get_default_executor(), std::forward<F>(f)))
+auto async(F&& f)
 {
   return async(get_default_executor(), std::forward<F>(f));
 }
