@@ -69,16 +69,7 @@ public:
   }
 
 private:
-  struct async_socket
-  {
-    uint8_t wanted_action = 0;
-    uint8_t current_action = 0;
-    boost::asio::ip::tcp::socket socket;
-
-    async_socket(boost::asio::io_service& io_service) : socket(io_service)
-    {
-    }
-  };
+  struct async_socket;
 
   using scope_lock = std::lock_guard<std::recursive_mutex>;
 
@@ -104,7 +95,8 @@ private:
   // CURLMOPT_SOCKETFUNCTION
   int socketfunction_cb(CURL* easy, curl_socket_t s, int action);
   // Called by asio when there is an action on a socket
-  void event_cb(async_socket* asocket,
+  void event_cb(curl_socket_t sock,
+                async_socket* asocket,
                 uint8_t action,
                 boost::system::error_code const& ec);
   // Called by asio when our timeout expires
