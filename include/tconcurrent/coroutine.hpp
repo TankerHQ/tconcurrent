@@ -63,8 +63,6 @@ template <typename Awaitable>
 typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
     Awaitable&& awaitable)
 {
-  if (token.is_cancel_requested())
-    throw operation_canceled{};
   if (!awaitable.is_ready())
   {
     auto canceler =

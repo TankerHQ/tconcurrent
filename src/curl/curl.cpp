@@ -18,6 +18,17 @@ namespace tconcurrent
 namespace curl
 {
 
+struct multi::async_socket
+{
+  uint8_t wanted_action = 0;
+  uint8_t current_action = 0;
+  boost::asio::ip::tcp::socket socket;
+
+  async_socket(boost::asio::io_service& io_service) : socket(io_service)
+  {
+  }
+};
+
 // C bouncers
 curl_socket_t multi::opensocket_c(void* clientp,
                                   curlsocktype purpose,
@@ -175,10 +186,23 @@ int multi::close_socket(curl_socket_t item)
 }
 
 // Called by asio when there is an action on a socket
-void multi::event_cb(async_socket* asocket,
+void multi::event_cb(curl_socket_t sock,
+                     async_socket* asocket,
                      uint8_t action,
                      boost::system::error_code const& ec)
 {
+  /* WORKAROUND
+   * On linux (at least), some times, only when the network sends unexpected
+   * tcp-reset, boost.asio will call our callback, after the socket has been
+   * cancel()ed, close()ed and destroyed, with an error code "Success".
+   * This means that asocket is already destroyed and results in undefined
+   * behavior.
+   * If this class is destroyed and boost.asio plays the same trick however, we
+   * will probably crash here.
+   */
+  if (!_sockets.count(sock))
+    return;
+
   if (ec == boost::asio::error::operation_aborted)
     return;
 
@@ -310,6 +334,7 @@ int multi::socketfunction_cb(CURL*, curl_socket_t s, int curlaction)
     asocket->socket.async_read_some(boost::asio::null_buffers(),
                                     std::bind(&multi::event_cb,
                                               this,
+                                              s,
                                               asocket,
                                               ActionRead,
                                               std::placeholders::_1));
@@ -320,6 +345,7 @@ int multi::socketfunction_cb(CURL*, curl_socket_t s, int curlaction)
     asocket->socket.async_write_some(boost::asio::null_buffers(),
                                      std::bind(&multi::event_cb,
                                                this,
+                                               s,
                                                asocket,
                                                ActionWrite,
                                                std::placeholders::_1));
