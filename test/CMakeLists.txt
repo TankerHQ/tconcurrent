@@ -22,4 +22,8 @@ set_target_properties(test_tconcurrent PROPERTIES CXX_EXTENSIONS OFF)
 set_target_properties(test_tconcurrent_curl PROPERTIES CXX_STANDARD 14)
 set_target_properties(test_tconcurrent_curl PROPERTIES CXX_EXTENSIONS OFF)
 
-add_test(test_tconcurrent test_tconcurrent)
+add_test(
+  NAME test_tconcurrent
+  COMMAND test_tconcurrent --reporter junit
+                           --out "${CMAKE_BINARY_DIR}/test_tconcurrent.xml"
+)
