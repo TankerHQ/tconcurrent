@@ -712,14 +712,14 @@ TEST_CASE("test future promise continuation complex cancel", "[future][cancel]")
   unsigned called = 0;
   promise<void> prom;
   auto fut = prom.get_future().then([&](future<void> fut) {
-    fut.then([&](cancelation_token& token, future<void> fut) {
+    return fut.then([&](cancelation_token& token, future<void> fut) {
       ++called;
       CHECK(token.is_cancel_requested());
     });
   });
   fut.request_cancel();
   prom.set_value({});
-  fut.get();
+  fut.get().get();
   CHECK(1 == called);
 }
 
