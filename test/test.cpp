@@ -847,7 +847,7 @@ TEST_CASE("test periodic task", "[periodic_task]")
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
   CHECK(pt.is_running());
-  std::this_thread::sleep_for(std::chrono::milliseconds(450));
+  async_wait(std::chrono::milliseconds(450)).get();
   pt.stop().get();
   CHECK(!pt.is_running());
   CHECK(4 == called);
@@ -866,7 +866,7 @@ TEST_CASE("test periodic task future", "[periodic_task]")
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
   CHECK(pt.is_running());
-  std::this_thread::sleep_for(std::chrono::milliseconds(450));
+  async_wait(std::chrono::milliseconds(500)).get();
   pt.stop().get();
   CHECK(!pt.is_running());
   CHECK(4 == called);
@@ -880,7 +880,7 @@ TEST_CASE("test periodic task immediate", "[periodic_task]")
   pt.set_callback([&]{ ++called; });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start(periodic_task::start_immediately);
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  async_wait(std::chrono::milliseconds(50)).get();
   CHECK(pt.is_running());
   pt.stop().get();
   CHECK(!pt.is_running());
@@ -904,7 +904,7 @@ TEST_CASE("test periodic task executor", "[periodic_task][executor]")
   pt.set_period(std::chrono::milliseconds(100));
   pt.start(periodic_task::start_immediately);
   CHECK(pt.is_running());
-  std::this_thread::sleep_for(std::chrono::milliseconds(450));
+  async_wait(std::chrono::milliseconds(450)).get();
   pt.stop().get();
   CHECK(!pt.is_running());
   CHECK(5 == called);
@@ -930,7 +930,7 @@ TEST_CASE("test periodic task error stop", "[periodic_task][executor]")
   pt.set_period(std::chrono::milliseconds(0));
   pt.start(periodic_task::start_immediately);
   CHECK(pt.is_running());
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  async_wait(std::chrono::milliseconds(50)).get();
   CHECK(!pt.is_running());
   CHECK(1 == called);
   CHECK(1 == goterror);
@@ -959,7 +959,7 @@ TEST_CASE("test periodic task future error stop", "[periodic_task][executor]")
   pt.set_period(std::chrono::milliseconds(1));
   pt.start();
   CHECK(pt.is_running());
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  async_wait(std::chrono::milliseconds(50)).get();
   CHECK(!pt.is_running());
   CHECK(1 == called);
   CHECK(1 == goterror);
@@ -1059,7 +1059,7 @@ TEST_CASE("test periodic task stop from inside", "[periodic_task]")
   pt.set_callback([&]{ ++called; pt.stop(); });
   pt.set_period(std::chrono::milliseconds(0));
   pt.start(periodic_task::start_immediately);
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  async_wait(std::chrono::milliseconds(10)).get();
   CHECK(!pt.is_running());
   CHECK(1 == called);
 }
@@ -1089,7 +1089,7 @@ TEST_CASE("test periodic task cancel", "[periodic_task][cancel]")
   pt.set_period(std::chrono::milliseconds(0));
   pt.start(periodic_task::start_immediately);
   CHECK(!prom.get_cancelation_token().is_cancel_requested());
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  async_wait(std::chrono::milliseconds(100)).get();
   auto stopfut = pt.stop();
   CHECK(prom.get_cancelation_token().is_cancel_requested());
   CHECK(!stopfut.is_ready());
