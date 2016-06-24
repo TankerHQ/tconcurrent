@@ -866,7 +866,7 @@ TEST_CASE("test periodic task future", "[periodic_task]")
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
   CHECK(pt.is_running());
-  async_wait(std::chrono::milliseconds(450)).get();
+  async_wait(std::chrono::milliseconds(500)).get();
   pt.stop().get();
   CHECK(!pt.is_running());
   CHECK(4 == called);
