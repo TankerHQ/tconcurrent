@@ -859,9 +859,8 @@ TEST_CASE("test periodic task future", "[periodic_task]")
 
   periodic_task pt;
   pt.set_callback([&] {
-    return async_wait(std::chrono::milliseconds(10)).and_then([&](tvoid) {
-      ++called;
-    });
+    return async_wait(std::chrono::milliseconds(10))
+        .and_then(get_synchronous_executor(), [&](tvoid) { ++called; });
   });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
