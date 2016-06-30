@@ -3,6 +3,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include <tconcurrent/promise.hpp>
+#include <tconcurrent/async.hpp>
 
 namespace tconcurrent
 {
@@ -81,14 +82,20 @@ future<read_all_result> read_all(multi& multi, std::shared_ptr<request> req)
   });
 
   ra->_promise.get_cancelation_token().push_cancelation_callback([ra] {
-    // if query is already finished
-    if (!ra->_req)
-      return;
+    auto doCancel = [ra] {
+      // if query is already finished
+      if (!ra->_req)
+        return;
 
-    ra->_multi.cancel(ra->_req.get());
-    ra->_promise.set_exception(std::make_exception_ptr(operation_canceled{}));
-    ra->_promise = {};
-    ra->_req = nullptr;
+      ra->_multi.cancel(ra->_req.get());
+      ra->_promise.set_exception(std::make_exception_ptr(operation_canceled{}));
+      ra->_promise = {};
+      ra->_req = nullptr;
+    };
+    if (get_default_executor().is_in_this_context())
+      doCancel();
+    else
+      tc::async(doCancel);
   });
 
   multi.process(ra->_req.get());
