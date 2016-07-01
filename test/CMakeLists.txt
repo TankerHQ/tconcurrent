@@ -27,3 +27,7 @@ add_test(
   COMMAND test_tconcurrent --reporter junit
                            --out "${CMAKE_BINARY_DIR}/test_tconcurrent.xml"
 )
+set_tests_properties(test_tconcurrent
+  PROPERTIES
+    TIMEOUT 60
+)
