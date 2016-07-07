@@ -122,7 +122,7 @@ public:
       p = _p,
       token = _cancelation_token,
       f = std::forward<F>(f)
-    ]() {
+    ]() mutable {
       return this_type::do_and_then_callback(
           *p, token.get(), [&] { return f(p->get()); });
     });
@@ -135,7 +135,7 @@ public:
       p = _p,
       token = _cancelation_token,
       f = std::forward<F>(f)
-    ]() {
+    ]() mutable {
       return this_type::do_and_then_callback(
           *p, token.get(), [&] { return f(*token, p->get()); });
     });

@@ -390,7 +390,11 @@ TEST_CASE("test not ready future then", "[future][then]")
   auto taskfut = package<int()>([]{ return 21; });
   auto& task = std::get<0>(taskfut);
   auto& fut = std::get<1>(taskfut);
-  auto fut2 = fut.then([](future<int> val){ return long(val.get()*2); });
+  // also test mutable callback
+  auto fut2 = fut.then([i = 0](future<int> val) mutable {
+    i = 42;
+    return long(val.get() * 2);
+  });
   static_assert(std::is_same<decltype(fut2)::value_type, long>::value,
                 "then can't deduce future type");
 
@@ -444,11 +448,12 @@ TEST_CASE("test error future and_then", "[future][then]")
 {
   bool called = false;
   auto fut = make_exceptional_future<int>(21);
-  auto fut2 = fut.and_then([&](int val)
-                           {
-                             called = true;
-                             return long(val * 2);
-                           });
+  // also test mutable callback
+  auto fut2 = fut.and_then([&, i = 0](int val) mutable {
+    i = 42;
+    called = true;
+    return long(val * 2);
+  });
   static_assert(std::is_same<decltype(fut2)::value_type, long>::value,
                 "and_then can't deduce future type");
   fut2.wait();
