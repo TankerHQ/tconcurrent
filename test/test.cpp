@@ -208,7 +208,7 @@ TEST_CASE("test packaged task packaged_task_result_type", "[packaged_task]")
   }
 }
 
-TEST_CASE("test future unwrap", "[future]")
+TEST_CASE("test future unwrap", "[future][unwrap]")
 {
   auto taskfut = package<future<int>(int)>([](int i)
                                            {
@@ -225,7 +225,7 @@ TEST_CASE("test future unwrap", "[future]")
   CHECK(42 == unfut.get());
 }
 
-TEST_CASE("test future unwrap void", "[future]")
+TEST_CASE("test future unwrap void", "[future][unwrap]")
 {
   auto taskfut = package<future<void>()>([]
                                          {
@@ -242,7 +242,7 @@ TEST_CASE("test future unwrap void", "[future]")
   CHECK_NOTHROW(unfut.get());
 }
 
-TEST_CASE("test future unwrap error", "[future]")
+TEST_CASE("test future unwrap error", "[future][unwrap]")
 {
   auto taskfut = package<future<int>(int)>([](int i) -> future<int>
                                            {
@@ -260,7 +260,7 @@ TEST_CASE("test future unwrap error", "[future]")
   CHECK_THROWS_AS(unfut.get(), int);
 }
 
-TEST_CASE("test future unwrap nested error", "[future]")
+TEST_CASE("test future unwrap nested error", "[future][unwrap]")
 {
   auto taskfut =
       package<future<int>(int)>([](int i)
@@ -735,7 +735,7 @@ TEST_CASE("test future ready continuation cancel token", "[future][cancel]")
   CHECK(1 == called);
 }
 
-TEST_CASE("test future promise unwrap cancel", "[future][cancel]")
+TEST_CASE("test future promise unwrap cancel", "[future][unwrap][cancel]")
 {
   unsigned called = 0;
   promise<future<int>> prom;
@@ -750,7 +750,7 @@ TEST_CASE("test future promise unwrap cancel", "[future][cancel]")
   CHECK(prom2.get_cancelation_token().is_cancel_requested());
 }
 
-TEST_CASE("test future promise unwrap late cancel", "[future][cancel]")
+TEST_CASE("test future promise unwrap late cancel", "[future][unwrap][cancel]")
 {
   unsigned called = 0;
   promise<future<int>> prom;
