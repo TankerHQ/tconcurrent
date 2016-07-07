@@ -850,7 +850,8 @@ TEST_CASE("test periodic task", "[periodic_task]")
   async_wait(std::chrono::milliseconds(450)).get();
   pt.stop().get();
   CHECK(!pt.is_running());
-  CHECK(4 == called);
+  CHECK(4 >= called);
+  CHECK(3 <= called);
 }
 
 TEST_CASE("test periodic task future", "[periodic_task]")
@@ -868,7 +869,8 @@ TEST_CASE("test periodic task future", "[periodic_task]")
   async_wait(std::chrono::milliseconds(500)).get();
   pt.stop().get();
   CHECK(!pt.is_running());
-  CHECK(4 == called);
+  CHECK(4 >= called);
+  CHECK(3 <= called);
 }
 
 TEST_CASE("test periodic task immediate", "[periodic_task]")
