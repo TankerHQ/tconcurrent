@@ -86,7 +86,7 @@ auto async_resumable(F&& cb)
   using return_type =
       std::decay_t<decltype(cb(std::declval<detail::coroutine_control&>()))>;
 
-  return async([cb = std::forward<F>(cb)](cancelation_token& token) {
+  return async([cb = std::forward<F>(cb)](cancelation_token& token) mutable {
     auto pack = package<return_type(detail::coroutine_control&)>(std::move(cb));
 
     detail::coroutine_control* cs = new detail::coroutine_control(
