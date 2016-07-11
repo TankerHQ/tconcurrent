@@ -557,6 +557,16 @@ TEST_CASE("test broken promise", "[promise]")
   CHECK_THROWS_AS(fut.get(), broken_promise);
 }
 
+TEST_CASE("test future timed wait", "[future][wait]")
+{
+  promise<void> prom;
+  auto fut = prom.get_future();
+  auto before = std::chrono::steady_clock::now();
+  fut.wait_for(std::chrono::milliseconds(100));
+  auto after = std::chrono::steady_clock::now();
+  CHECK(std::chrono::milliseconds(100) < after - before);
+}
+
 TEST_CASE("test future cancel ready", "[future][cancel]")
 {
   auto fut = make_ready_future(18);

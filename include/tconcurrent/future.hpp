@@ -177,6 +177,12 @@ public:
     _p->wait();
   }
 
+  template <typename Rep, typename Period>
+  void wait_for(std::chrono::duration<Rep, Period> const& dur) const
+  {
+    _p->wait_for(dur);
+  }
+
   bool is_ready() const noexcept
   {
     return _p && _p->_r.which() != 0;

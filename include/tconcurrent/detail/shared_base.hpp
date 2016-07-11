@@ -188,8 +188,14 @@ public:
   void wait() const
   {
     std::unique_lock<std::mutex> lock{_mutex};
-    while (_r.which() == 0)
-      _ready.wait(lock);
+    _ready.wait(lock, [&]{ return _r.which() != 0; });
+  }
+
+  template <class Rep, class Period>
+  void wait_for(std::chrono::duration<Rep, Period> const& dur) const
+  {
+    std::unique_lock<std::mutex> lock{_mutex};
+    _ready.wait_for(lock, dur, [&]{ return _r.which() != 0; });
   }
 
   std::shared_ptr<cancelation_token> reset_cancelation_token()
