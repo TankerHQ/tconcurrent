@@ -913,7 +913,8 @@ TEST_CASE("test periodic task executor", "[periodic_task][executor]")
   async_wait(std::chrono::milliseconds(450)).get();
   pt.stop().get();
   CHECK(!pt.is_running());
-  CHECK(5 == called);
+  CHECK(4 <= called);
+  CHECK(5 >= called);
   CHECK(!fail);
 }
 
