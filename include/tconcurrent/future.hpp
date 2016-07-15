@@ -122,7 +122,7 @@ public:
       p = _p,
       token = _cancelation_token,
       f = std::forward<F>(f)
-    ]() {
+    ]() mutable {
       return this_type::do_and_then_callback(
           *p, token.get(), [&] { return f(p->get()); });
     });
@@ -135,7 +135,7 @@ public:
       p = _p,
       token = _cancelation_token,
       f = std::forward<F>(f)
-    ]() {
+    ]() mutable {
       return this_type::do_and_then_callback(
           *p, token.get(), [&] { return f(*token, p->get()); });
     });
@@ -245,8 +245,8 @@ template <typename R>
 future<R> detail::future_unwrap<future<R>>::unwrap()
 {
   auto& fut = static_cast<future<future<R>>&>(*this);
-  auto sb = std::make_shared<typename future<R>::shared_type>(
-      fut._p->get_cancelation_token());
+  auto sb =
+      std::make_shared<typename future<R>::shared_type>(fut._cancelation_token);
   fut.then(get_synchronous_executor(),
            [sb](future<future<R>> const& fut) {
              if (fut.has_exception())
@@ -254,8 +254,7 @@ future<R> detail::future_unwrap<future<R>>::unwrap()
              else
              {
                auto nested = fut.get();
-               if (sb->get_cancelation_token() !=
-                   nested._p->get_cancelation_token())
+               if (sb->get_cancelation_token() != nested._cancelation_token)
                  sb->get_cancelation_token()->push_last_cancelation_callback(
                      [nested]() mutable { nested.request_cancel(); });
                nested.then(get_synchronous_executor(),

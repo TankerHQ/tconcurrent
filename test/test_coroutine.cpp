@@ -101,8 +101,9 @@ TEST_CASE("coroutine cancel propagation", "[coroutine][cancel]")
   unsigned called = 0;
   promise<void> prom;
   prom.get_cancelation_token().push_cancelation_callback([&] { ++called; });
-  auto f = async_resumable([&](auto& await) {
-    await(prom.get_future());
+  // also test that we can pass mutable callback to async_resumable
+  auto f = async_resumable([fut = prom.get_future()](awaiter& await) mutable {
+    await(fut);
     return 42;
   });
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
