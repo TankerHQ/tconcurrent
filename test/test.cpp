@@ -302,6 +302,32 @@ SCENARIO("future can be used with specific executors", "[future][executor]")
   }
 }
 
+TEST_CASE("test future ready to_void", "[future]")
+{
+  auto fut = make_ready_future(42).to_void();
+  CHECK(fut.is_ready());
+}
+
+TEST_CASE("test future to_void", "[future]")
+{
+  promise<int> prom;
+  auto fut = prom.get_future().to_void();
+  CHECK(!fut.is_ready());
+  prom.set_value(42);
+  CHECK(fut.is_ready());
+}
+
+TEST_CASE("test future to_void cancelation", "[future][cancel]")
+{
+  promise<int> prom;
+  auto fut = prom.get_future().to_void();
+  fut.request_cancel();
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+  prom.set_exception(std::make_exception_ptr(operation_canceled{}));
+  CHECK(fut.is_ready());
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+}
+
 TEST_CASE("test simple async", "[async]")
 {
   bool hasrun = false;
