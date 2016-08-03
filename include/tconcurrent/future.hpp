@@ -180,6 +180,11 @@ public:
     return bool(_p);
   }
 
+  tc::future<void> to_void()
+  {
+    return and_then(get_synchronous_executor(), [](value_type const&){});
+  }
+
 private:
   using shared_type = detail::shared_base<value_type>;
   using shared_pointer = std::shared_ptr<shared_type>;
