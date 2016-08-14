@@ -156,7 +156,7 @@ public:
     }
 
     if (resolved)
-      e.post(std::move(f));
+      e.post(std::forward<F>(f));
   }
 
   R const& get()
