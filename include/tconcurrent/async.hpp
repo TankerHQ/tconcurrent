@@ -24,6 +24,16 @@ auto async(F&& f)
   return async(get_default_executor(), std::forward<F>(f));
 }
 
+/** Run f synchronously and returns a future containing the result
+ *
+ * Actually calls async(get_synchronous_executor(), f).
+ */
+template <typename F>
+auto sync(F&& f)
+{
+  return async(get_synchronous_executor(), std::forward<F>(f));
+}
+
 }
 
 #endif

@@ -171,6 +171,27 @@ TEST_CASE("test packaged task cancel", "[packaged_task][cancel]")
   }
 }
 
+TEST_CASE("test sync", "[sync]")
+{
+  auto fut = sync([]{ return 15; });
+  CHECK(fut.is_ready());
+  CHECK(15 == fut.get());
+}
+
+TEST_CASE("test sync void", "[sync]")
+{
+  auto fut = sync([]{});
+  CHECK(fut.is_ready());
+  CHECK_NOTHROW(fut.get());
+}
+
+TEST_CASE("test sync throw", "[sync]")
+{
+  auto fut = sync([]{ throw 18; });
+  CHECK(fut.is_ready());
+  CHECK_THROWS_AS(fut.get(), int);
+}
+
 TEST_CASE("test packaged task packaged_task_result_type", "[packaged_task]")
 {
   {
