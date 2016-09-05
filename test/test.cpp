@@ -984,7 +984,6 @@ TEST_CASE("test periodic task error stop", "[periodic_task][executor]")
   pt.set_callback([&]{ ++called; throw 18; });
   pt.set_period(std::chrono::milliseconds(0));
   pt.start(periodic_task::start_immediately);
-  CHECK(pt.is_running());
   async_wait(std::chrono::milliseconds(50)).get();
   CHECK(!pt.is_running());
   CHECK(1 == called);
