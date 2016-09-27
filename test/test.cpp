@@ -8,6 +8,7 @@
 #include <tconcurrent/when.hpp>
 #include <tconcurrent/concurrent_queue.hpp>
 #include <tconcurrent/semaphore.hpp>
+#include <tconcurrent/future_group.hpp>
 
 using namespace tconcurrent;
 
@@ -1326,4 +1327,40 @@ TEST_CASE("test thread_pool error work", "[thread_pool]")
   tp.post([&]{ throw 18; });
   tp.stop();
   CHECK(called);
+}
+
+TEST_CASE("test future_group empty", "[future_group]")
+{
+  future_group group;
+  CHECK(group.terminate().is_ready());
+}
+
+TEST_CASE("test future_group ready", "[future_group]")
+{
+  future_group group;
+  group.add(tc::make_ready_future(18));
+  group.add(tc::make_ready_future(18.f));
+  group.add(tc::make_exceptional_future<void>(
+      std::make_exception_ptr(std::runtime_error("fail"))));
+  CHECK(group.terminate().is_ready());
+}
+
+TEST_CASE("test future_group not ready", "[future_group]")
+{
+  tc::promise<int> prom;
+  future_group group;
+  group.add(prom.get_future());
+  auto fut = group.terminate();
+  CHECK(!fut.is_ready());
+  CHECK(prom.get_cancelation_token().is_cancel_requested());
+  prom.set_value(18);
+  CHECK(fut.is_ready());
+}
+
+TEST_CASE("test future_group adding future after termination", "[future_group]")
+{
+  future_group group;
+  group.add(tc::make_ready_future(18));
+  CHECK(group.terminate().is_ready());
+  CHECK_THROWS(group.add(tc::make_ready_future(42)));
 }
