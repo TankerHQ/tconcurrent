@@ -3,6 +3,7 @@
 #include <tconcurrent/curl/curl.hpp>
 #include <tconcurrent/promise.hpp>
 #include <tconcurrent/async.hpp>
+#include <tconcurrent/delay.hpp>
 
 using namespace tconcurrent;
 using namespace tconcurrent::curl;
@@ -78,6 +79,24 @@ TEST_CASE("curl cancel request")
   auto after = std::chrono::steady_clock::now();
 
   CHECK(std::chrono::seconds(1) > after - before);
+}
+
+TEST_CASE("curl destroy multi during request")
+{
+  auto mul = new multi;
+
+  request req;
+  req.set_read_callback(
+      [](request&, void const*, std::size_t size) { return size; });
+  req.set_finish_callback(
+      [](request&, CURLcode c) { CHECK(false); });
+  req.set_url("http://httpbin.org/delay/5");
+
+  mul->process(&req);
+
+  tc::async_wait(std::chrono::milliseconds(100))
+      .then([&](tc::future<void> const&) { delete mul; })
+      .get();
 }
 
 TEST_CASE("curl multiple requests")

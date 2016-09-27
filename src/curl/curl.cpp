@@ -53,6 +53,19 @@ int multi::socketfunction_cb_c(
   return static_cast<multi*>(userp)->socketfunction_cb(easy, s, action);
 }
 
+void multi::event_cb_c(std::shared_ptr<bool> alive,
+                       multi* multi,
+                       curl_socket_t sock,
+                       async_socket* asocket,
+                       uint8_t action,
+                       boost::system::error_code const& ec)
+{
+  if (*alive == false)
+    return;
+
+  multi->event_cb(sock, asocket, action, ec);
+}
+
 size_t request::header_cb_c(char* ptr, size_t size, size_t nmemb, void* data)
 {
   return static_cast<request*>(data)->header_cb(ptr, size, nmemb);
@@ -86,6 +99,7 @@ multi::multi(boost::asio::io_service& io_service)
 
 multi::~multi()
 {
+  *_alive = false;
   future<void> fut;
   {
     scope_lock l{_mutex};
@@ -191,6 +205,9 @@ void multi::event_cb(curl_socket_t sock,
                      uint8_t action,
                      boost::system::error_code const& ec)
 {
+  if (ec == boost::asio::error::operation_aborted)
+    return;
+
   /* WORKAROUND
    * On linux (at least), some times, only when the network sends unexpected
    * tcp-reset, boost.asio will call our callback, after the socket has been
@@ -201,9 +218,6 @@ void multi::event_cb(curl_socket_t sock,
    * will probably crash here.
    */
   if (!_sockets.count(sock))
-    return;
-
-  if (ec == boost::asio::error::operation_aborted)
     return;
 
   scope_lock l{_mutex};
@@ -332,7 +346,8 @@ int multi::socketfunction_cb(CURL*, curl_socket_t s, int curlaction)
   if (todo & ActionRead)
   {
     asocket->socket.async_read_some(boost::asio::null_buffers(),
-                                    std::bind(&multi::event_cb,
+                                    std::bind(&multi::event_cb_c,
+                                              _alive,
                                               this,
                                               s,
                                               asocket,
@@ -343,7 +358,8 @@ int multi::socketfunction_cb(CURL*, curl_socket_t s, int curlaction)
   else if (todo & ActionWrite)
   {
     asocket->socket.async_write_some(boost::asio::null_buffers(),
-                                     std::bind(&multi::event_cb,
+                                     std::bind(&multi::event_cb_c,
+                                               _alive,
                                                this,
                                                s,
                                                asocket,
