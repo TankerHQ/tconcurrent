@@ -83,6 +83,11 @@ private:
   future<void> _timer_future;
   detail::CURLM_unique_ptr _multi;
 
+  // Sometimes boost asio calls us back even after all the sockets have been
+  // destroyed and multi has been destroyed too. We check this bool to see if
+  // the callback can run.
+  std::shared_ptr<bool> _alive{std::make_shared<bool>(true)};
+
   // Check for completed transfers, and remove their easy handles
   void remove_finished();
 
@@ -109,6 +114,13 @@ private:
   static int socketfunction_cb_c(
       CURL* easy, curl_socket_t s, int action, void* userp, void* socketp);
   static int multi_timer_cb_c(CURLM* multi, long timeout_ms, void* g);
+  // Check alive and forward the call to multi
+  static void event_cb_c(std::shared_ptr<bool> alive,
+                         multi* multi,
+                         curl_socket_t sock,
+                         async_socket* asocket,
+                         uint8_t action,
+                         boost::system::error_code const& ec);
 
   friend request;
 };
