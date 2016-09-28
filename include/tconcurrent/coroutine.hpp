@@ -35,6 +35,8 @@ struct coroutine_control
   template <typename Awaitable>
   typename std::decay_t<Awaitable>::value_type operator()(
       Awaitable&& awaitable);
+
+  void yield();
 };
 
 detail::coroutine_control*& get_current_coroutine_ptr();
@@ -74,6 +76,17 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
   if (token.is_cancel_requested())
     throw operation_canceled{};
   return awaitable.get();
+}
+
+inline void coroutine_control::yield()
+{
+  if (token.is_cancel_requested())
+    throw operation_canceled{};
+  *argctx = std::get<0>((*argctx)([](coroutine_control* ctrl) {
+    tc::async([ctrl] { run_coroutine(ctrl); });
+  }));
+  if (token.is_cancel_requested())
+    throw operation_canceled{};
 }
 
 }
