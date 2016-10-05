@@ -20,7 +20,7 @@ struct read_all_helper
   read_all_result::data_type _data;
   promise<read_all_result> _promise;
 
-  read_all_helper(multi& multi) : _multi(multi)
+  explicit read_all_helper(multi& multi) : _multi(multi)
   {
   }
 };

@@ -24,7 +24,8 @@ struct multi::async_socket
   uint8_t current_action = 0;
   boost::asio::ip::tcp::socket socket;
 
-  async_socket(boost::asio::io_service& io_service) : socket(io_service)
+  explicit async_socket(boost::asio::io_service& io_service)
+    : socket(io_service)
   {
   }
 };
