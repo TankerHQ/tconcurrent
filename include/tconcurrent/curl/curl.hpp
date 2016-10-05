@@ -60,8 +60,8 @@ public:
   multi& operator=(multi const&) = delete;
   multi& operator=(multi&&) = delete;
 
-  void process(request* req);
-  void cancel(request* req);
+  void process(std::shared_ptr<request> req);
+  void cancel(request& req);
 
   CURLM* get_multi()
   {
@@ -75,13 +75,14 @@ private:
 
   // this mutex must be recursive because when curl calls us back, we don't know
   // if it's because someone called curl or because one of our own callback
-  // (whchi already holds the lock) called curl
+  // (which already holds the lock) called curl
   std::recursive_mutex _mutex;
   bool _dying = false;
   boost::asio::io_service& _io_service;
   std::map<curl_socket_t, std::unique_ptr<async_socket>> _sockets;
   future<void> _timer_future;
   detail::CURLM_unique_ptr _multi;
+  std::vector<std::shared_ptr<request>> _running_requests;
 
   // Sometimes boost asio calls us back even after all the sockets have been
   // destroyed and multi has been destroyed too. We check this bool to see if
