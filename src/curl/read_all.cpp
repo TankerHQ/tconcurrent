@@ -87,7 +87,7 @@ future<read_all_result> read_all(multi& multi, std::shared_ptr<request> req)
       if (!ra->_req)
         return;
 
-      ra->_multi.cancel(ra->_req.get());
+      ra->_multi.cancel(*ra->_req);
       ra->_promise.set_exception(std::make_exception_ptr(operation_canceled{}));
       ra->_promise = {};
       ra->_req = nullptr;
@@ -98,7 +98,7 @@ future<read_all_result> read_all(multi& multi, std::shared_ptr<request> req)
       tc::async(doCancel);
   });
 
-  multi.process(ra->_req.get());
+  multi.process(ra->_req);
 
   return ra->_promise.get_future();
 }

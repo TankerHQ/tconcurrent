@@ -16,45 +16,45 @@ TEST_CASE("curl simple request")
   long httpcode = 0;
   long expectedhttpcode = 0;
   bool dataread = false;
-  request req;
-  req.set_read_callback([&](request& r, void const*, std::size_t size) {
+  auto req = std::make_shared<request>();
+  req->set_read_callback([&](request& r, void const*, std::size_t size) {
     curl_easy_getinfo(r.get_curl(), CURLINFO_RESPONSE_CODE, &httpcode);
     dataread = true;
     return size;
   });
-  req.set_finish_callback(
+  req->set_finish_callback(
       [=](request&, CURLcode c) mutable { finished.set_value(c); });
 
   SECTION("http")
   {
     expectedhttpcode = 200;
-    req.set_url("http://httpbin.org/get?TEST=test");
+    req->set_url("http://httpbin.org/get?TEST=test");
   }
 
   SECTION("https")
   {
     expectedhttpcode = 200;
-    req.set_url("https://httpbin.org/get?TEST=test");
+    req->set_url("https://httpbin.org/get?TEST=test");
   }
 
   SECTION("not found")
   {
     expectedhttpcode = 404;
-    req.set_url("http://httpbin.org/whatever");
+    req->set_url("http://httpbin.org/whatever");
   }
 
   SECTION("post")
   {
     expectedhttpcode = 200;
-    req.set_url("http://httpbin.org/post");
+    req->set_url("http://httpbin.org/post");
     static char const buf[] = "Test test test";
-    curl_easy_setopt(req.get_curl(), CURLOPT_POST, 1l);
+    curl_easy_setopt(req->get_curl(), CURLOPT_POST, 1l);
     curl_easy_setopt(
-        req.get_curl(), CURLOPT_POSTFIELDSIZE, long(sizeof(buf) - 1));
-    curl_easy_setopt(req.get_curl(), CURLOPT_POSTFIELDS, buf);
+        req->get_curl(), CURLOPT_POSTFIELDSIZE, long(sizeof(buf) - 1));
+    curl_easy_setopt(req->get_curl(), CURLOPT_POSTFIELDS, buf);
   }
 
-  mul.process(&req);
+  mul.process(req);
   auto code = finished.get_future().get();
   CAPTURE(curl_easy_strerror(code));
   CHECK(CURLE_OK == code);
@@ -66,16 +66,15 @@ TEST_CASE("curl cancel request")
 {
   multi mul;
 
-  request req;
-  req.set_read_callback(
+  auto req = std::make_shared<request>();
+  req->set_read_callback(
       [](request&, void const*, std::size_t size) { return size; });
-  req.set_finish_callback(
-      [](request&, CURLcode c) { CHECK(false); });
-  req.set_url("http://httpbin.org/delay/10");
+  req->set_finish_callback([](request&, CURLcode c) { CHECK(false); });
+  req->set_url("http://httpbin.org/delay/10");
 
   auto before = std::chrono::steady_clock::now();
-  mul.process(&req);
-  async([&] { mul.cancel(&req); }).get();
+  mul.process(req);
+  async([&] { mul.cancel(*req); }).get();
   auto after = std::chrono::steady_clock::now();
 
   CHECK(std::chrono::seconds(1) > after - before);
@@ -85,14 +84,13 @@ TEST_CASE("curl destroy multi during request")
 {
   auto mul = new multi;
 
-  request req;
-  req.set_read_callback(
+  auto req = std::make_shared<request>();
+  req->set_read_callback(
       [](request&, void const*, std::size_t size) { return size; });
-  req.set_finish_callback(
-      [](request&, CURLcode c) { CHECK(false); });
-  req.set_url("http://httpbin.org/delay/5");
+  req->set_finish_callback([](request&, CURLcode c) { CHECK(false); });
+  req->set_url("http://httpbin.org/delay/5");
 
-  mul->process(&req);
+  mul->process(req);
 
   tc::async_wait(std::chrono::milliseconds(100))
       .then([&](tc::future<void> const&) { delete mul; })
@@ -107,22 +105,25 @@ TEST_CASE("curl multiple requests")
 
   promise<void> finished[NB];
   bool dataread[NB] = {false};
-  request req[NB];
+  std::shared_ptr<request> reqs[NB];
+  for (auto& req : reqs)
+    req = std::make_shared<request>();
+
   for (int i = 0; i < NB; ++i)
   {
-    req[i].set_read_callback(
+    reqs[i]->set_read_callback(
         [&dataread, i](request&, void const*, std::size_t size) {
           dataread[i] = true;
           return size;
         });
     promise<void> finish = finished[i];
-    req[i].set_finish_callback(
+    reqs[i]->set_finish_callback(
         [finish](request&, CURLcode) mutable { finish.set_value({}); });
-    req[i].set_url("http://httpbin.org/drip?numbytes=100&duration=1");
+    reqs[i]->set_url("http://httpbin.org/drip?numbytes=100&duration=1");
   }
 
   for (int i = 0; i < NB; ++i)
-    mul.process(&req[i]);
+    mul.process(reqs[i]);
 
   for (int i = 0; i < NB; ++i)
   {

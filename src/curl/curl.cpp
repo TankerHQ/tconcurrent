@@ -112,9 +112,13 @@ multi::~multi()
     fut.request_cancel();
     fut.wait();
   }
+
+  // remove all requests
+  for (auto const& req : _running_requests)
+    curl_multi_remove_handle(_multi.get(), req->_easy.get());
 }
 
-void multi::process(request* req)
+void multi::process(std::shared_ptr<request> req)
 {
   curl_easy_setopt(
       req->_easy.get(), CURLOPT_OPENSOCKETFUNCTION, &multi::opensocket_c);
@@ -127,11 +131,18 @@ void multi::process(request* req)
   if (CURLM_OK != rc)
     throw std::runtime_error(std::string("curl_multi_add_handle failed: ") +
                              curl_multi_strerror(rc));
+
+  _running_requests.emplace_back(std::move(req));
 }
 
-void multi::cancel(request* req)
+void multi::cancel(request& req)
 {
-  curl_multi_remove_handle(_multi.get(), req->_easy.get());
+  curl_multi_remove_handle(_multi.get(), req._easy.get());
+  _running_requests.erase(
+      std::remove_if(_running_requests.begin(),
+                     _running_requests.end(),
+                     [&](auto const& r) { return r.get() == &req; }),
+      _running_requests.end());
 }
 
 void multi::remove_finished()
@@ -150,7 +161,8 @@ void multi::remove_finished()
       auto req = static_cast<request*>(reqptr);
       req->_finish_cb(*req, msg->data.result);
 
-      curl_multi_remove_handle(_multi.get(), easy);
+      // this will remove the handle from the multi
+      cancel(*req);
     }
   }
 }
