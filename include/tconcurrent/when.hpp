@@ -70,10 +70,10 @@ private:
 }
 
 template <typename InputIterator>
-future<std::vector<typename InputIterator::value_type>> when_all(
-    InputIterator first, InputIterator last)
+future<std::vector<typename std::iterator_traits<InputIterator>::value_type>>
+when_all(InputIterator first, InputIterator last)
 {
-  using value_type = typename InputIterator::value_type;
+  using value_type = typename std::iterator_traits<InputIterator>::value_type;
 
   static_assert(detail::is_future<value_type>::value,
                 "when_all must be called on iterators of futures");

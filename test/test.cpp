@@ -857,6 +857,15 @@ TEST_CASE("test when_all empty", "[when_all]")
   CHECK(0 == futs.size());
 }
 
+TEST_CASE("test when_all init list", "[when_all]")
+{
+  auto futures = {make_ready_future()};
+  auto all = when_all(futures.begin(), futures.end());
+  CHECK(all.is_ready());
+  auto& futs = all.get();
+  CHECK(1 == futs.size());
+}
+
 TEST_CASE("test when_all cancel", "[when_all][cancel]")
 {
   auto const NB_FUTURES = 100;
