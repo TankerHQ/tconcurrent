@@ -143,6 +143,18 @@ TEST_CASE("curl multiple requests")
   CHECK(!result.header.empty());                                         \
   CHECK(!result.data.empty());
 
+TEST_CASE("curl failure")
+{
+  multi mul;
+  auto req = std::make_shared<request>();
+
+  req->set_url("/lol");
+
+  auto fut = read_all(mul, req);
+  fut.wait();
+  CHECK(fut.has_exception());
+}
+
 TEST_CASE("curl read_all")
 {
   multi mul;

@@ -98,9 +98,12 @@ future<read_all_result> read_all(multi& multi, std::shared_ptr<request> req)
       tc::async(doCancel);
   });
 
+  // get the future first, the promise may be reset during the process
+  auto fut = ra->_promise.get_future();
+
   multi.process(ra->_req);
 
-  return ra->_promise.get_future();
+  return fut;
 }
 
 }
