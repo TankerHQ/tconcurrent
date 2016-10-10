@@ -788,6 +788,46 @@ TEST_CASE("test future ready continuation cancel token", "[future][cancel]")
   CHECK(1 == called);
 }
 
+TEST_CASE("test future from promise break cancel chain",
+          "[promise][future][cancel][breakchain]")
+{
+  tc::promise<void> prom;
+  auto fut1 = prom.get_future();
+  fut1.request_cancel();
+
+  unsigned called = 0;
+  auto fut2 = fut1.then([&](cancelation_token& token, future<void> fut) {
+                    ++called;
+                    CHECK(token.is_cancel_requested());
+                  })
+                  .break_cancelation_chain()
+                  .then([&](cancelation_token& token, future<void> fut) {
+                    ++called;
+                    CHECK(!token.is_cancel_requested());
+                  });
+  prom.set_value({});
+  fut2.get();
+  CHECK(2 == called);
+}
+
+TEST_CASE("test future from promise break cancel chain reversed",
+          "[promise][future][cancel][breakchain]")
+{
+  tc::promise<void> prom;
+  auto fut1 = prom.get_future();
+
+  unsigned called = 0;
+  auto fut2 = fut1.then([&](cancelation_token& token, future<void> fut) {
+    ++called;
+    CHECK(!token.is_cancel_requested());
+  }).break_cancelation_chain();
+  fut2.request_cancel();
+  CHECK(!prom.get_cancelation_token().is_cancel_requested());
+  prom.set_value({});
+  fut2.get();
+  CHECK(1 == called);
+}
+
 TEST_CASE("test future promise unwrap cancel", "[future][unwrap][cancel]")
 {
   unsigned called = 0;
