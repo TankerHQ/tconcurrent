@@ -45,19 +45,24 @@ future<void> periodic_task::stop()
   if (_state == State::Stopped)
     return make_ready_future();
   if (_state != State::Running)
-    return _future.then(get_synchronous_executor(),
-                        [&](future<void> const&) {});
+    // swallow exceptions
+    return _future.then(get_synchronous_executor(), [&](future<void> const&) {})
+        .break_cancelation_chain();
 
   assert(_future.is_valid());
 
   _state = State::Stopping;
   _future.request_cancel();
-  return _future.then(get_synchronous_executor(), [&](future<void> const&) {
-    scope_lock l(_mutex);
-    // can be Stopping, or Stopped if the callback threw on the last run
-    assert(_state != State::Running);
-    _state = State::Stopped;
-  });
+  return _future
+      .then(get_synchronous_executor(),
+            [&](future<void> const&) {
+              scope_lock l(_mutex);
+              // can be Stopping, or Stopped if the callback threw on the last
+              // run
+              assert(_state != State::Running);
+              _state = State::Stopped;
+            })
+      .break_cancelation_chain();
 }
 
 void periodic_task::reschedule()

@@ -1205,6 +1205,25 @@ TEST_CASE("test periodic task cancel", "[periodic_task][cancel]")
   CHECK(!pt.is_running());
 }
 
+TEST_CASE("test periodic task cancel no-propagation", "[periodic_task][cancel]")
+{
+  periodic_task pt;
+  pt.set_callback([&] {});
+  pt.set_period(std::chrono::milliseconds(0));
+  pt.start(periodic_task::start_immediately);
+  async_wait(std::chrono::milliseconds(100)).get();
+  auto stopfut = pt.stop();
+
+  unsigned called = 0;
+  auto fut2 = stopfut.then([&](cancelation_token& token, tc::future<void>) {
+    CHECK(!token.is_cancel_requested());
+    ++called;
+  });
+
+  fut2.get();
+  CHECK(1 == called);
+}
+
 SCENARIO("test concurrent_queue", "[concurrent_queue]")
 {
   GIVEN("an empty queue")
