@@ -141,6 +141,20 @@ public:
     });
   }
 
+  /**
+   * Do not propagate cancelation requests from here on.
+   *
+   * This function discards the cancelation token of the previous task and
+   * creates a new one, effectively preventing cancelation requests from going
+   * from this future to the previous task and from the previous future to the
+   * following tasks.
+   */
+  future& break_cancelation_chain()
+  {
+    _cancelation_token = _p->reset_cancelation_token();
+    return *this;
+  }
+
   void request_cancel()
   {
     auto const& token = _p->get_cancelation_token();

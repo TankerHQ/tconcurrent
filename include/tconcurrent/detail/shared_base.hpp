@@ -186,6 +186,13 @@ public:
       _ready.wait(lock);
   }
 
+  std::shared_ptr<cancelation_token> reset_cancelation_token()
+  {
+    std::unique_lock<std::mutex> lock{_mutex};
+    _cancelation_token = std::make_shared<cancelation_token>();
+    return _cancelation_token;
+  }
+
   std::shared_ptr<cancelation_token> get_cancelation_token()
   {
     std::unique_lock<std::mutex> lock{_mutex};
