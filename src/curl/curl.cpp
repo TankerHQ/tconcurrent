@@ -115,7 +115,7 @@ multi::~multi()
 
   // remove all requests
   for (auto const& req : _running_requests)
-    curl_multi_remove_handle(_multi.get(), req->_easy.get());
+    abort_request(*req);
 }
 
 void multi::process(std::shared_ptr<request> req)
@@ -137,12 +137,18 @@ void multi::process(std::shared_ptr<request> req)
 
 void multi::cancel(request& req)
 {
-  curl_multi_remove_handle(_multi.get(), req._easy.get());
+  abort_request(req);
   _running_requests.erase(
       std::remove_if(_running_requests.begin(),
                      _running_requests.end(),
                      [&](auto const& r) { return r.get() == &req; }),
       _running_requests.end());
+}
+
+void multi::abort_request(request& req)
+{
+  curl_multi_remove_handle(_multi.get(), req._easy.get());
+  req.notify_abort();
 }
 
 void multi::remove_finished()
@@ -408,6 +414,12 @@ void request::add_header(std::string const& header)
 {
   _header.reset(curl_slist_append(_header.release(), header.c_str()));
   curl_easy_setopt(_easy.get(), CURLOPT_HTTPHEADER, _header.get());
+}
+
+void request::notify_abort()
+{
+  if (_abort_cb)
+    _abort_cb(*this);
 }
 
 size_t request::header_cb(char* ptr, size_t size, size_t nmemb)

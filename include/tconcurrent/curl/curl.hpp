@@ -89,6 +89,9 @@ private:
   // the callback can run.
   std::shared_ptr<bool> _alive{std::make_shared<bool>(true)};
 
+  // Remove the handle from the CURL multi and notify the request
+  void abort_request(request& req);
+
   // Check for completed transfers, and remove their easy handles
   void remove_finished();
 
@@ -134,6 +137,7 @@ public:
   using read_callback =
       std::function<std::size_t(request&, void const*, std::size_t)>;
   using finish_callback = std::function<void(request&, CURLcode)>;
+  using abort_callback = std::function<void(request&)>;
 
   request();
 
@@ -153,6 +157,10 @@ public:
   void set_finish_callback(finish_callback cb)
   {
     _finish_cb = std::move(cb);
+  }
+  void set_abort_callback(abort_callback cb)
+  {
+    _abort_cb = std::move(cb);
   }
 
   CURL* get_curl()
@@ -176,7 +184,10 @@ private:
   header_callback _header_cb;
   read_callback _read_cb;
   finish_callback _finish_cb;
+  abort_callback _abort_cb;
   detail::CURL_unique_ptr _easy;
+
+  void notify_abort();
 
   size_t header_cb(char* ptr, size_t size, size_t nmemb);
   size_t write_cb(void* ptr, size_t size, size_t nmemb);

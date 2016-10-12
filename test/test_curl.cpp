@@ -193,3 +193,18 @@ TEST_CASE("curl read_all cancel")
 
   CHECK(std::chrono::seconds(1) > after - before);
 }
+
+TEST_CASE("curl read_all destroy multi")
+{
+  auto mul = std::make_unique<multi>();
+
+  auto req = std::make_shared<request>();
+  req->set_url("http://httpbin.org/delay/10");
+  auto fut = read_all(*mul, req);
+  async([&] { mul.reset(); }).get();
+  auto before = std::chrono::steady_clock::now();
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+  auto after = std::chrono::steady_clock::now();
+
+  CHECK(std::chrono::seconds(1) > after - before);
+}
