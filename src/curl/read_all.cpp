@@ -81,6 +81,17 @@ future<read_all_result> read_all(multi& multi, std::shared_ptr<request> req)
     ra->_req = nullptr;
   });
 
+  ra->_req->set_abort_callback([ra](request&) {
+    // if query is already finished
+    if (!ra->_req)
+      return;
+
+    ra->_promise.set_exception(std::make_exception_ptr(operation_canceled{}));
+    // break the cycles
+    ra->_promise = {};
+    ra->_req = nullptr;
+  });
+
   ra->_promise.get_cancelation_token().push_cancelation_callback([ra] {
     auto doCancel = [ra] {
       // if query is already finished
