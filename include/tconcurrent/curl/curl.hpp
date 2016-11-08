@@ -15,6 +15,30 @@ namespace tconcurrent
 namespace curl
 {
 
+class exception : public std::exception
+{
+public:
+  exception(exception const&) = default;
+  exception& operator=(exception const&) = default;
+
+  exception(CURLcode code) : code(code)
+  {
+  }
+
+  char const* what() const noexcept override
+  {
+    return curl_easy_strerror(code);
+  }
+
+  CURLcode get_code() const
+  {
+    return code;
+  }
+
+private:
+  CURLcode code;
+};
+
 namespace detail
 {
 struct curl_multi_cleanup_t
