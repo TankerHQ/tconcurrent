@@ -32,10 +32,16 @@ template <typename S>
 class promise_ptr
 {
 public:
+  using shared_ptr_type = std::shared_ptr<S>;
+
   promise_ptr() = default;
 
-  template <typename P>
-  promise_ptr(P&& p) : _ptr(std::forward<P>(p))
+  promise_ptr(shared_ptr_type const& p) : _ptr(p)
+  {
+    _ptr->increment_promise();
+  }
+
+  promise_ptr(shared_ptr_type&& p) : _ptr(std::move(p))
   {
     _ptr->increment_promise();
   }
