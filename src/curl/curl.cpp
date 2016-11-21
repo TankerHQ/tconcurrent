@@ -402,7 +402,11 @@ request::request() : _easy(curl_easy_init())
   //curl_easy_setopt(_easy.get(), CURLOPT_VERBOSE, 1L);
   curl_easy_setopt(_easy.get(), CURLOPT_ERRORBUFFER, &_error[0]);
   curl_easy_setopt(_easy.get(), CURLOPT_PRIVATE, this);
-  curl_easy_setopt(_easy.get(), CURLOPT_NOPROGRESS, 1L);
+  curl_easy_setopt(_easy.get(), CURLOPT_NOPROGRESS, 1l);
+
+  // less than 1B/s for 30s
+  curl_easy_setopt(_easy.get(), CURLOPT_LOW_SPEED_LIMIT, 1l);
+  curl_easy_setopt(_easy.get(), CURLOPT_LOW_SPEED_TIME, 30l);
 }
 
 void request::set_url(std::string url)
