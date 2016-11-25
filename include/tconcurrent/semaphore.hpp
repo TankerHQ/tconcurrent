@@ -21,7 +21,12 @@ public:
     }
     scope_lock& operator=(scope_lock&& r)
     {
-      s = std::exchange(r.s, nullptr);
+      if (this != &r)
+      {
+        if (s)
+          s->release();
+        s = std::exchange(r.s, nullptr);
+      }
       return *this;
     }
     ~scope_lock()
