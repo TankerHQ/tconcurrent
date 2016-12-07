@@ -407,6 +407,8 @@ request::request() : _easy(curl_easy_init())
   // less than 1B/s for 30s
   curl_easy_setopt(_easy.get(), CURLOPT_LOW_SPEED_LIMIT, 1l);
   curl_easy_setopt(_easy.get(), CURLOPT_LOW_SPEED_TIME, 30l);
+  // hard limit to 2 min for a request
+  curl_easy_setopt(_easy.get(), CURLOPT_TIMEOUT, 2l * 60l);
 }
 
 void request::set_url(std::string url)
