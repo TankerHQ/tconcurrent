@@ -8,20 +8,36 @@ namespace tconcurrent
 {
 
 template <typename E, typename F>
-auto async(E&& executor, F&& f)
+auto async(std::string const& name, E&& executor, F&& f)
 {
   using result_type = std::decay_t<packaged_task_result_type<F()>>;
 
   auto pack = package<result_type()>(std::forward<F>(f));
 
-  executor.post(std::move(std::get<0>(pack)));
-  return std::get<1>(pack);
+  executor.post(std::move(std::get<0>(pack)),
+                name + " (" + typeid(F).name() + ")");
+  return std::get<1>(pack).update_chain_name(name);
+}
+
+template <typename F>
+auto async(std::string const& name, F&& f)
+{
+  return async(name, get_default_executor(), std::forward<F>(f));
+}
+
+template <typename E,
+          typename F,
+          typename = std::enable_if_t<
+              !std::is_convertible<std::decay_t<E>, std::string>::value>>
+auto async(E&& executor, F&& f)
+{
+  return async({}, std::forward<E>(executor), std::forward<F>(f));
 }
 
 template <typename F>
 auto async(F&& f)
 {
-  return async(get_default_executor(), std::forward<F>(f));
+  return async({}, get_default_executor(), std::forward<F>(f));
 }
 
 /** Run f synchronously and returns a future containing the result

@@ -18,6 +18,7 @@ struct thread_pool::impl
   std::atomic<bool> _dead{false};
 
   error_handler_cb _error_cb{detail::default_error_cb};
+  task_trace_handler_cb _task_trace_handler;
 };
 
 namespace detail
@@ -134,10 +135,27 @@ void thread_pool::signal_error(std::exception_ptr const& e)
   _p->_error_cb(e);
 }
 
-void thread_pool::do_post(std::function<void()> work)
+void thread_pool::set_task_trace_handler(task_trace_handler_cb cb)
+{
+  _p->_task_trace_handler = std::move(cb);
+}
+
+void thread_pool::post(std::function<void()> work, std::string name)
 {
   assert(!_p->_dead.load());
-  _p->_io.post(std::move(work));
+  _p->_io.post([ this, work = std::move(work), name = std::move(name) ] {
+    if (_p->_task_trace_handler)
+    {
+      auto const before = std::chrono::steady_clock::now();
+      work();
+      auto const ellapsed = std::chrono::steady_clock::now() - before;
+      _p->_task_trace_handler(name, ellapsed);
+    }
+    else
+    {
+      work();
+    }
+  });
 }
 
 thread_pool& get_global_single_thread()

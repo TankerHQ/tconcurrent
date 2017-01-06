@@ -25,6 +25,8 @@ class thread_pool
 {
 public:
   using error_handler_cb = std::function<void(std::exception_ptr const&)>;
+  using task_trace_handler_cb = std::function<void(
+      std::string const& name, std::chrono::steady_clock::duration dur)>;
 
   thread_pool(thread_pool const&) = delete;
   thread_pool(thread_pool&&) = delete;
@@ -49,20 +51,15 @@ public:
    */
   void run_thread();
 
-  template <typename F>
-  void post(F&& work)
-  {
-    do_post(std::forward<F>(work));
-  }
+  void post(std::function<void()> work, std::string name = {});
 
   void set_error_handler(error_handler_cb cb);
   void signal_error(std::exception_ptr const& e);
+  void set_task_trace_handler(task_trace_handler_cb cb);
 
 private:
   struct impl;
   std::unique_ptr<impl> _p;
-
-  void do_post(std::function<void()> work);
 };
 
 thread_pool& get_default_executor();
@@ -74,7 +71,7 @@ class synchronous_executor
 {
 public:
   template <typename F>
-  void post(F&& work)
+  void post(F&& work, std::string const& = {})
   {
     work();
   }

@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <vector>
 #include <functional>
+#include <string>
 
 #include <boost/variant.hpp>
 
@@ -148,7 +149,7 @@ public:
   }
 
   template <typename E, typename F>
-  void then(E&& e, F&& f)
+  void then(std::string name, E&& e, F&& f)
   {
     bool resolved{false};
 
@@ -156,13 +157,15 @@ public:
       std::lock_guard<std::mutex> lock{_mutex};
       if (_r.which() == 0)
         _then.emplace_back(
-            [&e, f = std::forward<F>(f)]() mutable { e.post(std::move(f)); });
+            [ name = std::move(name), &e, f = std::forward<F>(f) ]() mutable {
+              e.post(std::move(f), std::move(name));
+            });
       else
         resolved = true;
     }
 
     if (resolved)
-      e.post(std::forward<F>(f));
+      e.post(std::forward<F>(f), std::move(name));
   }
 
   R const& get()
