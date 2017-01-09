@@ -6,9 +6,20 @@
 #include <map>
 #include <functional>
 #include <memory>
-#include <boost/asio.hpp>
-#include <boost/asio/steady_timer.hpp>
+#include <array>
 #include <curl/curl.h>
+
+namespace boost
+{
+namespace asio
+{
+class io_service;
+}
+namespace system
+{
+  class error_code;
+}
+}
 
 namespace tconcurrent
 {

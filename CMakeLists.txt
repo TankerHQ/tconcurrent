@@ -7,6 +7,7 @@ include(curl-config)
 
 add_library(tconcurrent
   src/coroutine.cpp
+  src/delay.cpp
   src/periodic_task.cpp
   src/thread_pool.cpp
 

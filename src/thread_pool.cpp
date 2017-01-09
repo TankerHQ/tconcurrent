@@ -5,8 +5,21 @@
 #include <tconcurrent/thread_pool.hpp>
 #include <tconcurrent/detail/util.hpp>
 
+#include <boost/asio/io_service.hpp>
+
 namespace tconcurrent
 {
+
+struct thread_pool::impl
+{
+  boost::asio::io_service _io;
+  std::unique_ptr<boost::asio::io_service::work> _work;
+  std::vector<std::thread> _threads;
+  std::atomic<bool> _dead{false};
+
+  error_handler_cb _error_cb{detail::default_error_cb};
+};
+
 namespace detail
 {
 void default_error_cb(std::exception_ptr const&)
@@ -32,9 +45,14 @@ boost::thread_specific_ptr<void> current_executor(noopdelete);
 #endif
 }
 
+thread_pool::thread_pool()
+  : _p(new impl)
+{
+}
+
 thread_pool::~thread_pool()
 {
-  _dead = true;
+  _p->_dead = true;
   stop();
 }
 
@@ -45,17 +63,22 @@ bool thread_pool::is_in_this_context() const
 
 bool thread_pool::is_single_threaded() const
 {
-  return _threads.size() == 1;
+  return _p->_threads.size() == 1;
+}
+
+boost::asio::io_service& thread_pool::get_io_service()
+{
+  return _p->_io;
 }
 
 void thread_pool::start(unsigned int thread_count)
 {
-  if (_work)
+  if (_p->_work)
     throw std::runtime_error("the threadpool is already running");
 
-  _work = std::make_unique<boost::asio::io_service::work>(_io);
+  _p->_work = std::make_unique<boost::asio::io_service::work>(_p->_io);
   for (unsigned int i = 0; i < thread_count; ++i)
-    _threads.emplace_back(
+    _p->_threads.emplace_back(
         [this]{
           run_thread();
         });
@@ -68,7 +91,7 @@ void thread_pool::run_thread()
   {
     try
     {
-      _io.run();
+      _p->_io.run();
       SET_THREAD_LOCAL(current_executor, nullptr);
       return;
     }
@@ -76,7 +99,7 @@ void thread_pool::run_thread()
     {
       try
       {
-        _error_cb(std::current_exception());
+        _p->_error_cb(std::current_exception());
       }
       catch (...)
       {
@@ -89,10 +112,32 @@ void thread_pool::run_thread()
 
 void thread_pool::stop()
 {
-  _work = nullptr;
-  for (auto &th : _threads)
+  _p->_work = nullptr;
+  for (auto &th : _p->_threads)
     th.join();
-  _threads.clear();
+  _p->_threads.clear();
+}
+
+bool thread_pool::is_running() const
+{
+  return _p->_work != nullptr;
+}
+
+void thread_pool::set_error_handler(error_handler_cb cb)
+{
+  assert(cb);
+  _p->_error_cb = std::move(cb);
+}
+
+void thread_pool::signal_error(std::exception_ptr const& e)
+{
+  _p->_error_cb(e);
+}
+
+void thread_pool::do_post(std::function<void()> work)
+{
+  assert(!_p->_dead.load());
+  _p->_io.post(std::move(work));
 }
 
 thread_pool& get_global_single_thread()
