@@ -79,8 +79,8 @@ public:
   // TODO replace this result_of and the others by decltype the day microsoft
   // makes a real compiler
   template <typename E, typename F>
-  auto then(E&& e, F&& f) -> future<
-      std::decay_t<std::result_of_t<F(future<R>)>>>
+  auto then(E&& e, F&& f)
+      -> future<std::decay_t<std::result_of_t<F(future<R>)>>>
   {
     return then_impl(std::forward<E>(e), [
       p = _p,
@@ -94,8 +94,8 @@ public:
   }
 
   template <typename E, typename F>
-  auto then(E&& e, F&& f) -> future<std::decay_t<
-      std::result_of_t<F(cancelation_token&, future<R>)>>>
+  auto then(E&& e, F&& f) -> future<
+      std::decay_t<std::result_of_t<F(cancelation_token&, future<R>)>>>
   {
     return then_impl(std::forward<E>(e), [
       p = _p,
@@ -115,8 +115,8 @@ public:
   }
 
   template <typename E, typename F>
-  auto and_then(E&& e, F&& f) -> future<
-      std::decay_t<std::result_of_t<F(value_type)>>>
+  auto and_then(E&& e, F&& f)
+      -> future<std::decay_t<std::result_of_t<F(value_type)>>>
   {
     return then_impl(std::forward<E>(e), [
       p = _p,
@@ -205,6 +205,18 @@ public:
     return and_then(get_synchronous_executor(), [](value_type const&){});
   }
 
+  std::string const& get_chain_name() const
+  {
+    return _chain_name;
+  }
+
+  this_type update_chain_name(std::string name) const
+  {
+    this_type ret{*this};
+    ret._chain_name = std::move(name);
+    return ret;
+  }
+
 private:
   using shared_type = detail::shared_base<value_type>;
   using shared_pointer = std::shared_ptr<shared_type>;
@@ -214,6 +226,10 @@ private:
   // copy here so that continuations can still use it
   cancelation_token_ptr _cancelation_token;
 
+  std::string _chain_name;
+
+  template <typename T>
+  friend class future;
   template <typename T>
   friend struct detail::future_unwrap;
   template <typename S, typename F>
@@ -234,12 +250,16 @@ private:
   }
 
   template <typename E, typename F>
-  auto then_impl(E&& e, F&& f) -> future<typename std::decay<decltype(f())>::type>
+  auto then_impl(E&& e, F&& f)
+      -> future<typename std::decay<decltype(f())>::type>
   {
     using result_type = typename std::decay<decltype(f())>::type;
 
     auto pack = package<result_type()>(std::forward<F>(f), _cancelation_token);
-    _p->then(std::forward<E>(e), std::move(pack.first));
+    _p->then(_chain_name + " (" + typeid(F).name() + ")",
+             std::forward<E>(e),
+             std::move(pack.first));
+    pack.second._chain_name = _chain_name;
     return pack.second;
   }
 

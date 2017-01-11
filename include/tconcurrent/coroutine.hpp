@@ -73,6 +73,8 @@ using coroutine_t = boost::context::execution_context<coroutine_controller>;
 
 struct coroutine_control
 {
+  std::string name;
+
   boost::context::fixedsize_stack salloc;
   boost::context::stack_context stack;
 
@@ -82,8 +84,9 @@ struct coroutine_control
   cancelation_token& token;
 
   template <typename F>
-  coroutine_control(F&& f, cancelation_token& token)
-    : salloc(boost::context::stack_traits::default_size() * 2),
+  coroutine_control(std::string name, F&& f, cancelation_token& token)
+    : name(std::move(name)),
+      salloc(boost::context::stack_traits::default_size() * 2),
       stack(salloc.allocate()),
       ctx(std::allocator_arg,
           boost::context::preallocated(stack.sp, stack.size, stack),
@@ -144,7 +147,9 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
 
     TC_SANITIZER_OPEN_RETURN_CONTEXT()
     *argctx = std::get<0>((*argctx)([&awaitable](coroutine_control* ctrl) {
-      awaitable.then([ctrl](auto const& f) { run_coroutine(ctrl); });
+      awaitable.update_chain_name(ctrl->name).then([ctrl](auto const& f) {
+        run_coroutine(ctrl);
+      });
     }));
     TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
   }
@@ -159,7 +164,7 @@ inline void coroutine_control::yield()
     throw operation_canceled{};
   TC_SANITIZER_OPEN_RETURN_CONTEXT()
   *argctx = std::get<0>((*argctx)([](coroutine_control* ctrl) {
-    tc::async([ctrl] { run_coroutine(ctrl); });
+    tc::async(ctrl->name, [ctrl] { run_coroutine(ctrl); });
   }));
   TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
   if (token.is_cancel_requested())
@@ -171,16 +176,18 @@ inline void coroutine_control::yield()
 using awaiter = detail::coroutine_control;
 
 template <typename F>
-auto async_resumable(F&& cb)
+auto async_resumable(std::string const& name, F&& cb)
 {
   using return_type =
       std::decay_t<decltype(cb(std::declval<detail::coroutine_control&>()))>;
 
-  return async([cb = std::forward<F>(cb)](cancelation_token& token) mutable {
+  return async(name, [cb = std::forward<F>(cb), name](
+          cancelation_token& token) mutable {
     auto pack = package<return_type(detail::coroutine_control&)>(std::move(cb));
 
     detail::coroutine_control* cs =
         new detail::coroutine_control(
+            name + " (" + typeid(F).name() + ")",
             [cb = std::move(pack.first), &cs](
                 detail::coroutine_t argctx,
                 detail::coroutine_controller const&) {
@@ -213,6 +220,12 @@ auto async_resumable(F&& cb)
 
     return pack.second;
   }).unwrap();
+}
+
+template <typename F>
+auto async_resumable(F&& cb)
+{
+  return async_resumable({}, std::forward<F>(cb));
 }
 
 inline awaiter& get_current_awaiter()

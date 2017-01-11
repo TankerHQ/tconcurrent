@@ -433,6 +433,37 @@ TEST_CASE("test ready future then", "[future][then]")
   CHECK(42 == fut2.get());
 }
 
+TEST_CASE("test ready future then with chain name", "[future][executor][then]")
+{
+  struct Executor
+  {
+    std::string name;
+    void post(std::function<void()> f, std::string n)
+    {
+      name = n;
+      f();
+    }
+  };
+
+  auto const ChainName = "test test";
+  Executor e;
+  auto fut =
+      make_ready_future(21).update_chain_name(ChainName).then(e, [](auto) {});
+  fut.get();
+  // only compare the beginning of the string because future appends the type of
+  // the lambda to the name
+  CHECK(ChainName == e.name.substr(0, strlen(ChainName)));
+}
+
+TEST_CASE("test ready future then with chain name propagation",
+          "[future][then]")
+{
+  auto const ChainName = "test test";
+  auto fut =
+      make_ready_future(21).update_chain_name(ChainName).then([](auto) {});
+  CHECK(ChainName == fut.get_chain_name());
+}
+
 TEST_CASE("test not ready future then", "[future][then]")
 {
   auto taskfut = package<int()>([]{ return 21; });
@@ -1403,6 +1434,26 @@ TEST_CASE("test thread_pool error work", "[thread_pool]")
 
   tp.start(1);
   tp.post([&]{ throw 18; });
+  tp.stop();
+  CHECK(called);
+}
+
+TEST_CASE("test thread_pool task trace", "[thread_pool]")
+{
+  bool called = false;
+  static auto const TaskName = "Little bobby";
+  static auto const WaitTime = std::chrono::milliseconds(100);
+
+  thread_pool tp;
+  tp.set_task_trace_handler(
+      [&](std::string const& name, std::chrono::steady_clock::duration dur) {
+        CHECK(TaskName == name);
+        CHECK(WaitTime <= dur);
+        called = true;
+      });
+
+  tp.start(1);
+  tp.post([]{ std::this_thread::sleep_for(WaitTime); }, TaskName);
   tp.stop();
   CHECK(called);
 }
