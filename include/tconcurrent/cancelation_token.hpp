@@ -93,6 +93,23 @@ public:
       current();
   }
 
+  /** Set a cancelation callback for a scope duration
+   *
+   * This will set a cancelation callback that will be automatically unset when
+   * the returned scope_canceler is destroyed.
+   *
+   * It is possible to nest cancelation callbacks like this:
+   *
+   *     {
+   *       auto const c1 = make_scope_canceler(canceler1);
+   *       // canceler1 will be called if a cancelation is requested here
+   *       {
+   *         auto const c2 = make_scope_canceler(canceler2);
+   *         // canceler2 will be called if a cancelation is requested here
+   *       }
+   *       // canceler1 will be called if a cancelation is requested here
+   *     }
+   */
   scope_canceler make_scope_canceler(cancelation_callback cb)
   {
     return scope_canceler(this, std::move(cb));

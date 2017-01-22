@@ -7,6 +7,17 @@
 namespace tconcurrent
 {
 
+/** Run a task on the given executor
+ *
+ * \param name (optional) the name of the task, for debugging purposes.
+ * \param executor (optional) the executor on which the task will be run
+ * \param f the callback to run which must have one of the following signatures:
+ *
+ *     T func();
+ *     T func(cancelation_token&);
+ *
+ * \return the future corresponding to the result of the function
+ */
 template <typename E, typename F>
 auto async(std::string const& name, E&& executor, F&& f)
 {
