@@ -23,8 +23,8 @@
 
 namespace tconcurrent
 {
-template <typename F>
-auto async_resumable(std::string const& name, F&& cb);
+template <typename E, typename F>
+auto async_resumable(std::string const& name, E&& executor, F&& cb);
 
 namespace detail
 {
@@ -106,6 +106,8 @@ public:
 private:
   std::string name;
 
+  thread_pool& executor;
+
   boost::context::fixedsize_stack salloc;
   boost::context::stack_context stack;
 
@@ -116,9 +118,10 @@ private:
 
   bool aborted = false;
 
-  template <typename F>
-  coroutine_control(std::string name, F&& f, cancelation_token& token)
+  template <typename E, typename F>
+  coroutine_control(std::string name, E&& e, F&& f, cancelation_token& token)
     : name(std::move(name)),
+      executor(std::forward<E>(e)),
       salloc(boost::context::stack_traits::default_size() * 2),
       stack(salloc.allocate()),
       ctx(std::allocator_arg,
@@ -133,8 +136,9 @@ private:
   typename std::decay_t<Awaitable>::value_type await(
       Awaitable&& awaitable, bool early_return);
 
-  template <typename F>
-  friend auto ::tconcurrent::async_resumable(std::string const& name, F&& cb);
+  template <typename E, typename F>
+  friend auto ::tconcurrent::async_resumable(
+      std::string const& name, E&& executor, F&& cb);
   friend coroutine_status run_coroutine(coroutine_control* ctrl);
   friend abort_handler;
 };
@@ -241,6 +245,7 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
         [&aborted, &progressing_awaitable, &finished_awaitable, &awaitable](
             coroutine_control* ctrl) {
           progressing_awaitable.then(
+              ctrl->executor,
               [aborted, &finished_awaitable, ctrl](std::decay_t<Awaitable> f) {
                 // cancel was called, the coroutine is already dead and the
                 // memory free
@@ -314,8 +319,8 @@ using awaiter = detail::coroutine_control;
  *
  * \return the future corresponding to the result of the callback
  */
-template <typename F>
-auto async_resumable(std::string const& name, F&& cb)
+template <typename E, typename F>
+auto async_resumable(std::string const& name, E&& executor, F&& cb)
 {
   using return_type =
       std::decay_t<decltype(cb(std::declval<detail::coroutine_control&>()))>;
@@ -324,12 +329,13 @@ auto async_resumable(std::string const& name, F&& cb)
 
   auto token = std::make_shared<cancelation_token>();
   auto pack = package_cancelable<future<return_type>()>(
-      [ cb = std::forward<F>(cb), fullName, token ]() mutable {
+      [ &executor, cb = std::forward<F>(cb), fullName, token ]() mutable {
         auto pack = package<return_type(detail::coroutine_control&)>(
             std::move(cb), token);
 
         detail::coroutine_control* cs = new detail::coroutine_control(
             fullName,
+            executor,
             [cb = std::move(pack.first), &cs](
                 detail::coroutine_t argctx,
                 detail::coroutine_controller const&) {
@@ -365,7 +371,7 @@ auto async_resumable(std::string const& name, F&& cb)
       },
       token);
 
-  get_default_executor().post(std::move(std::get<0>(pack)), fullName);
+  executor.post(std::move(std::get<0>(pack)), fullName);
 
   return std::move(std::get<1>(pack)).update_chain_name(fullName).unwrap();
 }
@@ -373,7 +379,13 @@ auto async_resumable(std::string const& name, F&& cb)
 template <typename F>
 auto async_resumable(F&& cb)
 {
-  return async_resumable({}, std::forward<F>(cb));
+  return async_resumable({}, get_default_executor(), std::forward<F>(cb));
+}
+
+template <typename F>
+auto async_resumable(std::string const& name, F&& cb)
+{
+  return async_resumable(name, get_default_executor(), std::forward<F>(cb));
 }
 
 inline awaiter& get_current_awaiter()
