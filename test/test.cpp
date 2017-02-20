@@ -1078,7 +1078,7 @@ TEST_CASE("test periodic task error stop", "[periodic_task][executor]")
   async_wait(std::chrono::milliseconds(50)).get();
   CHECK(!pt.is_running());
   CHECK(1 == called);
-  CHECK(1 == goterror);
+  REQUIRE(1 == goterror);
   CHECK_THROWS_AS(std::rethrow_exception(holdIt), int);
 }
 
@@ -1109,7 +1109,7 @@ TEST_CASE("test periodic task future error stop", "[periodic_task][executor]")
   async_wait(std::chrono::milliseconds(50)).get();
   CHECK(!pt.is_running());
   CHECK(1 == called);
-  CHECK(1 == goterror);
+  REQUIRE(1 == goterror);
   CHECK_THROWS_AS(std::rethrow_exception(holdIt), int);
 }
 
