@@ -2,7 +2,7 @@
 
 #include <tconcurrent/periodic_task.hpp>
 #include <tconcurrent/packaged_task.hpp>
-#include <tconcurrent/delay.hpp>
+#include <tconcurrent/async_wait.hpp>
 
 namespace tconcurrent
 {

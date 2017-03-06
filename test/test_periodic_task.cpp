@@ -1,7 +1,7 @@
 #include <doctest.h>
 
 #include <tconcurrent/async.hpp>
-#include <tconcurrent/delay.hpp>
+#include <tconcurrent/async_wait.hpp>
 #include <tconcurrent/periodic_task.hpp>
 #include <tconcurrent/promise.hpp>
 

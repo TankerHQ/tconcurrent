@@ -1,6 +1,6 @@
 #include <doctest.h>
 
-#include <tconcurrent/delay.hpp>
+#include <tconcurrent/async_wait.hpp>
 
 using namespace tconcurrent;
 
