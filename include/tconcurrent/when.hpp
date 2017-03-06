@@ -69,6 +69,13 @@ private:
 
 }
 
+/** Get a future that will be ready when all the given futures are ready
+ *
+ * If a cancelation is requested on the returned future, the cancelation request
+ * is propagated to the futures given as argument.
+ *
+ * \return a future<std::vector<future<T>>> that always finishes with a value.
+ */
 template <typename InputIterator>
 future<std::vector<typename std::iterator_traits<InputIterator>::value_type>>
 when_all(InputIterator first, InputIterator last)

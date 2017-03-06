@@ -136,6 +136,18 @@ inline void run_coroutine(coroutine_control* ctrl)
   f(ctrl);
 }
 
+/** Unschedule the coroutine while \p awaitable is not ready
+ *
+ * If \p awaitable is already ready, no context-switch occur. This call is a
+ * cancelation point, it can throw operation_canceled if a cancelation is
+ * requested, even if \p awaitable finished with a value.
+ *
+ * \param awaitable what should be awaited, usually a future
+ *
+ * \return the value contained in \p awaitable if there is one
+ *
+ * \throw the exception contained in \p awaitable if there is one
+ */
 template <typename Awaitable>
 typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
     Awaitable&& awaitable)
@@ -158,6 +170,11 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
   return awaitable.get();
 }
 
+/** Unschedule the coroutine immediately and put it in the task queue.
+ *
+ * This is a cancelation point, if a cancelation is requested before or after
+ * the yield actually occurs, operation_canceled will be thrown.
+ */
 inline void coroutine_control::yield()
 {
   if (token.is_cancel_requested())
@@ -175,6 +192,16 @@ inline void coroutine_control::yield()
 
 using awaiter = detail::coroutine_control;
 
+/** Create a resumable function and schedule it
+ *
+ * \param name (optional) the name of the coroutine, only used for debugging
+ * purposes
+ * \param cb the callback to run. Its signature should be:
+ *
+ *     T func(awaiter& await);
+ *
+ * \return the future corresponding to the result of the callback
+ */
 template <typename F>
 auto async_resumable(std::string const& name, F&& cb)
 {

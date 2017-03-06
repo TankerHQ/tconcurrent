@@ -9,6 +9,11 @@
 namespace tconcurrent
 {
 
+/** Return a future that will be ready in \p delay
+ *
+ * The returned future is cancelable. If the executor is single threaded, a
+ * cancelation request will immediately put the future in a canceled state.
+ */
 future<void> async_wait(thread_pool& pool,
                         std::chrono::steady_clock::duration delay);
 

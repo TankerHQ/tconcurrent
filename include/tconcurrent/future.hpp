@@ -56,6 +56,12 @@ struct future_unwrap
 template <typename R>
 struct future_unwrap<future<R>>
 {
+  /** Unwrap a nested future
+   *
+   * Transform a future<future<T>> to a future<T>.
+   *
+   * This is equivalent to the monadic join.
+   */
   future<R> unwrap();
 };
 
@@ -68,14 +74,29 @@ public:
   using this_type = future<R>;
   using value_type = typename detail::future_value_type<R>::type;
 
+  /// Construct a future in an invalid state
   future() = default;
 
+  /// Same as then(E&& e, F&& f) with the default executor as `e`
   template <typename F>
   auto then(F&& f)
   {
     return then(get_default_executor(), std::forward<F>(f));
   }
 
+  /** Register a callback to run when the future gets ready
+   *
+   * \param e an executor to run the callback on
+   * \param f a function to call when the future completes. Its signature must
+   * be one of:
+   *
+   *     U func(future<T> const&);
+   *     U func(cancelation_token&, future<T> const&);
+   *
+   * It will receive *this as an argument and optionally the cancelation_token.
+   *
+   * \return a future<U> containing the result of the callback
+   */
   // TODO replace this result_of and the others by decltype the day microsoft
   // makes a real compiler
   template <typename E, typename F>
@@ -114,6 +135,27 @@ public:
     return and_then(get_default_executor(), std::forward<F>(f));
   }
 
+  /** Register a callback to run when the future gets ready with a result value
+   *
+   * This function is similar to then(E&& e, F&& f) but the callback will be
+   * called only if the future finishes with a value. If the future finishes
+   * with an exception, the callback will not be called and the resulting future
+   * will get the same exception.
+   *
+   * This function represents the Haskell Functor.fmap function.
+   *
+   * \param e an executor to run the callback on
+   * \param f a function to call when the future completes with a value. Its
+   * signature must be one of:
+   *
+   *     U func(T const&);
+   *     U func(cancelation_token&, T const&);
+   *
+   * It will receive `this->get()` as an argument and optionally the
+   * cancelation_token.
+   *
+   * \return a future<U> containing the result of the callback
+   */
   template <typename E, typename F>
   auto and_then(E&& e, F&& f)
       -> future<std::decay_t<std::result_of_t<F(value_type)>>>
@@ -141,8 +183,11 @@ public:
     });
   }
 
-  /**
-   * Do not propagate cancelation requests from here on.
+  /** Prevent cancelation requests to propagate from this future
+   *
+   * This means that cancelation requests that may be triggered on this future
+   * before this call, or on previous futures, will not be propagated to then
+   * and and_then callbacks.
    *
    * This function discards the cancelation token of the previous task and
    * creates a new one, effectively preventing cancelation requests from going
@@ -155,6 +200,17 @@ public:
     return *this;
   }
 
+  /** Request a cancelation of the future
+   *
+   * This does not guarantee that the future will be canceled. After this call,
+   * the future may still not be ready, it may finish with a value or with an
+   * error.
+   *
+   * If the cancelation request succeeds, the future will finish with an error
+   * of type operation_canceled.
+   *
+   * Requesting a cancelation on a future that is already ready has no effect.
+   */
   void request_cancel()
   {
     auto const& token = _p->get_cancelation_token();
@@ -162,27 +218,40 @@ public:
       token->request_cancel();
   }
 
+  /** Get the contained result value
+   *
+   * If the future is not ready, this call will block. If the future contains an
+   * exception, it will be rethrown here.
+   */
   value_type const& get() const
   {
     return _p->get();
   }
 
+  /** Get the contained exception
+   *
+   * If the future is not ready, this call will block. If the future does not
+   * contain an exception, this call will throw.
+   */
   std::exception_ptr const& get_exception() const
   {
     return _p->get_exception();
   }
 
+  /// Wait indefinitely for the future to get ready
   void wait() const
   {
     _p->wait();
   }
 
+  /// Wait for the future to get ready and timeout after \p dur
   template <typename Rep, typename Period>
   void wait_for(std::chrono::duration<Rep, Period> const& dur) const
   {
     _p->wait_for(dur);
   }
 
+  /// Return true if the future has a result value or an exception
   bool is_ready() const noexcept
   {
     return _p && _p->_r.which() != 0;
@@ -195,11 +264,13 @@ public:
   {
     return _p && _p->_r.which() == 2;
   }
+  /// Return false if the future has been default constructed or moved-from
   bool is_valid() const noexcept
   {
     return bool(_p);
   }
 
+  /// Get a future equivalent to this one but discarding the result value
   tc::future<void> to_void()
   {
     return and_then(get_synchronous_executor(), [](value_type const&){});
@@ -210,6 +281,9 @@ public:
     return _chain_name;
   }
 
+  /** Return a new future with a different name that will be propagated to then
+   * and and_then
+   */
   this_type update_chain_name(std::string name) const
   {
     this_type ret{*this};
@@ -319,6 +393,7 @@ future<R> detail::future_unwrap<future<R>>::unwrap()
   return future<R>(sb);
 }
 
+/// Create a future in a ready state with value \p val
 template <typename T>
 auto make_ready_future(T&& val) -> future<typename std::decay<T>::type>
 {
@@ -332,6 +407,7 @@ auto make_ready_future(T&& val) -> future<typename std::decay<T>::type>
   return fut;
 }
 
+/// Create a void future in a ready state
 inline auto make_ready_future() -> future<void>
 {
   using shared_base_type = future<void>::shared_type;
@@ -343,6 +419,7 @@ inline auto make_ready_future() -> future<void>
   return fut;
 }
 
+/// Create a future in an exceptional state with the exception err
 template <typename T, typename E>
 auto make_exceptional_future(E&& err) -> future<T>
 {
