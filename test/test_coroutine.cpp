@@ -100,9 +100,10 @@ TEST_CASE("coroutine cancel propagation", "[coroutine][cancel]")
 {
   unsigned called = 0;
   promise<void> prom;
+  auto fut = prom.get_future();
   prom.get_cancelation_token().push_cancelation_callback([&] { ++called; });
   // also test that we can pass mutable callback to async_resumable
-  auto f = async_resumable([fut = prom.get_future()](awaiter& await) mutable {
+  auto f = async_resumable([&fut](awaiter& await) mutable {
     await(fut);
     return 42;
   });
@@ -118,13 +119,13 @@ TEST_CASE("coroutine yield", "[coroutine]")
 {
   unsigned progress = 0;
   tc::promise<void> prom;
-  auto fut1 =
-      tc::async_resumable([&, fut = prom.get_future() ](tc::awaiter & await) {
-        ++progress;
-        fut.wait();
-        await.yield();
-        ++progress;
-      });
+  auto fut = prom.get_future();
+  auto fut1 = tc::async_resumable([&](tc::awaiter& await) {
+    ++progress;
+    fut.wait();
+    await.yield();
+    ++progress;
+  });
   // this will be scheduled during the yield
   auto fut2 = tc::async([&] { CHECK(1 == progress); });
   prom.set_value({});
@@ -137,17 +138,30 @@ TEST_CASE("coroutine yield cancel", "[coroutine][cancel]")
 {
   std::atomic<unsigned> progress{0};
   tc::promise<void> prom;
-  auto fut1 =
-      tc::async_resumable([&, fut = prom.get_future() ](tc::awaiter & await) {
-        ++progress;
-        fut.wait();
-        await.yield();
-        ++progress;
-      });
+  auto fut = prom.get_future();
+  auto fut1 = tc::async_resumable([&](tc::awaiter& await) {
+    ++progress;
+    fut.wait();
+    await.yield();
+    ++progress;
+  });
   while (progress.load() != 1)
     ;
   fut1.request_cancel();
   prom.set_value({});
   CHECK(1 == progress);
   CHECK_THROWS_AS(fut1.get(), operation_canceled);
+}
+
+TEST_CASE("coroutine await move-only type", "[coroutine]")
+{
+  tc::promise<std::unique_ptr<int>> prom;
+  auto fut = prom.get_future();
+  auto finished = tc::async_resumable([&](tc::awaiter& await) {
+    auto const ptr = await(fut);
+    REQUIRE(ptr);
+    CHECK(42 == *ptr);
+  });
+  prom.set_value(std::make_unique<int>(42));
+  finished.get();
 }

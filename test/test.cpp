@@ -912,7 +912,9 @@ TEST_CASE("test when_all", "[when_all]")
     if (i % 2)
       promises[i].set_value({});
 
-  auto all = when_all(futures.begin(), futures.end());
+  auto all = when_all(
+      std::make_move_iterator(futures.begin()),
+      std::make_move_iterator(futures.end()));
   CHECK(!all.is_ready());
 
   for (unsigned int i = 0; i < NB_FUTURES; ++i)
@@ -920,7 +922,7 @@ TEST_CASE("test when_all", "[when_all]")
       promises[i].set_value({});
 
   CHECK(all.is_ready());
-  auto& futs = all.get();
+  auto futs = all.get();
   CHECK(futures.size() == futs.size());
   for (auto const& fut : futs)
   {
@@ -932,19 +934,12 @@ TEST_CASE("test when_all", "[when_all]")
 TEST_CASE("test when_all empty", "[when_all]")
 {
   std::vector<future<int>> futures;
-  auto all = when_all(futures.begin(), futures.end());
+  auto all = when_all(
+      std::make_move_iterator(futures.begin()),
+      std::make_move_iterator(futures.end()));
   CHECK(all.is_ready());
-  auto& futs = all.get();
+  auto futs = all.get();
   CHECK(0 == futs.size());
-}
-
-TEST_CASE("test when_all init list", "[when_all]")
-{
-  auto futures = {make_ready_future()};
-  auto all = when_all(futures.begin(), futures.end());
-  CHECK(all.is_ready());
-  auto& futs = all.get();
-  CHECK(1 == futs.size());
 }
 
 TEST_CASE("test when_all cancel", "[when_all][cancel]")
@@ -956,7 +951,9 @@ TEST_CASE("test when_all cancel", "[when_all][cancel]")
   for (auto const& prom : promises)
     futures.push_back(prom.get_future());
 
-  auto all = when_all(futures.begin(), futures.end());
+  auto all = when_all(
+      std::make_move_iterator(futures.begin()),
+      std::make_move_iterator(futures.end()));
   all.request_cancel();
 
   for (unsigned int i = 0; i < NB_FUTURES; ++i)

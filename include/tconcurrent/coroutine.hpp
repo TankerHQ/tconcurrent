@@ -152,22 +152,28 @@ template <typename Awaitable>
 typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
     Awaitable&& awaitable)
 {
-  if (!awaitable.is_ready())
+  std::decay_t<Awaitable> finished_awaitable;
+  if (awaitable.is_ready())
+    finished_awaitable = std::move(awaitable);
+  else
   {
     auto canceler =
-        token.make_scope_canceler([&] { awaitable.request_cancel(); });
+        token.make_scope_canceler(awaitable.make_canceler());
 
     TC_SANITIZER_OPEN_RETURN_CONTEXT()
-    *argctx = std::get<0>((*argctx)([&awaitable](coroutine_control* ctrl) {
-      awaitable.update_chain_name(ctrl->name).then([ctrl](auto const& f) {
-        run_coroutine(ctrl);
-      });
-    }));
+    *argctx = std::get<0>(
+        (*argctx)([&finished_awaitable, &awaitable](coroutine_control* ctrl) {
+          std::move(awaitable).update_chain_name(ctrl->name)
+              .then([&finished_awaitable, ctrl](std::decay_t<Awaitable> f) {
+                finished_awaitable = std::move(f);
+                run_coroutine(ctrl);
+              });
+        }));
     TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
   }
   if (token.is_cancel_requested())
     throw operation_canceled{};
-  return awaitable.get();
+  return finished_awaitable.get();
 }
 
 /** Unschedule the coroutine immediately and put it in the task queue.
@@ -245,7 +251,7 @@ auto async_resumable(std::string const& name, F&& cb)
 
     f(cs);
 
-    return pack.second;
+    return std::move(pack.second);
   }).unwrap();
 }
 

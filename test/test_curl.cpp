@@ -135,7 +135,7 @@ TEST_CASE("curl multiple requests")
 #define CHECK_READALL()                                                  \
   auto fut = read_all(mul, req);                                         \
                                                                          \
-  auto& result = fut.get();                                              \
+  auto result = fut.get();                                              \
   long httpcode;                                                         \
   curl_easy_getinfo(req->get_curl(), CURLINFO_RESPONSE_CODE, &httpcode); \
                                                                          \

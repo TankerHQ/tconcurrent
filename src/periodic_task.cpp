@@ -107,7 +107,7 @@ future<void> periodic_task::do_call(cancelation_token& token)
     return make_ready_future();
   }
 
-  return fut.then(get_synchronous_executor(), [this](decltype(fut) const& fut) {
+  return fut.then(get_synchronous_executor(), [this](decltype(fut) fut) {
     scope_lock l(_mutex);
     if (fut.has_value())
       reschedule();
