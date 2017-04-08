@@ -168,14 +168,20 @@ public:
       e.post(std::forward<F>(f), std::move(name));
   }
 
-  R const& get()
+  template <typename Rcv>
+  Rcv get()
   {
+    static_assert(
+        std::is_same<R, std::decay_t<Rcv>>::value,
+        "Rcv must be a R or R const&");
+
     std::unique_lock<std::mutex> lock{_mutex};
     while (_r.which() == 0)
       _ready.wait(lock);
     if (_r.which() == 2)
       std::rethrow_exception(std::move(boost::get<v_exception>(_r).exc));
-    return boost::get<v_value>(_r).value;
+    // this may or may not move depending on Rcv being a reference or not
+    return std::move(boost::get<v_value>(_r).value);
   }
 
   std::exception_ptr const& get_exception()

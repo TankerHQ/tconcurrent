@@ -74,6 +74,11 @@ public:
   using this_type = future<R>;
   using value_type = typename detail::future_value_type<R>::type;
 
+  future(future const&) = delete;
+  future& operator=(future const&) = delete;
+  future(future&&) = default;
+  future& operator=(future&&) = default;
+
   /// Construct a future in an invalid state
   future() = default;
 
@@ -166,7 +171,7 @@ public:
       f = std::forward<F>(f)
     ]() mutable {
       return this_type::do_and_then_callback(
-          *p, token.get(), [&] { return f(p->get()); });
+          *p, token.get(), [&] { return f(p->template get<value_type>()); });
     });
   }
   template <typename E, typename F>
@@ -178,8 +183,9 @@ public:
       token = _cancelation_token,
       f = std::forward<F>(f)
     ]() mutable {
-      return this_type::do_and_then_callback(
-          *p, token.get(), [&] { return f(*token, p->get()); });
+      return this_type::do_and_then_callback(*p, token.get(), [&] {
+        return f(*token, p->template get<value_type>());
+      });
     });
   }
 
@@ -194,10 +200,10 @@ public:
    * from this future to the previous task and from the previous future to the
    * following tasks.
    */
-  future& break_cancelation_chain()
+  future break_cancelation_chain() &&
   {
     _cancelation_token = _p->reset_cancelation_token();
-    return *this;
+    return std::move(*this);
   }
 
   /** Request a cancelation of the future
@@ -218,14 +224,25 @@ public:
       token->request_cancel();
   }
 
+  /** Get a callable that will cancel this future
+   */
+  auto make_canceler()
+  {
+    return [_p = this->_p] {
+      auto const& token = _p->get_cancelation_token();
+      if (token)
+        token->request_cancel();
+    };
+  }
+
   /** Get the contained result value
    *
    * If the future is not ready, this call will block. If the future contains an
    * exception, it will be rethrown here.
    */
-  value_type const& get() const
+  value_type get()
   {
-    return _p->get();
+    return _p->template get<value_type>();
   }
 
   /** Get the contained exception
@@ -284,9 +301,9 @@ public:
   /** Return a new future with a different name that will be propagated to then
    * and and_then
    */
-  this_type update_chain_name(std::string name) const
+  this_type update_chain_name(std::string name) &&
   {
-    this_type ret{*this};
+    this_type ret{std::move(*this)};
     ret._chain_name = std::move(name);
     return ret;
   }
@@ -334,7 +351,7 @@ private:
              std::forward<E>(e),
              std::move(pack.first));
     pack.second._chain_name = _chain_name;
-    return pack.second;
+    return std::move(pack.second);
   }
 
   template <typename F>
@@ -353,7 +370,7 @@ private:
     else
     {
       assert(p._r.which() == 2);
-      p.get(); // rethrow to set the future to error
+      p.template get<value_type const&>(); // rethrow to set the future to error
       assert(false && "unreachable code");
       std::terminate();
     }
@@ -367,7 +384,7 @@ future<R> detail::future_unwrap<future<R>>::unwrap()
   auto sb =
       std::make_shared<typename future<R>::shared_type>(fut._cancelation_token);
   fut.then(get_synchronous_executor(),
-           [sb](future<future<R>> const& fut) {
+           [sb](future<future<R>> fut) {
              if (fut.has_exception())
                sb->set_exception(fut.get_exception());
              else
@@ -375,9 +392,9 @@ future<R> detail::future_unwrap<future<R>>::unwrap()
                auto nested = fut.get();
                if (sb->get_cancelation_token() != nested._cancelation_token)
                  sb->get_cancelation_token()->push_last_cancelation_callback(
-                     [nested]() mutable { nested.request_cancel(); });
+                     nested.make_canceler());
                nested.then(get_synchronous_executor(),
-                           [sb](future<R> const& nested) {
+                           [sb](future<R> nested) {
                              if (nested.has_exception())
                                sb->set_exception(nested.get_exception());
                              else

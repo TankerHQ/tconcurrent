@@ -27,7 +27,7 @@ auto async(std::string const& name, E&& executor, F&& f)
 
   executor.post(std::move(std::get<0>(pack)),
                 name + " (" + typeid(F).name() + ")");
-  return std::get<1>(pack).update_chain_name(name);
+  return std::move(std::get<1>(pack)).update_chain_name(name);
 }
 
 template <typename F>
