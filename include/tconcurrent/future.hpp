@@ -72,6 +72,58 @@ public:
   using this_type = F<R>;
   using value_type = typename detail::future_value_type<R>::type;
 
+  /// Same as then(E&& e, Func&& func) with the default executor as `e`
+  template <typename Func>
+  auto then(Func&& func)
+  {
+    return then(get_default_executor(), std::forward<Func>(func));
+  }
+
+  /** Register a callback to run when the future gets ready
+   *
+   * \param e an executor to run the callback on
+   * \param func a function to call when the future completes. Its signature
+   * must be one of:
+   *
+   *     U func(future<T> const&);
+   *     U func(cancelation_token&, future<T> const&);
+   *
+   * It will receive *this as an argument and optionally the cancelation_token.
+   *
+   * \return a future<U> containing the result of the callback
+   */
+  // TODO replace this result_of and the others by decltype the day microsoft
+  // makes a real compiler
+  template <typename E, typename Func>
+  auto then(E&& e, Func&& func)
+      -> future<std::decay_t<std::result_of_t<Func(this_type&&)>>>
+  {
+    return then_impl(std::forward<E>(e), [
+      p = this->_p,
+      token = this->_cancelation_token,
+      func = std::forward<Func>(func)
+    ]() mutable {
+      this_type fut(p);
+      fut._cancelation_token = token;
+      return func(std::move(fut));
+    });
+  }
+
+  template <typename E, typename Func>
+  auto then(E&& e, Func&& func) -> future<
+      std::decay_t<std::result_of_t<Func(cancelation_token&, this_type&&)>>>
+  {
+    return then_impl(std::forward<E>(e), [
+      p = this->_p,
+      token = this->_cancelation_token,
+      func = std::forward<Func>(func)
+    ]() mutable {
+      this_type fut(p);
+      fut._cancelation_token = token;
+      return func(*token, std::move(fut));
+    });
+  }
+
   /** Prevent cancelation requests to propagate from this future
    *
    * This means that cancelation requests that may be triggered on this future
@@ -201,6 +253,44 @@ protected:
   {
     return static_cast<this_type*>(this);
   }
+
+  template <typename E, typename Func>
+  auto then_impl(E&& e, Func&& func)
+      -> future<typename std::decay<decltype(func())>::type>
+  {
+    using result_type = typename std::decay<decltype(func())>::type;
+
+    auto pack =
+        package<result_type()>(std::forward<Func>(func), _cancelation_token);
+    _p->then(
+        _chain_name + " (" + typeid(Func).name() + ")",
+        std::forward<E>(e),
+        std::move(pack.first));
+    pack.second._chain_name = _chain_name;
+    return std::move(pack.second);
+  }
+
+  template <typename Func>
+  static auto do_and_then_callback(shared_type& p,
+                                   cancelation_token* token,
+                                   Func&& cb)
+  {
+    assert(p._r.which() != 0);
+    if (p._r.which() == 1)
+    {
+      if (token && token->is_cancel_requested())
+        throw operation_canceled();
+      else
+        return cb();
+    }
+    else
+    {
+      assert(p._r.which() == 2);
+      p.template get<value_type const&>(); // rethrow to set the future to error
+      assert(false && "unreachable code");
+      std::terminate();
+    }
+  }
 };
 
 }
@@ -232,58 +322,6 @@ public:
   /// Construct a future in an invalid state
   future() = default;
 
-  /// Same as then(E&& e, F&& f) with the default executor as `e`
-  template <typename F>
-  auto then(F&& f)
-  {
-    return then(get_default_executor(), std::forward<F>(f));
-  }
-
-  /** Register a callback to run when the future gets ready
-   *
-   * \param e an executor to run the callback on
-   * \param f a function to call when the future completes. Its signature must
-   * be one of:
-   *
-   *     U func(future<T> const&);
-   *     U func(cancelation_token&, future<T> const&);
-   *
-   * It will receive *this as an argument and optionally the cancelation_token.
-   *
-   * \return a future<U> containing the result of the callback
-   */
-  // TODO replace this result_of and the others by decltype the day microsoft
-  // makes a real compiler
-  template <typename E, typename F>
-  auto then(E&& e, F&& f)
-      -> future<std::decay_t<std::result_of_t<F(future<R>)>>>
-  {
-    return then_impl(std::forward<E>(e), [
-      p = this->_p,
-      token = this->_cancelation_token,
-      f = std::forward<F>(f)
-    ]() mutable {
-      future fut(p);
-      fut._cancelation_token = token;
-      return f(std::move(fut));
-    });
-  }
-
-  template <typename E, typename F>
-  auto then(E&& e, F&& f) -> future<
-      std::decay_t<std::result_of_t<F(cancelation_token&, future<R>)>>>
-  {
-    return then_impl(std::forward<E>(e), [
-      p = this->_p,
-      token = this->_cancelation_token,
-      f = std::forward<F>(f)
-    ]() mutable {
-      future fut(p);
-      fut._cancelation_token = token;
-      return f(*token, std::move(fut));
-    });
-  }
-
   template <typename F>
   auto and_then(F&& f)
   {
@@ -313,9 +351,9 @@ public:
    */
   template <typename E, typename F>
   auto and_then(E&& e, F&& f)
-      -> future<std::decay_t<std::result_of_t<F(value_type)>>>
+      -> future<std::decay_t<std::result_of_t<F(value_type&&)>>>
   {
-    return then_impl(std::forward<E>(e), [
+    return this->then_impl(std::forward<E>(e), [
       p = this->_p,
       token = this->_cancelation_token,
       f = std::forward<F>(f)
@@ -326,9 +364,9 @@ public:
   }
   template <typename E, typename F>
   auto and_then(E&& e, F&& f) -> future<
-      std::decay_t<std::result_of_t<F(cancelation_token&, value_type)>>>
+      std::decay_t<std::result_of_t<F(cancelation_token&, value_type&&)>>>
   {
-    return then_impl(std::forward<E>(e), [
+    return this->then_impl(std::forward<E>(e), [
       p = this->_p,
       token = this->_cancelation_token,
       f = std::forward<F>(f)
@@ -359,6 +397,8 @@ private:
   using typename base_type::shared_type;
   using typename base_type::shared_pointer;
 
+  template <template <typename> class, typename>
+  friend class detail::future_base;
   template <typename T>
   friend class future;
   template <typename T>
@@ -377,44 +417,6 @@ private:
   explicit future(std::shared_ptr<detail::shared_base<value_type>> p)
     : base_type(std::move(p))
   {
-  }
-
-  template <typename E, typename F>
-  auto then_impl(E&& e, F&& f)
-      -> future<typename std::decay<decltype(f())>::type>
-  {
-    using result_type = typename std::decay<decltype(f())>::type;
-
-    auto pack =
-        package<result_type()>(std::forward<F>(f), this->_cancelation_token);
-    this->_p->then(
-        this->_chain_name + " (" + typeid(F).name() + ")",
-        std::forward<E>(e),
-        std::move(pack.first));
-    pack.second._chain_name = this->_chain_name;
-    return std::move(pack.second);
-  }
-
-  template <typename F>
-  static auto do_and_then_callback(shared_type& p,
-                                   cancelation_token* token,
-                                   F&& cb)
-  {
-    assert(p._r.which() != 0);
-    if (p._r.which() == 1)
-    {
-      if (token && token->is_cancel_requested())
-        throw operation_canceled();
-      else
-        return cb();
-    }
-    else
-    {
-      assert(p._r.which() == 2);
-      p.template get<value_type const&>(); // rethrow to set the future to error
-      assert(false && "unreachable code");
-      std::terminate();
-    }
   }
 };
 
