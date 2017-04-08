@@ -5,8 +5,13 @@ project(tconcurrent)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Boost REQUIRED COMPONENTS system thread context)
-include(curl-config)
+find_package(Boost 1.61 REQUIRED COMPONENTS system thread context)
+
+if(TANKER_ENVIRONMENT)
+  include(curl-config)
+else()
+  find_package(CURL REQUIRED)
+endif()
 
 add_library(tconcurrent
   src/coroutine.cpp
