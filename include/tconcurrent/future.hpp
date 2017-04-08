@@ -65,12 +65,13 @@ struct future_unwrap<future<R>>
   future<R> unwrap();
 };
 
-template <template <typename> class F, typename R>
+template <template <typename> class F, typename R, bool Ref>
 class future_base
 {
 public:
   using this_type = F<R>;
   using value_type = typename detail::future_value_type<R>::type;
+  using get_type = std::conditional_t<Ref, value_type const&, value_type>;
 
   /// Same as then(E&& e, Func&& func) with the default executor as `e`
   template <typename Func>
@@ -121,6 +122,61 @@ public:
       this_type fut(p);
       fut._cancelation_token = token;
       return func(*token, std::move(fut));
+    });
+  }
+
+  template <typename Func>
+  auto and_then(Func&& func)
+  {
+    return and_then(get_default_executor(), std::forward<Func>(func));
+  }
+
+  /** Register a callback to run when the future gets ready with a result value
+   *
+   * This function is similar to then(E&& e, F&& f) but the callback will be
+   * called only if the future finishes with a value. If the future finishes
+   * with an exception, the callback will not be called and the resulting future
+   * will get the same exception.
+   *
+   * This function represents the Haskell Functor.fmap function.
+   *
+   * \param e an executor to run the callback on
+   * \param f a function to call when the future completes with a value. Its
+   * signature must be one of:
+   *
+   *     U func(T const&);
+   *     U func(cancelation_token&, T const&);
+   *
+   * It will receive `this->get()` as an argument and optionally the
+   * cancelation_token.
+   *
+   * \return a future<U> containing the result of the callback
+   */
+  template <typename E, typename Func>
+  auto and_then(E&& e, Func&& func)
+      -> future<std::decay_t<std::result_of_t<Func(get_type)>>>
+  {
+    return then_impl(std::forward<E>(e), [
+      p = _p,
+      token = _cancelation_token,
+      func = std::forward<Func>(func)
+    ]() mutable {
+      return this_type::do_and_then_callback(
+          *p, token.get(), [&] { return func(p->template get<get_type>()); });
+    });
+  }
+  template <typename E, typename Func>
+  auto and_then(E&& e, Func&& func) -> future<
+      std::decay_t<std::result_of_t<Func(cancelation_token&, get_type)>>>
+  {
+    return then_impl(std::forward<E>(e), [
+      p = _p,
+      token = _cancelation_token,
+      func = std::forward<Func>(func)
+    ]() mutable {
+      return this_type::do_and_then_callback(*p, token.get(), [&] {
+        return func(*token, p->template get<get_type>());
+      });
     });
   }
 
@@ -202,6 +258,16 @@ public:
     return bool(_p);
   }
 
+  /** Get the contained result value
+   *
+   * If the future is not ready, this call will block. If the future contains an
+   * exception, it will be rethrown here.
+   */
+  get_type get()
+  {
+    return _p->template get<get_type>();
+  }
+
   /** Get the contained exception
    *
    * If the future is not ready, this call will block. If the future does not
@@ -249,6 +315,7 @@ protected:
   {
   }
 
+private:
   this_type* this_()
   {
     return static_cast<this_type*>(this);
@@ -302,7 +369,7 @@ namespace detail
 {
 // see above
 template <typename R>
-using base_for_future = detail::future_base<future, R>;
+using base_for_future = detail::future_base<future, R, false>;
 }
 
 template <typename R>
@@ -322,82 +389,17 @@ public:
   /// Construct a future in an invalid state
   future() = default;
 
-  template <typename F>
-  auto and_then(F&& f)
-  {
-    return and_then(get_default_executor(), std::forward<F>(f));
-  }
-
-  /** Register a callback to run when the future gets ready with a result value
-   *
-   * This function is similar to then(E&& e, F&& f) but the callback will be
-   * called only if the future finishes with a value. If the future finishes
-   * with an exception, the callback will not be called and the resulting future
-   * will get the same exception.
-   *
-   * This function represents the Haskell Functor.fmap function.
-   *
-   * \param e an executor to run the callback on
-   * \param f a function to call when the future completes with a value. Its
-   * signature must be one of:
-   *
-   *     U func(T const&);
-   *     U func(cancelation_token&, T const&);
-   *
-   * It will receive `this->get()` as an argument and optionally the
-   * cancelation_token.
-   *
-   * \return a future<U> containing the result of the callback
-   */
-  template <typename E, typename F>
-  auto and_then(E&& e, F&& f)
-      -> future<std::decay_t<std::result_of_t<F(value_type&&)>>>
-  {
-    return this->then_impl(std::forward<E>(e), [
-      p = this->_p,
-      token = this->_cancelation_token,
-      f = std::forward<F>(f)
-    ]() mutable {
-      return this_type::do_and_then_callback(
-          *p, token.get(), [&] { return f(p->template get<value_type>()); });
-    });
-  }
-  template <typename E, typename F>
-  auto and_then(E&& e, F&& f) -> future<
-      std::decay_t<std::result_of_t<F(cancelation_token&, value_type&&)>>>
-  {
-    return this->then_impl(std::forward<E>(e), [
-      p = this->_p,
-      token = this->_cancelation_token,
-      f = std::forward<F>(f)
-    ]() mutable {
-      return this_type::do_and_then_callback(*p, token.get(), [&] {
-        return f(*token, p->template get<value_type>());
-      });
-    });
-  }
-
-  /** Get the contained result value
-   *
-   * If the future is not ready, this call will block. If the future contains an
-   * exception, it will be rethrown here.
-   */
-  value_type get()
-  {
-    return this->_p->template get<value_type>();
-  }
-
   /// Get a future equivalent to this one but discarding the result value
   tc::future<void> to_void()
   {
-    return and_then(get_synchronous_executor(), [](value_type const&){});
+    return this->and_then(get_synchronous_executor(), [](value_type const&){});
   }
 
 private:
   using typename base_type::shared_type;
   using typename base_type::shared_pointer;
 
-  template <template <typename> class, typename>
+  template <template <typename> class, typename, bool>
   friend class detail::future_base;
   template <typename T>
   friend class future;
