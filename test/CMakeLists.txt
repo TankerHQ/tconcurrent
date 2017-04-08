@@ -17,10 +17,5 @@ add_executable(test_tconcurrent_curl
 target_link_libraries(test_tconcurrent tconcurrent tconcurrent_catch_main)
 target_link_libraries(test_tconcurrent_curl tconcurrent tconcurrent_catch_main)
 
-set_target_properties(test_tconcurrent PROPERTIES CXX_STANDARD 14)
-set_target_properties(test_tconcurrent PROPERTIES CXX_EXTENSIONS OFF)
-set_target_properties(test_tconcurrent_curl PROPERTIES CXX_STANDARD 14)
-set_target_properties(test_tconcurrent_curl PROPERTIES CXX_EXTENSIONS OFF)
-
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/results/test")
 add_catch_test(NAME test_tconcurrent COMMAND test_tconcurrent)

@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.4)
 
 project(tconcurrent)
 
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 find_package(Boost REQUIRED COMPONENTS system thread context)
 include(curl-config)
 
@@ -14,8 +17,6 @@ add_library(tconcurrent
   src/curl/curl.cpp
   src/curl/read_all.cpp
 )
-set_property(TARGET tconcurrent PROPERTY CXX_STANDARD 14)
-set_property(TARGET tconcurrent PROPERTY CXX_EXTENSIONS OFF)
 target_include_directories(tconcurrent PUBLIC include)
 target_link_libraries(tconcurrent PUBLIC
   Boost::system
