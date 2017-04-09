@@ -183,6 +183,9 @@ public:
     });
   }
 
+  /// Get a future equivalent to this one but discarding the result value
+  tc::future<void> to_void();
+
   /** Prevent cancelation requests to propagate from this future
    *
    * This means that cancelation requests that may be triggered on this future
@@ -392,12 +395,6 @@ public:
   /// Construct a future in an invalid state
   future() = default;
 
-  /// Get a future equivalent to this one but discarding the result value
-  tc::future<void> to_void()
-  {
-    return this->and_then(get_synchronous_executor(), [](value_type const&){});
-  }
-
 private:
   using typename base_type::shared_type;
   using typename base_type::shared_pointer;
@@ -424,6 +421,12 @@ private:
   {
   }
 };
+
+template <template <typename> class F, typename R, bool Ref>
+tc::future<void> detail::future_base<F, R, Ref>::to_void()
+{
+  return and_then(get_synchronous_executor(), [](value_type const&){});
+}
 
 template <
     template <typename> class Fut1,
