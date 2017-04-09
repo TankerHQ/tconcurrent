@@ -53,8 +53,11 @@ struct future_unwrap
 {
 };
 
-template <typename R>
-struct future_unwrap<future<R>>
+template <
+    template <typename> class Fut1,
+    template <typename> class Fut2,
+    typename R>
+struct future_unwrap<Fut1<Fut2<R>>>
 {
   /** Unwrap a nested future
    *
@@ -62,11 +65,11 @@ struct future_unwrap<future<R>>
    *
    * This is equivalent to the monadic join.
    */
-  future<R> unwrap();
+  Fut2<R> unwrap();
 };
 
 template <template <typename> class F, typename R, bool Ref>
-class future_base
+class future_base : public detail::future_unwrap<F<R>>
 {
 public:
   using this_type = F<R>;
@@ -374,8 +377,7 @@ using base_for_future = detail::future_base<future, R, false>;
 }
 
 template <typename R>
-class future : public detail::base_for_future<R>,
-               public detail::future_unwrap<R>
+class future : public detail::base_for_future<R>
 {
 public:
   using base_type = detail::base_for_future<R>;
@@ -423,37 +425,35 @@ private:
   }
 };
 
-template <typename R>
-future<R> detail::future_unwrap<future<R>>::unwrap()
+template <
+    template <typename> class Fut1,
+    template <typename> class Fut2,
+    typename R>
+Fut2<R> detail::future_unwrap<Fut1<Fut2<R>>>::unwrap()
 {
-  auto& fut = static_cast<future<future<R>>&>(*this);
-  auto sb =
-      std::make_shared<typename future<R>::shared_type>(fut._cancelation_token);
-  fut.then(get_synchronous_executor(),
-           [sb](future<future<R>> fut) {
-             if (fut.has_exception())
-               sb->set_exception(fut.get_exception());
+  auto& fut1 = static_cast<future<future<R>>&>(*this);
+  auto sb = std::make_shared<typename future<R>::shared_type>(
+      fut1._cancelation_token);
+  fut1.then(get_synchronous_executor(),
+           [sb](Fut1<Fut2<R>> fut1) {
+             if (fut1.has_exception())
+               sb->set_exception(fut1.get_exception());
              else
              {
-               auto nested = fut.get();
-               if (sb->get_cancelation_token() != nested._cancelation_token)
+               auto fut2 = fut1.get();
+               if (sb->get_cancelation_token() != fut2._cancelation_token)
                  sb->get_cancelation_token()->push_last_cancelation_callback(
-                     nested.make_canceler());
-               nested.then(get_synchronous_executor(),
-                           [sb](future<R> nested) {
-                             if (nested.has_exception())
-                               sb->set_exception(nested.get_exception());
+                     fut2.make_canceler());
+               fut2.then(get_synchronous_executor(),
+                           [sb](Fut2<R> fut2) {
+                             if (fut2.has_exception())
+                               sb->set_exception(fut2.get_exception());
                              else
-                               sb->set(
-// Lol, msvc does not want a typename here
-#ifndef _WIN32
-                                   typename
-#endif
-                                   future<R>::value_type(nested.get()));
+                               sb->set(fut2.get());
                            });
              }
            });
-  return future<R>(sb);
+  return Fut2<R>(sb);
 }
 
 /// Create a future in a ready state with value \p val
