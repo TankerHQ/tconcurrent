@@ -17,6 +17,10 @@ template <typename T>
 struct is_future<future<T>> : std::true_type
 {};
 
+template <typename T>
+struct is_future<shared_future<T>> : std::true_type
+{};
+
 template <typename F>
 class when_all_callback
 {

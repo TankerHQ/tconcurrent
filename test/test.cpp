@@ -22,6 +22,31 @@ TEST_CASE("test ready future", "[future]")
   CHECK(42 == future.get());
 }
 
+TEST_CASE("test ready future moves result", "[future]")
+{
+  auto future = make_ready_future(std::make_unique<int>(42));
+  // move the unique_ptr out
+  CHECK(42 == *future.get());
+  // there is nothing left
+  CHECK(!future.get());
+}
+
+TEST_CASE("test future to shared_future conversion", "[future][shared]")
+{
+  auto future = make_ready_future(42);
+  auto shared_future = future.to_shared();
+  CHECK(!future.is_valid());
+  CHECK(shared_future.is_ready());
+  CHECK(42 == shared_future.get());
+}
+
+TEST_CASE("test shared_future doesn't move result out", "[future][shared]")
+{
+  auto future = make_ready_future(std::make_unique<int>(42)).to_shared();
+  CHECK(42 == *future.get());
+  CHECK(42 == *future.get());
+}
+
 TEST_CASE("test void ready future", "[future]")
 {
   auto future = make_ready_future();
@@ -229,6 +254,31 @@ TEST_CASE("test packaged task packaged_task_result_type", "[packaged_task]")
         "packaged_task_result_type deduction error");
   }
 }
+
+static_assert(
+    std::is_same<
+        future<int>,
+        decltype(std::declval<future<future<int>>>().unwrap())>::value,
+    "incorrect unwrap signature");
+
+static_assert(
+    std::is_same<
+        future<int>,
+        decltype(std::declval<shared_future<future<int>>>().unwrap())>::value,
+    "incorrect unwrap signature");
+
+static_assert(
+    std::is_same<
+        shared_future<int>,
+        decltype(std::declval<future<shared_future<int>>>().unwrap())>::value,
+    "incorrect unwrap signature");
+
+static_assert(
+    std::is_same<
+        shared_future<int>,
+        decltype(
+            std::declval<shared_future<shared_future<int>>>().unwrap())>::value,
+    "incorrect unwrap signature");
 
 TEST_CASE("test future unwrap", "[future][unwrap]")
 {

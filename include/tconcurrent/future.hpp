@@ -321,6 +321,16 @@ protected:
   {
   }
 
+  future_base(
+      shared_pointer p,
+      cancelation_token_ptr cancelation_token,
+      std::string chain_name)
+    : _p(std::move(p))
+    , _cancelation_token(std::move(cancelation_token))
+    , _chain_name(std::move(chain_name))
+  {
+  }
+
 private:
   this_type* this_()
   {
@@ -369,6 +379,51 @@ private:
 }
 
 template <typename R>
+class shared_future;
+
+namespace detail
+{
+// workaround for VS2015, we can't use CRTP with a class template inside the
+// class
+template <typename R>
+using base_for_shared_future = detail::future_base<shared_future, R, true>;
+}
+
+template <typename R>
+class shared_future : public detail::base_for_shared_future<R>
+{
+public:
+  using base_type = detail::base_for_shared_future<R>;
+  using typename base_type::this_type;
+  using typename base_type::value_type;
+
+  shared_future(shared_future const&) = default;
+  shared_future& operator=(shared_future const&) = default;
+  shared_future(shared_future&&) = default;
+  shared_future& operator=(shared_future&&) = default;
+
+  /// Construct a shared_future in an invalid state
+  shared_future() = default;
+
+  /// Convert a future to a shared_future
+  shared_future(future<R>&& fut);
+
+private:
+  using typename base_type::shared_type;
+  using typename base_type::shared_pointer;
+
+  template <template <typename> class, typename, bool>
+  friend class detail::future_base;
+  template <typename T>
+  friend struct detail::future_unwrap;
+
+  explicit shared_future(std::shared_ptr<detail::shared_base<value_type>> p)
+    : base_type(std::move(p))
+  {
+  }
+};
+
+template <typename R>
 class future;
 
 namespace detail
@@ -394,6 +449,11 @@ public:
   /// Construct a future in an invalid state
   future() = default;
 
+  shared_future<R> to_shared()
+  {
+    return shared_future<R>(std::move(*this));
+  }
+
 private:
   using typename base_type::shared_type;
   using typename base_type::shared_pointer;
@@ -402,6 +462,7 @@ private:
   friend class detail::future_base;
   template <typename T>
   friend class future;
+  friend class shared_future<R>;
   template <typename T>
   friend struct detail::future_unwrap;
   template <typename S, typename F>
@@ -420,6 +481,15 @@ private:
   {
   }
 };
+
+template <typename R>
+shared_future<R>::shared_future(future<R>&& fut)
+  : base_type(
+        std::move(fut._p),
+        std::move(fut._cancelation_token),
+        std::move(fut._chain_name))
+{
+}
 
 template <template <typename> class F, typename R, bool Ref>
 tc::future<void> detail::future_base<F, R, Ref>::to_void()
