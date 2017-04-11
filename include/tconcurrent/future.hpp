@@ -103,8 +103,8 @@ public:
       -> future<std::decay_t<std::result_of_t<Func(this_type&&)>>>
   {
     return then_impl(std::forward<E>(e), [
-      p = this->_p,
-      token = this->_cancelation_token,
+      p = _p,
+      token = _cancelation_token,
       chain_name = _chain_name,
       func = std::forward<Func>(func)
     ]() mutable {
@@ -120,8 +120,8 @@ public:
       std::decay_t<std::result_of_t<Func(cancelation_token&, this_type&&)>>>
   {
     return then_impl(std::forward<E>(e), [
-      p = this->_p,
-      token = this->_cancelation_token,
+      p = _p,
+      token = _cancelation_token,
       chain_name = _chain_name,
       func = std::forward<Func>(func)
     ]() mutable {
@@ -168,8 +168,9 @@ public:
       token = _cancelation_token,
       func = std::forward<Func>(func)
     ]() mutable {
-      return this_type::do_and_then_callback(
-          *p, token.get(), [&] { return func(p->template get<get_type>()); });
+      return do_and_then_callback(*p, token.get(), [&] {
+        return func(p->template get<get_type>());
+      });
     });
   }
   template <typename E, typename Func>
@@ -181,7 +182,7 @@ public:
       token = _cancelation_token,
       func = std::forward<Func>(func)
     ]() mutable {
-      return this_type::do_and_then_callback(*p, token.get(), [&] {
+      return do_and_then_callback(*p, token.get(), [&] {
         return func(*token, p->template get<get_type>());
       });
     });
