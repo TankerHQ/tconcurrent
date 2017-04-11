@@ -105,10 +105,12 @@ public:
     return then_impl(std::forward<E>(e), [
       p = this->_p,
       token = this->_cancelation_token,
+      chain_name = _chain_name,
       func = std::forward<Func>(func)
     ]() mutable {
       this_type fut(p);
       fut._cancelation_token = token;
+      fut._chain_name = chain_name;
       return func(std::move(fut));
     });
   }
@@ -120,10 +122,12 @@ public:
     return then_impl(std::forward<E>(e), [
       p = this->_p,
       token = this->_cancelation_token,
+      chain_name = _chain_name,
       func = std::forward<Func>(func)
     ]() mutable {
       this_type fut(p);
       fut._cancelation_token = token;
+      fut._chain_name = chain_name;
       return func(*token, std::move(fut));
     });
   }
