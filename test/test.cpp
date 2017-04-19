@@ -22,6 +22,31 @@ TEST_CASE("test ready future", "[future]")
   CHECK(42 == future.get());
 }
 
+TEST_CASE("test ready future moves result", "[future]")
+{
+  auto future = make_ready_future(std::make_unique<int>(42));
+  // move the unique_ptr out
+  CHECK(42 == *future.get());
+  // there is nothing left
+  CHECK(!future.get());
+}
+
+TEST_CASE("test future to shared_future conversion", "[future][shared]")
+{
+  auto future = make_ready_future(42);
+  auto shared_future = future.to_shared();
+  CHECK(!future.is_valid());
+  CHECK(shared_future.is_ready());
+  CHECK(42 == shared_future.get());
+}
+
+TEST_CASE("test shared_future doesn't move result out", "[future][shared]")
+{
+  auto future = make_ready_future(std::make_unique<int>(42)).to_shared();
+  CHECK(42 == *future.get());
+  CHECK(42 == *future.get());
+}
+
 TEST_CASE("test void ready future", "[future]")
 {
   auto future = make_ready_future();
@@ -229,6 +254,31 @@ TEST_CASE("test packaged task packaged_task_result_type", "[packaged_task]")
         "packaged_task_result_type deduction error");
   }
 }
+
+static_assert(
+    std::is_same<
+        future<int>,
+        decltype(std::declval<future<future<int>>>().unwrap())>::value,
+    "incorrect unwrap signature");
+
+static_assert(
+    std::is_same<
+        future<int>,
+        decltype(std::declval<shared_future<future<int>>>().unwrap())>::value,
+    "incorrect unwrap signature");
+
+static_assert(
+    std::is_same<
+        shared_future<int>,
+        decltype(std::declval<future<shared_future<int>>>().unwrap())>::value,
+    "incorrect unwrap signature");
+
+static_assert(
+    std::is_same<
+        shared_future<int>,
+        decltype(
+            std::declval<shared_future<shared_future<int>>>().unwrap())>::value,
+    "incorrect unwrap signature");
 
 TEST_CASE("test future unwrap", "[future][unwrap]")
 {
@@ -912,7 +962,9 @@ TEST_CASE("test when_all", "[when_all]")
     if (i % 2)
       promises[i].set_value({});
 
-  auto all = when_all(futures.begin(), futures.end());
+  auto all = when_all(
+      std::make_move_iterator(futures.begin()),
+      std::make_move_iterator(futures.end()));
   CHECK(!all.is_ready());
 
   for (unsigned int i = 0; i < NB_FUTURES; ++i)
@@ -920,7 +972,7 @@ TEST_CASE("test when_all", "[when_all]")
       promises[i].set_value({});
 
   CHECK(all.is_ready());
-  auto& futs = all.get();
+  auto futs = all.get();
   CHECK(futures.size() == futs.size());
   for (auto const& fut : futs)
   {
@@ -932,19 +984,12 @@ TEST_CASE("test when_all", "[when_all]")
 TEST_CASE("test when_all empty", "[when_all]")
 {
   std::vector<future<int>> futures;
-  auto all = when_all(futures.begin(), futures.end());
+  auto all = when_all(
+      std::make_move_iterator(futures.begin()),
+      std::make_move_iterator(futures.end()));
   CHECK(all.is_ready());
-  auto& futs = all.get();
+  auto futs = all.get();
   CHECK(0 == futs.size());
-}
-
-TEST_CASE("test when_all init list", "[when_all]")
-{
-  auto futures = {make_ready_future()};
-  auto all = when_all(futures.begin(), futures.end());
-  CHECK(all.is_ready());
-  auto& futs = all.get();
-  CHECK(1 == futs.size());
 }
 
 TEST_CASE("test when_all cancel", "[when_all][cancel]")
@@ -956,7 +1001,9 @@ TEST_CASE("test when_all cancel", "[when_all][cancel]")
   for (auto const& prom : promises)
     futures.push_back(prom.get_future());
 
-  auto all = when_all(futures.begin(), futures.end());
+  auto all = when_all(
+      std::make_move_iterator(futures.begin()),
+      std::make_move_iterator(futures.end()));
   all.request_cancel();
 
   for (unsigned int i = 0; i < NB_FUTURES; ++i)
@@ -1492,4 +1539,17 @@ TEST_CASE("test future_group adding future after termination", "[future_group]")
   group.add(tc::make_ready_future(18));
   CHECK(group.terminate().is_ready());
   CHECK_THROWS(group.add(tc::make_ready_future(42)));
+}
+
+TEST_CASE("test future_group double termination", "[future_group]")
+{
+  future_group group;
+  tc::promise<int> prom;
+  group.add(prom.get_future());
+  auto first_terminate = group.terminate();
+  CHECK(!first_terminate.is_ready());
+  prom.set_value({});
+  CHECK(first_terminate.is_ready());
+
+  CHECK(group.terminate().is_ready());
 }

@@ -108,7 +108,7 @@ multi::~multi()
   {
     scope_lock l{_mutex};
     _dying = true;
-    fut = _timer_future;
+    fut = std::move(_timer_future);
   }
 
   if (fut.is_valid())

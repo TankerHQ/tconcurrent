@@ -79,7 +79,7 @@ future<void> async_wait(thread_pool& pool,
 
     timer->async_wait(task);
 
-    return fut;
+    return std::move(fut);
   }
 }
 

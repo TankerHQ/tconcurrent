@@ -19,13 +19,6 @@ public:
       assert(false && "destructing a future_group that was not terminated");
       return;
     }
-    collect();
-    if (!_futures.empty())
-    {
-      assert(false &&
-             "destructing a future_group before all futures are ready");
-      return;
-    }
   }
 
   template <typename Future>
@@ -43,7 +36,13 @@ public:
     _terminating = true;
     for (auto& fut : _futures)
       fut.request_cancel();
-    return when_all(_futures.begin(), _futures.end()).to_void();
+    auto ret = when_all(std::make_move_iterator(_futures.begin()),
+                        std::make_move_iterator(_futures.end()))
+                   .to_void();
+    _futures.clear();
+    // move ret, otherwise it doesn't compile
+    // static_cast to silence a clang warning
+    return static_cast<decltype(ret)&&>(ret);
   }
 
 private:
