@@ -1540,3 +1540,16 @@ TEST_CASE("test future_group adding future after termination", "[future_group]")
   CHECK(group.terminate().is_ready());
   CHECK_THROWS(group.add(tc::make_ready_future(42)));
 }
+
+TEST_CASE("test future_group double termination", "[future_group]")
+{
+  future_group group;
+  tc::promise<int> prom;
+  group.add(prom.get_future());
+  auto first_terminate = group.terminate();
+  CHECK(!first_terminate.is_ready());
+  prom.set_value({});
+  CHECK(first_terminate.is_ready());
+
+  CHECK(group.terminate().is_ready());
+}
