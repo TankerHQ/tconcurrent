@@ -1,10 +1,2 @@
-# Xcode stuff
-
-*.cmake
-*.build
-*.xcodeproj
-CMakeScripts
-.DS_Store
-Debug
-Release
+build
 doc/build
