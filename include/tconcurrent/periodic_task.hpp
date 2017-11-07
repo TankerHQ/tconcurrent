@@ -7,10 +7,18 @@
 
 #include <tconcurrent/future.hpp>
 
+#include <tconcurrent/detail/export.hpp>
+
+#ifdef _MSC_VER
+#pragma warning(push)
+// remove dll-interface warning
+#pragma warning(disable:4251)
+#endif
+
 namespace tconcurrent
 {
 
-class periodic_task
+class TCONCURRENT_EXPORT periodic_task
 {
 public:
   using duration_type = std::chrono::steady_clock::duration;
@@ -89,5 +97,9 @@ private:
 };
 
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif

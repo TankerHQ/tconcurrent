@@ -9,6 +9,8 @@
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/packaged_task.hpp>
 
+#include <tconcurrent/detail/export.hpp>
+
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
 #define TCONCURRENT_SANITIZER
@@ -108,6 +110,7 @@ struct coroutine_control
   void yield();
 };
 
+TCONCURRENT_EXPORT
 detail::coroutine_control*& get_current_coroutine_ptr();
 
 inline void run_coroutine(coroutine_control* ctrl)

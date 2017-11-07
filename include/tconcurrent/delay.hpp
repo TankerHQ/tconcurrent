@@ -6,6 +6,8 @@
 #include <tconcurrent/future.hpp>
 #include <tconcurrent/thread_pool.hpp>
 
+#include <tconcurrent/detail/export.hpp>
+
 namespace tconcurrent
 {
 
@@ -14,6 +16,7 @@ namespace tconcurrent
  * The returned future is cancelable. If the executor is single threaded, a
  * cancelation request will immediately put the future in a canceled state.
  */
+TCONCURRENT_EXPORT
 future<void> async_wait(thread_pool& pool,
                         std::chrono::steady_clock::duration delay);
 

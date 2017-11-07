@@ -6,6 +6,14 @@
 #include <thread>
 #include <functional>
 
+#include <tconcurrent/detail/export.hpp>
+
+#ifdef _MSC_VER
+#pragma warning(push)
+// remove dll-interface warning
+#pragma warning(disable:4251)
+#endif
+
 namespace boost
 {
 namespace asio
@@ -18,10 +26,11 @@ namespace tconcurrent
 {
 namespace detail
 {
+TCONCURRENT_EXPORT
 void default_error_cb(std::exception_ptr const&);
 }
 
-class thread_pool
+class TCONCURRENT_EXPORT thread_pool
 {
 public:
   using error_handler_cb = std::function<void(std::exception_ptr const&)>;
@@ -62,9 +71,9 @@ private:
   std::unique_ptr<impl> _p;
 };
 
-thread_pool& get_default_executor();
-void start_thread_pool(unsigned int thread_count);
-thread_pool& get_background_executor();
+TCONCURRENT_EXPORT thread_pool& get_default_executor();
+TCONCURRENT_EXPORT void start_thread_pool(unsigned int thread_count);
+TCONCURRENT_EXPORT thread_pool& get_background_executor();
 
 /// Executor that runs its work in-place
 class synchronous_executor
@@ -78,8 +87,12 @@ public:
 };
 
 // FIXME do an abstraction so that executors can be passed by value
-synchronous_executor& get_synchronous_executor();
+TCONCURRENT_EXPORT synchronous_executor& get_synchronous_executor();
 
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif

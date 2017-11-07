@@ -1,5 +1,7 @@
 enable_testing()
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+
 if (TANKER_ENVIRONMENT)
   include(catch-config)
 else()
