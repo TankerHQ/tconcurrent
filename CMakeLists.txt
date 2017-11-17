@@ -5,6 +5,8 @@ project(tconcurrent)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+
 find_package(Boost 1.61 REQUIRED COMPONENTS system thread context)
 
 add_library(tconcurrent
