@@ -13,6 +13,10 @@ if(TANKER_ENVIRONMENT)
   include(curl-config)
 else()
   find_package(CURL REQUIRED)
+  add_library(curl STATIC IMPORTED)
+  set_target_properties(curl PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${CURL_INCLUDE_DIRS}"
+    IMPORTED_LOCATION "${CURL_LIBRARIES}")
 endif()
 
 add_library(tconcurrent
