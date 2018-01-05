@@ -7,20 +7,13 @@
 #include <functional>
 
 #include <tconcurrent/detail/export.hpp>
+#include <tconcurrent/detail/boost_fwd.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(push)
 // remove dll-interface warning
 #pragma warning(disable:4251)
 #endif
-
-namespace boost
-{
-namespace asio
-{
-class io_service;
-}
-}
 
 namespace tconcurrent
 {

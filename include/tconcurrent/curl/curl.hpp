@@ -2,6 +2,7 @@
 #define TCONCURRENT_CURL_HPP
 
 #include <tconcurrent/future.hpp>
+#include <tconcurrent/detail/boost_fwd.hpp>
 
 #include <map>
 #include <functional>
@@ -9,17 +10,6 @@
 #include <array>
 #include <curl/curl.h>
 
-namespace boost
-{
-namespace asio
-{
-class io_service;
-}
-namespace system
-{
-  class error_code;
-}
-}
 
 namespace tconcurrent
 {
