@@ -49,11 +49,11 @@ stack_bounds get_stack_bounds();
         &fsholder, stack_bounds.stack, stack_bounds.size);
 
 #define TC_SANITIZER_CLOSE_SWITCH_CONTEXT()    \
-    __sanitizer_finish_switch_fiber(fsholder); \
+    __sanitizer_finish_switch_fiber(fsholder, nullptr, nullptr); \
   }
 
 #define TC_SANITIZER_ENTER_NEW_CONTEXT() \
-  __sanitizer_finish_switch_fiber(nullptr)
+  __sanitizer_finish_switch_fiber(nullptr, nullptr, nullptr)
 
 #define TC_SANITIZER_EXIT_CONTEXT()                     \
   auto const stack_bounds = detail::get_stack_bounds(); \
