@@ -23,6 +23,9 @@
 
 namespace tconcurrent
 {
+template <typename F>
+auto async_resumable(std::string const& name, F&& cb);
+
 namespace detail
 {
 
@@ -73,11 +76,34 @@ stack_bounds get_stack_bounds();
 /// Thrown inside a coroutine to stop it
 struct abort_coroutine {};
 
+struct abort_handler;
+
 using coroutine_controller = std::function<void(struct coroutine_control*)>;
 using coroutine_t = boost::context::execution_context<coroutine_controller>;
 
-struct coroutine_control
+enum class coroutine_status {
+  waiting,
+  finished,
+  aborted,
+};
+
+coroutine_status run_coroutine(coroutine_control* ctrl);
+
+class coroutine_control
 {
+public:
+  coroutine_control(coroutine_control const&) = delete;
+  coroutine_control(coroutine_control&&) = delete;
+  coroutine_control& operator=(coroutine_control const&) = delete;
+  coroutine_control& operator=(coroutine_control&&) = delete;
+
+  template <typename Awaitable>
+  typename std::decay_t<Awaitable>::value_type operator()(
+      Awaitable&& awaitable);
+
+  void yield();
+
+private:
   std::string name;
 
   boost::context::fixedsize_stack salloc;
@@ -103,30 +129,18 @@ struct coroutine_control
       token(token)
   {}
 
-  coroutine_control(coroutine_control const&) = delete;
-  coroutine_control(coroutine_control&&) = delete;
-  coroutine_control& operator=(coroutine_control const&) = delete;
-  coroutine_control& operator=(coroutine_control&&) = delete;
-
-  template <typename Awaitable>
-  typename std::decay_t<Awaitable>::value_type operator()(
-      Awaitable&& awaitable);
-
   template <typename Awaitable>
   typename std::decay_t<Awaitable>::value_type await(
       Awaitable&& awaitable, bool early_return);
 
-  void yield();
+  template <typename F>
+  friend auto ::tconcurrent::async_resumable(std::string const& name, F&& cb);
+  friend coroutine_status run_coroutine(coroutine_control* ctrl);
+  friend abort_handler;
 };
 
 TCONCURRENT_EXPORT
 detail::coroutine_control*& get_current_coroutine_ptr();
-
-enum class coroutine_status {
-  waiting,
-  finished,
-  aborted,
-};
 
 inline coroutine_status run_coroutine(coroutine_control* ctrl)
 {
