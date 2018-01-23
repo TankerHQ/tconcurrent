@@ -112,6 +112,10 @@ struct coroutine_control
   typename std::decay_t<Awaitable>::value_type operator()(
       Awaitable&& awaitable);
 
+  template <typename Awaitable>
+  typename std::decay_t<Awaitable>::value_type await(
+      Awaitable&& awaitable, bool early_return);
+
   void yield();
 };
 
@@ -169,13 +173,33 @@ template <typename Awaitable>
 typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
     Awaitable&& awaitable)
 {
+  return await(std::forward<Awaitable>(awaitable), true);
+}
+
+/** Unschedule the coroutine immediately and put it in the task queue.
+ *
+ * This is a cancelation point, if a cancelation is requested before or after
+ * the yield actually occurs, operation_canceled will be thrown.
+ */
+inline void coroutine_control::yield()
+{
+  if (token.is_cancel_requested())
+    throw operation_canceled{};
+
+  await(tc::make_ready_future(), false);
+}
+
+template <typename Awaitable>
+typename std::decay_t<Awaitable>::value_type coroutine_control::await(
+    Awaitable&& awaitable, bool early_return)
+{
   using FutureType = std::decay_t<Awaitable>;
 
   FutureType finished_awaitable;
   // atomic because we don't want the compiler to reorder instructions
   auto const aborted = std::make_shared<std::atomic<bool>>(false);
 
-  if (awaitable.is_ready())
+  if (early_return && awaitable.is_ready())
     finished_awaitable = std::move(awaitable);
   else
   {
@@ -220,24 +244,6 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
   if (token.is_cancel_requested())
     throw operation_canceled{};
   return finished_awaitable.get();
-}
-
-/** Unschedule the coroutine immediately and put it in the task queue.
- *
- * This is a cancelation point, if a cancelation is requested before or after
- * the yield actually occurs, operation_canceled will be thrown.
- */
-inline void coroutine_control::yield()
-{
-  if (token.is_cancel_requested())
-    throw operation_canceled{};
-  TC_SANITIZER_OPEN_RETURN_CONTEXT()
-  *argctx = std::get<0>((*argctx)([](coroutine_control* ctrl) {
-    tc::async(ctrl->name, [ctrl] { run_coroutine(ctrl); });
-  }));
-  TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
-  if (token.is_cancel_requested())
-    throw operation_canceled{};
 }
 
 struct abort_handler
