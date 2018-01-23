@@ -73,6 +73,7 @@ class future_base : public detail::future_unwrap<F<R>>
 {
 public:
   using this_type = F<R>;
+  using result_type = R;
   using value_type = typename detail::future_value_type<R>::type;
   using get_type = std::conditional_t<Ref, value_type const&, value_type>;
 
