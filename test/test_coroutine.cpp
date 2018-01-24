@@ -96,6 +96,22 @@ TEST_CASE("coroutine wait error", "[coroutine]")
   CHECK_THROWS_AS(f.get(), int);
 }
 
+TEST_CASE("coroutine cancel before run", "[coroutine][cancel]")
+{
+  unsigned called = 0;
+  async([&] {
+    auto f = async_resumable([&called](awaiter& await) {
+      ++called;
+      return 42;
+    });
+    f.request_cancel();
+    REQUIRE(f.is_ready());
+    CHECK_THROWS_AS(f.get(), operation_canceled);
+  })
+      .get();
+  CHECK(0 == called);
+}
+
 TEST_CASE("coroutine cancel already requested", "[coroutine][cancel]")
 {
   unsigned called = 0;

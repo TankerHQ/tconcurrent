@@ -460,6 +460,17 @@ TEST_CASE("test async cancelation_token canceled", "[async][cancel]")
   fut.get();
 }
 
+TEST_CASE("test async cancel before run", "[async][cancel]")
+{
+  async([&] {
+    auto fut = async([&] { REQUIRE(false); });
+    fut.request_cancel();
+    REQUIRE(fut.is_ready());
+    CHECK_THROWS_AS(fut.get(), operation_canceled);
+  })
+      .get();
+}
+
 TEST_CASE("test is_in_this_context", "[executor]")
 {
   auto fut = async([&]
