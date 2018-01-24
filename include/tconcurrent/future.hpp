@@ -26,6 +26,10 @@ auto package(F&& f, cancelation_token_ptr token)
 namespace detail
 {
 
+template <typename S, typename F>
+auto package(F&& f, cancelation_token_ptr token, bool cancelable)
+    -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
+
 template <typename T>
 struct future_value_type
 {
@@ -473,7 +477,8 @@ private:
   template <typename T>
   friend struct detail::future_unwrap;
   template <typename S, typename F>
-  friend auto package(F&& f, cancelation_token_ptr token)
+  friend auto detail::package(
+      F&& f, cancelation_token_ptr token, bool cancelable)
       -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
   template <typename T>
   friend class promise;

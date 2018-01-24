@@ -197,6 +197,20 @@ TEST_CASE("test packaged task cancel", "[packaged_task][cancel]")
   }
 }
 
+TEST_CASE("test packaged task canceled before run", "[packaged_task][cancel]")
+{
+  bool run = false;
+  auto taskfut = package_cancelable<void()>([&]() { run = true; });
+  auto& task = std::get<0>(taskfut);
+  auto& future = std::get<1>(taskfut);
+
+  future.request_cancel();
+  CHECK(future.is_ready());
+  task();
+  CHECK(!run);
+  CHECK_THROWS_AS(future.get(), operation_canceled);
+}
+
 TEST_CASE("test sync", "[sync]")
 {
   auto fut = sync([]{ return 15; });
@@ -435,10 +449,13 @@ TEST_CASE("test async cancelation_token not canceled", "[async][cancel]")
 
 TEST_CASE("test async cancelation_token canceled", "[async][cancel]")
 {
+  promise<void> prom;
   auto fut = async([&](cancelation_token& token) {
+    prom.set_value({});
     while (!token.is_cancel_requested())
       ;
   });
+  prom.get_future().get();
   fut.request_cancel();
   fut.get();
 }
