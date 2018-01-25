@@ -1,5 +1,9 @@
 #include <tconcurrent/coroutine.hpp>
 
+#ifdef TCONCURRENT_SANITIZER
+#include <iostream>
+#endif
+
 #include <boost/thread.hpp>
 
 namespace tconcurrent
