@@ -23,7 +23,7 @@ auto async(std::string const& name, E&& executor, F&& f)
 {
   using result_type = std::decay_t<packaged_task_result_type<F()>>;
 
-  auto pack = package<result_type()>(std::forward<F>(f));
+  auto pack = package_cancelable<result_type()>(std::forward<F>(f));
 
   executor.post(std::move(std::get<0>(pack)),
                 name + " (" + typeid(F).name() + ")");

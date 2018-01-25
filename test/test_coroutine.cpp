@@ -96,6 +96,43 @@ TEST_CASE("coroutine wait error", "[coroutine]")
   CHECK_THROWS_AS(f.get(), int);
 }
 
+TEST_CASE("coroutine cancel before run", "[coroutine][cancel]")
+{
+  unsigned called = 0;
+  async([&] {
+    auto f = async_resumable([&called](awaiter& await) {
+      ++called;
+      return 42;
+    });
+    f.request_cancel();
+    REQUIRE(f.is_ready());
+    CHECK_THROWS_AS(f.get(), operation_canceled);
+  })
+      .get();
+  CHECK(0 == called);
+}
+
+TEST_CASE("coroutine cancel already requested", "[coroutine][cancel]")
+{
+  unsigned called = 0;
+  promise<void> prom1;
+  auto fut1 = prom1.get_future();
+  promise<void> prom2;
+  auto fut2 = prom2.get_future();
+  auto f = async_resumable([&fut1, &fut2](awaiter& await) {
+    fut1.get();
+    await(fut2);
+    return 42;
+  });
+  auto fut3 = async([&] {
+    f.request_cancel();
+    CHECK(f.is_ready());
+    CHECK_THROWS_AS(f.get(), operation_canceled);
+  });
+  prom1.set_value({});
+  fut3.get();
+}
+
 TEST_CASE("coroutine cancel propagation", "[coroutine][cancel]")
 {
   unsigned called = 0;
@@ -107,10 +144,12 @@ TEST_CASE("coroutine cancel propagation", "[coroutine][cancel]")
     await(fut);
     return 42;
   });
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  f.request_cancel();
-  CHECK(prom.get_cancelation_token().is_cancel_requested());
-  CHECK(1 == called);
+  async([&] {
+    f.request_cancel();
+    CHECK(prom.get_cancelation_token().is_cancel_requested());
+    CHECK(f.is_ready());
+    CHECK(1 == called);
+  }).get();
   prom.set_value({});
   CHECK_THROWS_AS(f.get(), operation_canceled);
 }
@@ -134,7 +173,7 @@ TEST_CASE("coroutine yield", "[coroutine]")
   CHECK(2 == progress);
 }
 
-TEST_CASE("coroutine yield cancel", "[coroutine][cancel]")
+TEST_CASE("coroutine yield cancel before yield", "[coroutine][cancel]")
 {
   std::atomic<unsigned> progress{0};
   tc::promise<void> prom;
@@ -150,6 +189,29 @@ TEST_CASE("coroutine yield cancel", "[coroutine][cancel]")
   fut1.request_cancel();
   prom.set_value({});
   CHECK(1 == progress);
+  CHECK_THROWS_AS(fut1.get(), operation_canceled);
+}
+
+TEST_CASE("coroutine yield cancel on yield", "[coroutine][cancel]")
+{
+  std::atomic<unsigned> progress{0};
+  auto prom = tc::promise<void>();
+  tc::future<void> fut1;
+  fut1 = tc::async_resumable([&](tc::awaiter& await) {
+    tc::async([&] {
+      if (++progress != 2)
+        CHECK(!"the test is messed up");
+      fut1.request_cancel();
+      CHECK(fut1.is_ready());
+      prom.set_value({});
+    });
+    if (++progress != 1)
+      CHECK(!"the test is messed up");
+    await.yield();
+    ++progress;
+  });
+  prom.get_future().wait();
+  CHECK(2 == progress);
   CHECK_THROWS_AS(fut1.get(), operation_canceled);
 }
 

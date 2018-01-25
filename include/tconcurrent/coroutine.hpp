@@ -23,6 +23,9 @@
 
 namespace tconcurrent
 {
+template <typename F>
+auto async_resumable(std::string const& name, F&& cb);
+
 namespace detail
 {
 
@@ -70,11 +73,37 @@ stack_bounds get_stack_bounds();
 
 #endif
 
+/// Thrown inside a coroutine to stop it
+struct abort_coroutine {};
+
+struct abort_handler;
+
 using coroutine_controller = std::function<void(struct coroutine_control*)>;
 using coroutine_t = boost::context::execution_context<coroutine_controller>;
 
-struct coroutine_control
+enum class coroutine_status {
+  waiting,
+  finished,
+  aborted,
+};
+
+coroutine_status run_coroutine(coroutine_control* ctrl);
+
+class coroutine_control
 {
+public:
+  coroutine_control(coroutine_control const&) = delete;
+  coroutine_control(coroutine_control&&) = delete;
+  coroutine_control& operator=(coroutine_control const&) = delete;
+  coroutine_control& operator=(coroutine_control&&) = delete;
+
+  template <typename Awaitable>
+  typename std::decay_t<Awaitable>::value_type operator()(
+      Awaitable&& awaitable);
+
+  void yield();
+
+private:
   std::string name;
 
   boost::context::fixedsize_stack salloc;
@@ -84,6 +113,8 @@ struct coroutine_control
   coroutine_t* argctx;
 
   cancelation_token& token;
+
+  bool aborted = false;
 
   template <typename F>
   coroutine_control(std::string name, F&& f, cancelation_token& token)
@@ -98,28 +129,26 @@ struct coroutine_control
       token(token)
   {}
 
-  coroutine_control(coroutine_control const&) = delete;
-  coroutine_control(coroutine_control&&) = delete;
-  coroutine_control& operator=(coroutine_control const&) = delete;
-  coroutine_control& operator=(coroutine_control&&) = delete;
-
   template <typename Awaitable>
-  typename std::decay_t<Awaitable>::value_type operator()(
-      Awaitable&& awaitable);
+  typename std::decay_t<Awaitable>::value_type await(
+      Awaitable&& awaitable, bool early_return);
 
-  void yield();
+  template <typename F>
+  friend auto ::tconcurrent::async_resumable(std::string const& name, F&& cb);
+  friend coroutine_status run_coroutine(coroutine_control* ctrl);
+  friend abort_handler;
 };
 
 TCONCURRENT_EXPORT
 detail::coroutine_control*& get_current_coroutine_ptr();
 
-inline void run_coroutine(coroutine_control* ctrl)
+inline coroutine_status run_coroutine(coroutine_control* ctrl)
 {
   auto& ptr = get_current_coroutine_ptr();
-  assert(!ptr);
+  auto const previous_coroutine = ptr;
   ptr = ctrl;
-  BOOST_SCOPE_EXIT(&ptr) {
-    ptr = nullptr;
+  BOOST_SCOPE_EXIT(&ptr, &previous_coroutine) {
+    ptr = previous_coroutine;
   } BOOST_SCOPE_EXIT_END
 
   coroutine_controller f;
@@ -133,10 +162,13 @@ inline void run_coroutine(coroutine_control* ctrl)
   // if coroutine just finished
   if (!ctrl->ctx)
   {
+    auto const status =
+        ctrl->aborted ? coroutine_status::aborted : coroutine_status::finished;
     delete ctrl;
-    return;
+    return status;
   }
   f(ctrl);
+  return coroutine_status::waiting;
 }
 
 /** Unschedule the coroutine while \p awaitable is not ready
@@ -155,28 +187,7 @@ template <typename Awaitable>
 typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
     Awaitable&& awaitable)
 {
-  std::decay_t<Awaitable> finished_awaitable;
-  if (awaitable.is_ready())
-    finished_awaitable = std::move(awaitable);
-  else
-  {
-    auto canceler =
-        token.make_scope_canceler(awaitable.make_canceler());
-
-    TC_SANITIZER_OPEN_RETURN_CONTEXT()
-    *argctx = std::get<0>(
-        (*argctx)([&finished_awaitable, &awaitable](coroutine_control* ctrl) {
-          std::move(awaitable).update_chain_name(ctrl->name)
-              .then([&finished_awaitable, ctrl](std::decay_t<Awaitable> f) {
-                finished_awaitable = std::move(f);
-                run_coroutine(ctrl);
-              });
-        }));
-    TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
-  }
-  if (token.is_cancel_requested())
-    throw operation_canceled{};
-  return finished_awaitable.get();
+  return await(std::forward<Awaitable>(awaitable), true);
 }
 
 /** Unschedule the coroutine immediately and put it in the task queue.
@@ -188,15 +199,107 @@ inline void coroutine_control::yield()
 {
   if (token.is_cancel_requested())
     throw operation_canceled{};
-  TC_SANITIZER_OPEN_RETURN_CONTEXT()
-  *argctx = std::get<0>((*argctx)([](coroutine_control* ctrl) {
-    tc::async(ctrl->name, [ctrl] { run_coroutine(ctrl); });
-  }));
-  TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
-  if (token.is_cancel_requested())
-    throw operation_canceled{};
+
+  await(tc::make_ready_future(), false);
 }
 
+template <typename Awaitable>
+typename std::decay_t<Awaitable>::value_type coroutine_control::await(
+    Awaitable&& awaitable, bool early_return)
+{
+  using FutureType = std::decay_t<Awaitable>;
+
+  FutureType finished_awaitable;
+  // atomic because we don't want the compiler to reorder instructions
+  auto const aborted = std::make_shared<std::atomic<bool>>(false);
+
+  if (early_return && awaitable.is_ready())
+    finished_awaitable = std::move(awaitable);
+  else
+  {
+    auto progressing_awaitable =
+        std::move(awaitable).update_chain_name(this->name);
+
+    auto canceler = token.make_scope_canceler([this,
+                                               aborted,
+                                               &progressing_awaitable] {
+      assert(get_default_executor().is_in_this_context());
+
+      progressing_awaitable.request_cancel();
+
+      *aborted = true;
+      // run the coroutine one last time so that it can abort
+      auto const status = run_coroutine(this);
+      (void)status;
+      assert(
+          status == coroutine_status::aborted &&
+          "tc::detail::abort_coroutine must never be caught");
+    });
+
+    TC_SANITIZER_OPEN_RETURN_CONTEXT()
+    *argctx = std::get<0>((*argctx)(
+        [&aborted, &progressing_awaitable, &finished_awaitable, &awaitable](
+            coroutine_control* ctrl) {
+          progressing_awaitable.then(
+              [aborted, &finished_awaitable, ctrl](std::decay_t<Awaitable> f) {
+                // cancel was called, the coroutine is already dead and the
+                // memory free
+                if (*aborted)
+                  return;
+
+                finished_awaitable = std::move(f);
+                run_coroutine(ctrl);
+              });
+        }));
+    TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
+  }
+  if (*aborted)
+    throw abort_coroutine{};
+  if (token.is_cancel_requested())
+    throw operation_canceled{};
+  return finished_awaitable.get();
+}
+
+struct abort_handler
+{
+  detail::coroutine_control* cs;
+
+  template <
+      typename T,
+      std::enable_if_t<
+          std::is_same<typename std::decay_t<T>::result_type, void>::value,
+          int> _ = 0>
+  auto operator()(T&& fut)
+  {
+    try
+    {
+      fut.get();
+    }
+    catch (detail::abort_coroutine)
+    {
+      cs->aborted = true;
+      throw operation_canceled{};
+    }
+  }
+
+  template <
+      typename T,
+      std::enable_if_t<
+          !std::is_same<typename std::decay_t<T>::result_type, void>::value,
+          int> _ = 0>
+  auto operator()(T&& fut)
+  {
+    try
+    {
+      return fut.get();
+    }
+    catch (detail::abort_coroutine)
+    {
+      cs->aborted = true;
+      throw operation_canceled{};
+    }
+  }
+};
 }
 
 using awaiter = detail::coroutine_control;
@@ -254,7 +357,7 @@ auto async_resumable(std::string const& name, F&& cb)
 
     f(cs);
 
-    return std::move(pack.second);
+    return pack.second.then(tc::get_synchronous_executor(), detail::abort_handler{cs});
   }).unwrap();
 }
 

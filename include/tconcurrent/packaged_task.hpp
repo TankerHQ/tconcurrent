@@ -75,14 +75,18 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
 {
   using base_type = shared_base<shared_base_type<R>>;
 
+  std::atomic<bool> _done{false};
   std::function<R(cancelation_token&, Args...)> _f;
+  bool _cancelable;
 
   template <typename F>
   shared(
+      bool cancelable,
       cancelation_token_ptr token,
       F&& f,
       void_t<decltype(std::declval<F>()(std::declval<Args>()...))>* = nullptr)
     : base_type(std::move(token)),
+      _cancelable(cancelable),
       // TODO vs2015 doesn't accept a forward for f here...
       _f([f](cancelation_token&, auto&&... args) mutable {
         return f(std::forward<decltype(args)>(args)...);
@@ -92,11 +96,14 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
 
   template <typename F>
   shared(
+      bool cancelable,
       cancelation_token_ptr token,
       F&& f,
       void_t<decltype(std::declval<F>()(std::declval<cancelation_token&>(),
                                         std::declval<Args>()...))>** = nullptr)
-    : base_type(std::move(token)), _f(std::forward<F>(f))
+    : base_type(std::move(token)),
+      _cancelable(cancelable),
+      _f(std::forward<F>(f))
   {
     assert(_f);
   }
@@ -104,8 +111,12 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
   template <typename... A>
   void operator()(A&&... args)
   {
+    if (_done.exchange(true))
+      return;
     try
     {
+      if (_cancelable)
+        this->_cancelation_token->pop_cancelation_callback();
       package_caller<R>::do_call(
           *this, _f, *this->_cancelation_token, std::forward<A>(args)...);
     }
@@ -116,6 +127,24 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
     _f = nullptr;
   }
 };
+
+template <typename S, typename F>
+auto package(F&& f, cancelation_token_ptr token, bool cancelable)
+    -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>
+{
+  auto p = std::make_shared<detail::shared<S>>(
+      cancelable, token, std::forward<F>(f));
+  if (cancelable)
+    token->push_cancelation_callback([p, token = token.get()] {
+      if (p->_done.exchange(true))
+        return;
+      token->pop_cancelation_callback();
+      p->set_exception(std::make_exception_ptr(operation_canceled{}));
+      p->_f = nullptr;
+    });
+  return std::make_pair(packaged_task<S>(p),
+                        future<detail::result_of_t_<S>>(p));
+}
 
 }
 
@@ -135,7 +164,8 @@ private:
   detail::promise_ptr<shared_type> _p;
 
   template <typename S, typename F>
-  friend auto package(F&& f, cancelation_token_ptr token)
+  friend auto detail::package(
+      F&& f, cancelation_token_ptr token, bool cancelable)
       -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
 
   explicit packaged_task(std::shared_ptr<detail::shared<R(Args...)>> p)
@@ -148,16 +178,22 @@ template <typename S, typename F>
 auto package(F&& f, cancelation_token_ptr token)
     -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>
 {
-  auto p =
-      std::make_shared<detail::shared<S>>(std::move(token), std::forward<F>(f));
-  return std::make_pair(packaged_task<S>(p),
-                        future<detail::result_of_t_<S>>(p));
+  return detail::package<S>(
+      std::forward<F>(f), token, false);
 }
 
 template <typename S, typename F>
 auto package(F&& f)
 {
-  return package<S>(std::forward<F>(f), std::make_shared<cancelation_token>());
+  return detail::package<S>(
+      std::forward<F>(f), std::make_shared<cancelation_token>(), false);
+}
+
+template <typename S, typename F>
+auto package_cancelable(F&& f)
+{
+  return detail::package<S>(
+      std::forward<F>(f), std::make_shared<cancelation_token>(), true);
 }
 
 }
