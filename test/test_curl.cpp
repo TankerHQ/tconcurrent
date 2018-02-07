@@ -1,4 +1,4 @@
-#include <catch.hpp>
+#include <doctest.h>
 
 #include <tconcurrent/curl/curl.hpp>
 #include <tconcurrent/promise.hpp>
@@ -25,25 +25,25 @@ TEST_CASE("curl simple request")
   req->set_finish_callback(
       [=](request&, CURLcode c) mutable { finished.set_value(c); });
 
-  SECTION("http")
+  SUBCASE("http")
   {
     expectedhttpcode = 200;
     req->set_url("http://httpbin.org/get?TEST=test");
   }
 
-  SECTION("https")
+  SUBCASE("https")
   {
     expectedhttpcode = 200;
     req->set_url("https://httpbin.org/get?TEST=test");
   }
 
-  SECTION("not found")
+  SUBCASE("not found")
   {
     expectedhttpcode = 404;
     req->set_url("http://httpbin.org/whatever");
   }
 
-  SECTION("post")
+  SUBCASE("post")
   {
     expectedhttpcode = 200;
     req->set_url("http://httpbin.org/post");
@@ -56,7 +56,8 @@ TEST_CASE("curl simple request")
 
   mul.process(req);
   auto code = finished.get_future().get();
-  CAPTURE(curl_easy_strerror(code));
+  auto err = curl_easy_strerror(code);
+  CAPTURE(err);
   CHECK(CURLE_OK == code);
   CHECK(dataread);
   CHECK(expectedhttpcode == httpcode);
@@ -160,13 +161,13 @@ TEST_CASE("curl read_all")
   multi mul;
   auto req = std::make_shared<request>();
 
-  SECTION("simple")
+  SUBCASE("simple")
   {
     req->set_url("http://httpbin.org/get?TEST=test");
     CHECK_READALL()
   }
 
-  SECTION("post continue")
+  SUBCASE("post continue")
   {
     req->set_url("http://httpbin.org/post");
     static char const buf[] = "Test test test";
