@@ -320,13 +320,16 @@ auto async_resumable(std::string const& name, F&& cb)
   using return_type =
       std::decay_t<decltype(cb(std::declval<detail::coroutine_control&>()))>;
 
-  return async(name, [cb = std::forward<F>(cb), name](
-          cancelation_token& token) mutable {
-    auto pack = package<return_type(detail::coroutine_control&)>(std::move(cb));
+  auto const fullName = name + " (" + typeid(F).name() + ")";
 
-    detail::coroutine_control* cs =
-        new detail::coroutine_control(
-            name + " (" + typeid(F).name() + ")",
+  auto token = std::make_shared<cancelation_token>();
+  auto pack = package_cancelable<future<return_type>()>(
+      [ cb = std::forward<F>(cb), fullName, token ]() mutable {
+        auto pack = package<return_type(detail::coroutine_control&)>(
+            std::move(cb), token);
+
+        detail::coroutine_control* cs = new detail::coroutine_control(
+            fullName,
             [cb = std::move(pack.first), &cs](
                 detail::coroutine_t argctx,
                 detail::coroutine_controller const&) {
@@ -344,21 +347,27 @@ auto async_resumable(std::string const& name, F&& cb)
               TC_SANITIZER_EXIT_CONTEXT()
               return argctx;
             },
-            token);
+            *token);
 
-    detail::coroutine_controller f;
-    {
-      TC_SANITIZER_OPEN_SWITCH_CONTEXT(
-          reinterpret_cast<char const*>(cs->stack.sp) - cs->stack.size,
-          cs->stack.size)
-      std::tie(cs->ctx, f) = cs->ctx({});
-      TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
-    }
+        detail::coroutine_controller f;
+        {
+          TC_SANITIZER_OPEN_SWITCH_CONTEXT(
+              reinterpret_cast<char const*>(cs->stack.sp) - cs->stack.size,
+              cs->stack.size)
+          std::tie(cs->ctx, f) = cs->ctx({});
+          TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
+        }
 
-    f(cs);
+        f(cs);
 
-    return pack.second.then(tc::get_synchronous_executor(), detail::abort_handler{cs});
-  }).unwrap();
+        return pack.second.then(
+            tc::get_synchronous_executor(), detail::abort_handler{cs});
+      },
+      token);
+
+  get_default_executor().post(std::move(std::get<0>(pack)), fullName);
+
+  return std::move(std::get<1>(pack)).update_chain_name(fullName).unwrap();
 }
 
 template <typename F>

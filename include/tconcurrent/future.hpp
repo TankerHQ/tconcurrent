@@ -525,11 +525,16 @@ Fut2<R> detail::future_unwrap<Fut1<Fut2<R>>>::unwrap()
              else
              {
                auto fut2 = fut1.get();
+               cancelation_token_ptr token;
                if (sb->get_cancelation_token() != fut2._cancelation_token)
-                 sb->get_cancelation_token()->push_last_cancelation_callback(
-                     fut2.make_canceler());
+               {
+                 token = sb->get_cancelation_token();
+                 token->push_cancelation_callback(fut2.make_canceler());
+               }
                fut2.then(get_synchronous_executor(),
-                           [sb](Fut2<R> fut2) {
+                           [sb, token](Fut2<R> fut2) {
+                             if (token)
+                               token->pop_cancelation_callback();
                              if (fut2.has_exception())
                                sb->set_exception(fut2.get_exception());
                              else
@@ -537,7 +542,10 @@ Fut2<R> detail::future_unwrap<Fut1<Fut2<R>>>::unwrap()
                            });
              }
            });
-  return Fut2<R>(sb);
+
+  auto ret = Fut2<R>(sb);
+  ret._chain_name = fut1._chain_name;
+  return std::move(ret);
 }
 
 /// Create a future in a ready state with value \p val

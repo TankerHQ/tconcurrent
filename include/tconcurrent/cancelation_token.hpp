@@ -67,19 +67,6 @@ public:
       current();
   }
 
-  void push_last_cancelation_callback(cancelation_callback cb)
-  {
-    auto current = [&] {
-      scope_lock l(_mutex);
-      _do_cancels.push_front(std::move(cb));
-      return _is_cancel_requested && _do_cancels.size() == 1 ?
-                 _do_cancels.back() :
-                 cancelation_callback{};
-    }();
-    if (current)
-      current();
-  }
-
   void pop_cancelation_callback()
   {
     auto current = [&] {
