@@ -1,4 +1,4 @@
-#include <catch.hpp>
+#include <doctest.h>
 
 #include <tconcurrent/coroutine.hpp>
 #include <tconcurrent/delay.hpp>
@@ -7,25 +7,25 @@
 
 using namespace tconcurrent;
 
-TEST_CASE("coroutine empty", "[coroutine]")
+TEST_CASE("coroutine empty")
 {
   auto f = async_resumable([](auto& awaiter) {});
   CHECK_NOTHROW(f.get());
 }
 
-TEST_CASE("coroutine return", "[coroutine]")
+TEST_CASE("coroutine return")
 {
   auto f = async_resumable([](auto& awaiter) { return 42; });
   CHECK(42 == f.get());
 }
 
-TEST_CASE("coroutine throw", "[coroutine]")
+TEST_CASE("coroutine throw")
 {
   auto f = async_resumable([](auto& awaiter) { throw 42; });
   CHECK_THROWS_AS(f.get(), int);
 }
 
-TEST_CASE("coroutine wait ready", "[coroutine]")
+TEST_CASE("coroutine wait ready")
 {
   auto ready = make_ready_future();
   auto f = async_resumable([&](auto& await) {
@@ -35,7 +35,7 @@ TEST_CASE("coroutine wait ready", "[coroutine]")
   CHECK(42 == f.get());
 }
 
-TEST_CASE("coroutine global wait ready", "[coroutine]")
+TEST_CASE("coroutine global wait ready")
 {
   auto ready = make_ready_future();
   auto f = async_resumable([&](auto& await) {
@@ -45,14 +45,14 @@ TEST_CASE("coroutine global wait ready", "[coroutine]")
   CHECK(42 == f.get());
 }
 
-TEST_CASE("coroutine wait ready value", "[coroutine]")
+TEST_CASE("coroutine wait ready value")
 {
   auto ready = make_ready_future(42);
   auto f = async_resumable([&](auto& await) { return await(ready); });
   CHECK(42 == f.get());
 }
 
-TEST_CASE("coroutine wait", "[coroutine]")
+TEST_CASE("coroutine wait")
 {
   promise<void> prom;
   auto f = async_resumable([&](auto& await) {
@@ -63,7 +63,7 @@ TEST_CASE("coroutine wait", "[coroutine]")
   CHECK(42 == f.get());
 }
 
-TEST_CASE("coroutine nested", "[coroutine]")
+TEST_CASE("coroutine nested")
 {
   promise<int> prom;
   auto f = async_resumable([&](auto& await) {
@@ -74,7 +74,7 @@ TEST_CASE("coroutine nested", "[coroutine]")
   CHECK(42 == f.get());
 }
 
-TEST_CASE("coroutine wait and throw", "[coroutine]")
+TEST_CASE("coroutine wait and throw")
 {
   promise<void> prom;
   auto f = async_resumable([&](auto& await) {
@@ -85,7 +85,7 @@ TEST_CASE("coroutine wait and throw", "[coroutine]")
   CHECK_THROWS_AS(f.get(), int);
 }
 
-TEST_CASE("coroutine wait error", "[coroutine]")
+TEST_CASE("coroutine wait error")
 {
   promise<void> prom;
   auto f = async_resumable([&](auto& await) {
@@ -96,7 +96,7 @@ TEST_CASE("coroutine wait error", "[coroutine]")
   CHECK_THROWS_AS(f.get(), int);
 }
 
-TEST_CASE("coroutine cancel before run", "[coroutine][cancel]")
+TEST_CASE("coroutine cancel before run")
 {
   unsigned called = 0;
   async([&] {
@@ -112,7 +112,7 @@ TEST_CASE("coroutine cancel before run", "[coroutine][cancel]")
   CHECK(0 == called);
 }
 
-TEST_CASE("coroutine cancel already requested", "[coroutine][cancel]")
+TEST_CASE("coroutine cancel already requested")
 {
   unsigned called = 0;
   promise<void> prom1;
@@ -133,7 +133,7 @@ TEST_CASE("coroutine cancel already requested", "[coroutine][cancel]")
   fut3.get();
 }
 
-TEST_CASE("coroutine cancel propagation", "[coroutine][cancel]")
+TEST_CASE("coroutine cancel propagation")
 {
   unsigned called = 0;
   promise<void> prom;
@@ -154,7 +154,7 @@ TEST_CASE("coroutine cancel propagation", "[coroutine][cancel]")
   CHECK_THROWS_AS(f.get(), operation_canceled);
 }
 
-TEST_CASE("coroutine yield", "[coroutine]")
+TEST_CASE("coroutine yield")
 {
   unsigned progress = 0;
   tc::promise<void> prom;
@@ -173,7 +173,7 @@ TEST_CASE("coroutine yield", "[coroutine]")
   CHECK(2 == progress);
 }
 
-TEST_CASE("coroutine yield cancel before yield", "[coroutine][cancel]")
+TEST_CASE("coroutine yield cancel before yield")
 {
   std::atomic<unsigned> progress{0};
   tc::promise<void> prom;
@@ -192,7 +192,7 @@ TEST_CASE("coroutine yield cancel before yield", "[coroutine][cancel]")
   CHECK_THROWS_AS(fut1.get(), operation_canceled);
 }
 
-TEST_CASE("coroutine yield cancel on yield", "[coroutine][cancel]")
+TEST_CASE("coroutine yield cancel on yield")
 {
   std::atomic<unsigned> progress{0};
   auto prom = tc::promise<void>();
@@ -215,7 +215,7 @@ TEST_CASE("coroutine yield cancel on yield", "[coroutine][cancel]")
   CHECK_THROWS_AS(fut1.get(), operation_canceled);
 }
 
-TEST_CASE("coroutine await move-only type", "[coroutine]")
+TEST_CASE("coroutine await move-only type")
 {
   tc::promise<std::unique_ptr<int>> prom;
   auto fut = prom.get_future();
