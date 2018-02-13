@@ -537,7 +537,10 @@ Fut2<R> detail::future_unwrap<Fut1<Fut2<R>>>::unwrap()
                            });
              }
            });
-  return Fut2<R>(sb);
+
+  auto ret = Fut2<R>(sb);
+  ret._chain_name = fut1._chain_name;
+  return std::move(ret);
 }
 
 /// Create a future in a ready state with value \p val
