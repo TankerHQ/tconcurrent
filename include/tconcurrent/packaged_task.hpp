@@ -196,6 +196,12 @@ auto package_cancelable(F&& f)
       std::forward<F>(f), std::make_shared<cancelation_token>(), true);
 }
 
+template <typename S, typename F>
+auto package_cancelable(F&& f, cancelation_token_ptr token)
+{
+  return detail::package<S>(std::forward<F>(f), token, true);
+}
+
 }
 
 #endif
