@@ -62,11 +62,10 @@ SCENARIO("test semaphore")
       CHECK(3 == sem.count());
     }
 
-    // FIXME this is broken because future expects a copyable type
-    //THEN("we can get a scope_lock")
-    //{
-    //  auto l = sem.get_scoped_lock();
-    //}
+    THEN("we can get a scope_lock")
+    {
+      auto l = sem.get_scope_lock();
+    }
   }
 }
 
