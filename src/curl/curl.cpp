@@ -5,7 +5,7 @@
 
 #include <tconcurrent/thread_pool.hpp>
 #include <tconcurrent/async.hpp>
-#include <tconcurrent/delay.hpp>
+#include <tconcurrent/async_wait.hpp>
 
 #include <boost/asio.hpp>
 

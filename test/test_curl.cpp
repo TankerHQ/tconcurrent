@@ -3,7 +3,7 @@
 #include <tconcurrent/curl/curl.hpp>
 #include <tconcurrent/promise.hpp>
 #include <tconcurrent/async.hpp>
-#include <tconcurrent/delay.hpp>
+#include <tconcurrent/async_wait.hpp>
 
 using namespace tconcurrent;
 using namespace tconcurrent::curl;

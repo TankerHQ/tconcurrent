@@ -1,7 +1,7 @@
 #include <doctest.h>
 
 #include <tconcurrent/coroutine.hpp>
-#include <tconcurrent/delay.hpp>
+#include <tconcurrent/async_wait.hpp>
 #include <tconcurrent/promise.hpp>
 #include <tconcurrent/thread_pool.hpp>
 

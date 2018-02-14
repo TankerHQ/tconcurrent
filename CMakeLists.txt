@@ -17,7 +17,7 @@ set_target_properties(curl PROPERTIES
 
 add_library(tconcurrent
   src/coroutine.cpp
-  src/delay.cpp
+  src/async_wait.cpp
   src/periodic_task.cpp
   src/thread_pool.cpp
 
