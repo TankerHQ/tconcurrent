@@ -25,6 +25,20 @@ TEST_CASE("coroutine throw")
   CHECK_THROWS_AS(f.get(), int);
 }
 
+TEST_CASE("coroutine on executor")
+{
+  thread_pool tp;
+  tp.start(1);
+  auto f = async_resumable("test", tp, [&](auto& await) {
+    CHECK(tp.is_in_this_context());
+    await.yield();
+    CHECK(tp.is_in_this_context());
+    await(tc::async(tp, [] {}));
+    CHECK(tp.is_in_this_context());
+  });
+  f.get();
+}
+
 TEST_CASE("coroutine wait ready")
 {
   auto ready = make_ready_future();
