@@ -122,6 +122,115 @@ when_all(InputIterator first, InputIterator last)
 
   return cb.get_future();
 }
+
+template <class Sequence>
+struct when_any_result
+{
+  std::size_t index;
+  Sequence futures;
+};
+
+namespace detail
+{
+template <typename F>
+class when_any_callback
+{
+public:
+  using result_type = when_any_result<std::vector<F>>;
+
+  when_any_callback(std::vector<F> futures)
+    : _p(std::make_shared<shared>(std::move(futures)))
+  {
+    assert(!_p->futures.empty());
+
+    _p->self_canceler = _p->prom.get_cancelation_token().make_scope_canceler(
+        [p = _p] { p->request_cancel(); });
+
+    unsigned int index = 0;
+    for (auto& fut : _p->futures)
+    {
+      _p->futures[index].then(
+          get_synchronous_executor(),
+          [ self = *this, index ](auto&& f) mutable { self(index); });
+      ++index;
+    }
+  }
+
+  void operator()(unsigned int index)
+  {
+    if (!_p->triggered.exchange(true))
+      _p->prom.set_value(result_type{index, std::move(_p->futures)});
+  };
+
+  future<result_type> get_future()
+  {
+    return _p->prom.get_future();
+  }
+
+private:
+  struct shared
+  {
+    std::vector<F> futures;
+    std::vector<std::function<void()>> future_cancelers;
+    std::atomic<bool> triggered{false};
+    promise<result_type> prom;
+    cancelation_token::scope_canceler self_canceler;
+
+    shared(std::vector<F> afutures)
+      : futures(std::move(afutures))
+    {
+      future_cancelers.reserve(futures.size());
+      std::transform(
+          futures.begin(),
+          futures.end(),
+          std::back_inserter(future_cancelers),
+          [&](F& future) { return future.make_canceler(); });
+    }
+
+    void request_cancel()
+    {
+      for (auto const& canceler : future_cancelers)
+        canceler();
+    }
+  };
+
+  std::shared_ptr<shared> _p;
+};
+
+}
+
+/** Get a future that will be ready when any one of the given futures is ready
+ *
+ * If a cancelation is requested on the returned future, the cancelation request
+ * is propagated to the futures given as argument.
+ *
+ * If the input range is empty, returns a ready future with an index of
+ * size_t(-1).
+ *
+ * \return a future<when_any_result<std::vector<future<T>>>> that always
+ * finishes with a value.
+ */
+template <typename InputIterator>
+future<when_any_result<
+    std::vector<typename std::iterator_traits<InputIterator>::value_type>>>
+when_any(InputIterator first, InputIterator last)
+{
+  using value_type = typename std::iterator_traits<InputIterator>::value_type;
+
+  static_assert(detail::is_future<value_type>::value,
+                "when_any must be called on iterators of futures");
+
+  if (first == last)
+    return make_ready_future(
+        when_any_result<std::vector<value_type>>{size_t(-1), {}});
+
+  std::vector<value_type> futlist;
+  futlist.insert(futlist.begin(), first, last);
+
+  detail::when_any_callback<value_type> cb{std::move(futlist)};
+
+  return cb.get_future();
+}
 }
 
 #endif
