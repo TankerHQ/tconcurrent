@@ -111,14 +111,10 @@ when_all(InputIterator first, InputIterator last)
 
   detail::when_all_callback<value_type> cb{futlist};
 
-  unsigned int index = 0;
-  for (auto& fut : futlist)
-  {
-    fut.then(get_synchronous_executor(), [index, cb](value_type f) mutable {
-      cb(index, std::move(f));
-    });
-    ++index;
-  }
+  for (unsigned int index = 0; index < futlist.size(); ++index)
+    futlist[index].then(
+        get_synchronous_executor(),
+        [index, cb](value_type f) mutable { cb(index, std::move(f)); });
 
   return cb.get_future();
 }
@@ -152,14 +148,10 @@ public:
     _p->self_canceler = _p->prom.get_cancelation_token().make_scope_canceler(
         [p = _p] { p->request_cancel(); });
 
-    unsigned int index = 0;
-    for (auto& fut : _p->futures)
-    {
+    for (unsigned int index = 0; index < _p->futures.size(); ++index)
       _p->futures[index].then(
           get_synchronous_executor(),
           [ self = *this, index ](auto&& f) mutable { self(index); });
-      ++index;
-    }
   }
 
   void operator()(unsigned int index)
