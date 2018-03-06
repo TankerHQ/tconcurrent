@@ -150,4 +150,18 @@ TEST_CASE("when_any")
 
     CHECK(any.is_ready());
   }
+
+  SUBCASE("should cancel all other futures when a future gets ready")
+  {
+    auto any = when_any(
+        std::make_move_iterator(futures.begin()),
+        std::make_move_iterator(futures.end()),
+        when_any_options_auto_cancel);
+
+    promises[0].set_value({});
+
+    CHECK(std::all_of(++promises.begin(), promises.end(), [](auto&& p) {
+      return p.get_cancelation_token().is_cancel_requested();
+    }));
+  }
 }

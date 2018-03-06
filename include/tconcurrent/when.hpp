@@ -130,6 +130,12 @@ struct when_any_result
   Sequence futures;
 };
 
+enum when_any_options
+{
+  when_any_options_none,
+  when_any_options_auto_cancel,
+};
+
 namespace detail
 {
 template <typename F>
@@ -138,8 +144,8 @@ class when_any_callback
 public:
   using result_type = when_any_result<std::vector<F>>;
 
-  when_any_callback(std::vector<F> futures)
-    : _p(std::make_shared<shared>(std::move(futures)))
+  when_any_callback(std::vector<F> futures, when_any_options options)
+    : _p(std::make_shared<shared>(std::move(futures))), _options(options)
   {
     assert(!_p->futures.empty());
 
@@ -159,7 +165,13 @@ public:
   void operator()(unsigned int index)
   {
     if (!_p->triggered.exchange(true))
+    {
+      if (_options & when_any_options_auto_cancel)
+        for (unsigned int i = 0; i < _p->futures.size(); ++i)
+          if (i != index)
+            _p->futures[i].request_cancel();
       _p->prom.set_value(result_type{index, std::move(_p->futures)});
+    }
   };
 
   future<result_type> get_future()
@@ -195,6 +207,7 @@ private:
   };
 
   std::shared_ptr<shared> _p;
+  when_any_options _options;
 };
 
 }
@@ -213,7 +226,10 @@ private:
 template <typename InputIterator>
 future<when_any_result<
     std::vector<typename std::iterator_traits<InputIterator>::value_type>>>
-when_any(InputIterator first, InputIterator last)
+when_any(
+    InputIterator first,
+    InputIterator last,
+    when_any_options options = when_any_options_none)
 {
   using value_type = typename std::iterator_traits<InputIterator>::value_type;
 
@@ -227,7 +243,7 @@ when_any(InputIterator first, InputIterator last)
   std::vector<value_type> futlist;
   futlist.insert(futlist.begin(), first, last);
 
-  detail::when_any_callback<value_type> cb{std::move(futlist)};
+  detail::when_any_callback<value_type> cb{std::move(futlist), options};
 
   return cb.get_future();
 }
