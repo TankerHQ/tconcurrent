@@ -19,7 +19,7 @@ struct operation_canceled : std::exception
   }
 };
 
-class cancelation_token
+class cancelation_token : public std::enable_shared_from_this<cancelation_token>
 {
 public:
   using cancelation_callback = std::function<void()>;
@@ -28,26 +28,25 @@ public:
   {
   public:
     scope_canceler() = default;
-    scope_canceler(cancelation_token* token, cancelation_callback cb)
+    scope_canceler(
+        std::shared_ptr<cancelation_token> token, cancelation_callback cb)
       : _token(token)
     {
       assert(cb);
-      _token->push_cancelation_callback(std::move(cb));
+      token->push_cancelation_callback(std::move(cb));
+    }
+
+    ~scope_canceler()
+    {
+      if (auto const t = _token.lock())
+        t->pop_cancelation_callback();
     }
 
     scope_canceler(scope_canceler&&) = default;
     scope_canceler& operator=(scope_canceler&&) = default;
 
   private:
-    struct deleter
-    {
-      void operator()(cancelation_token* token) const
-      {
-        token->pop_cancelation_callback();
-      }
-    };
-
-    std::unique_ptr<cancelation_token, deleter> _token;
+    std::weak_ptr<cancelation_token> _token;
   };
 
   bool is_cancel_requested() const
@@ -99,7 +98,7 @@ public:
    */
   scope_canceler make_scope_canceler(cancelation_callback cb)
   {
-    return scope_canceler(this, std::move(cb));
+    return scope_canceler(shared_from_this(), std::move(cb));
   }
 
   void request_cancel()

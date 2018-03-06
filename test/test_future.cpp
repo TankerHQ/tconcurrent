@@ -391,6 +391,18 @@ TEST_CASE("scoped_cancelers should support nesting")
   }
 }
 
+TEST_CASE(
+    "it should be ok to set a value to a promise while a scope canceler is set")
+{
+  promise<void> prom;
+
+  auto const canceler = prom.get_cancelation_token().make_scope_canceler([] {});
+
+  prom.set_value({});
+
+  prom = promise<void>();
+}
+
 /////////////////////////
 // promise and cancel
 /////////////////////////
