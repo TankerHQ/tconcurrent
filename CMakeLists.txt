@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.4)
 
 project(tconcurrent)
+include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+conan_basic_setup(TARGETS)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -8,12 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
 find_package(Boost 1.61 REQUIRED COMPONENTS system thread context)
-
 find_package(CURL REQUIRED)
-add_library(curl STATIC IMPORTED)
-set_target_properties(curl PROPERTIES
-  INTERFACE_INCLUDE_DIRECTORIES "${CURL_INCLUDE_DIRS}"
-  IMPORTED_LOCATION "${CURL_LIBRARIES}")
 
 add_library(tconcurrent
   src/coroutine.cpp
@@ -31,10 +28,11 @@ target_include_directories(tconcurrent PUBLIC
 )
 
 target_link_libraries(tconcurrent PUBLIC
+  # Keep components, to avoid linking with everything
   Boost::system
   Boost::thread
   Boost::context
-  curl
+  CONAN_PKG::libcurl
 )
 
 target_compile_definitions(tconcurrent PRIVATE
@@ -59,5 +57,6 @@ install(EXPORT tconcurrent
 )
 
 if(BUILD_TESTS)
+  enable_testing()
   add_subdirectory(test)
 endif()

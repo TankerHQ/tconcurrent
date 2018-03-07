@@ -1,0 +1,17 @@
+stages:
+  - export
+
+tanker/stable:
+  stage: export
+  script:
+    - python3 -m pipenv install
+    - python3 -m pipenv run conan user --clean tanker
+    - python3 -m pipenv run conan user --remote godzilla --password ${CONAN_GODZILLA_TANKER_PASSWORD} tanker
+    - python3 -m pipenv run conan export . tanker/stable
+    - python3 -m pipenv run conan upload "tconcurrent/${CI_COMMIT_TAG}@tanker/stable" --remote godzilla
+  only:
+    - tags
+  when: manual
+  tags:
+    - linux
+    - debian9
