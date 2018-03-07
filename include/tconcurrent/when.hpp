@@ -2,7 +2,21 @@
 #define TCONCURRENT_WHEN_HPP
 
 #include <atomic>
+
+#include <flags/flags.hpp>
+
 #include <tconcurrent/promise.hpp>
+
+namespace tconcurrent
+{
+enum class when_any_options
+{
+  none = 0,
+  auto_cancel = 1 << 0,
+};
+}
+
+ALLOW_FLAGS_FOR_ENUM(tconcurrent::when_any_options)
 
 namespace tconcurrent
 {
@@ -126,12 +140,6 @@ struct when_any_result
   Sequence futures;
 };
 
-enum when_any_options
-{
-  when_any_options_none,
-  when_any_options_auto_cancel,
-};
-
 namespace detail
 {
 template <typename F>
@@ -158,7 +166,7 @@ public:
   {
     if (!_p->triggered.exchange(true))
     {
-      if (_options & when_any_options_auto_cancel)
+      if (_options & when_any_options::auto_cancel)
         for (unsigned int i = 0; i < _p->futures.size(); ++i)
           if (i != index)
             _p->futures[i].request_cancel();
@@ -221,7 +229,7 @@ future<when_any_result<
 when_any(
     InputIterator first,
     InputIterator last,
-    when_any_options options = when_any_options_none)
+    when_any_options options = when_any_options::none)
 {
   using value_type = typename std::iterator_traits<InputIterator>::value_type;
 

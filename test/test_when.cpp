@@ -156,7 +156,7 @@ TEST_CASE("when_any")
     auto any = when_any(
         std::make_move_iterator(futures.begin()),
         std::make_move_iterator(futures.end()),
-        when_any_options_auto_cancel);
+        when_any_options::auto_cancel);
 
     promises[0].set_value({});
 
