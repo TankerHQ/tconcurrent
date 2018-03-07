@@ -8,7 +8,8 @@ tanker/stable:
     - python3 -m pipenv run conan user --clean tanker
     - python3 -m pipenv run conan user --remote godzilla --password ${CONAN_GODZILLA_TANKER_PASSWORD} tanker
     - python3 -m pipenv run conan export . tanker/stable
-    - python3 -m pipenv run conan upload "tconcurrent/${CI_COMMIT_TAG}@tanker/stable" --remote godzilla
+      # get the reference of the current package
+    - python3 -m pipenv run conan upload $(python3 -m pipenv run conan info . 2> /dev/null | head -n 1) --remote godzilla
   only:
     - tags
   when: manual
