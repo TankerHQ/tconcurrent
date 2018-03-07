@@ -33,6 +33,7 @@ target_link_libraries(tconcurrent PUBLIC
   Boost::thread
   Boost::context
   CONAN_PKG::libcurl
+  CONAN_PKG::enum-flags
 )
 
 target_compile_definitions(tconcurrent PRIVATE

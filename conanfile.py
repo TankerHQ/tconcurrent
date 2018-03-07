@@ -16,6 +16,7 @@ class TconcurrentConan(ConanFile):
     def requirements(self):
         self.requires("Boost/1.66.0@%s/%s" % (self.user, self.channel))
         self.requires("libcurl/7.53.0@%s/%s" % (self.user, self.channel))
+        self.requires("enum-flags/6df748a@%s/%s" % (self.user, self.channel))
 
     def build_requirements(self):
         self.build_requires("doctest/1.2.6@%s/%s" % (self.user, self.channel))

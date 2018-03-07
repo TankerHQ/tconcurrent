@@ -65,3 +65,103 @@ TEST_CASE("when_all should propagate cancel")
     return prom.get_cancelation_token().is_cancel_requested();
   }));
 }
+
+TEST_CASE("when_any on empty vector should return a ready future")
+{
+  std::vector<future<int>> futures;
+  auto any = when_any(
+      std::make_move_iterator(futures.begin()),
+      std::make_move_iterator(futures.end()));
+  CHECK(any.is_ready());
+  auto result = any.get();
+  CHECK(size_t(-1) == result.index);
+  CHECK(0 == result.futures.size());
+}
+
+TEST_CASE("when_any")
+{
+  auto const NB_FUTURES = 10;
+
+  std::vector<promise<void>> promises(NB_FUTURES);
+  std::vector<future<void>> futures;
+  for (auto const& prom : promises)
+    futures.push_back(prom.get_future());
+
+  SUBCASE("should propagate cancel")
+  {
+    auto any = when_any(
+        std::make_move_iterator(futures.begin()),
+        std::make_move_iterator(futures.end()));
+    any.request_cancel();
+
+    CHECK(std::all_of(promises.begin(), promises.end(), [](auto& prom) {
+      return prom.get_cancelation_token().is_cancel_requested();
+    }));
+  }
+
+  SUBCASE("should get ready when one future is ready")
+  {
+    auto any = when_any(
+        std::make_move_iterator(futures.begin()),
+        std::make_move_iterator(futures.end()));
+    CHECK(!any.is_ready());
+
+    promises[NB_FUTURES / 2].set_value({});
+
+    CHECK(any.is_ready());
+
+    auto result = any.get();
+    CHECK(futures.size() == result.futures.size());
+    CHECK(result.index == NB_FUTURES / 2);
+    // check that only one future is ready
+    for (size_t i = 0; i < NB_FUTURES; ++i)
+      if (i == NB_FUTURES / 2)
+        CHECK(result.futures[i].is_ready());
+      else
+        CHECK(!result.futures[i].is_ready());
+  }
+
+  SUBCASE("should return a ready future if one future is already ready")
+  {
+    promises[NB_FUTURES / 2].set_value({});
+
+    auto any = when_any(
+        std::make_move_iterator(futures.begin()),
+        std::make_move_iterator(futures.end()));
+    CHECK(any.is_ready());
+  }
+
+  SUBCASE("should work if multiple futures get ready")
+  {
+    auto const NB_FUTURES = 10;
+
+    std::vector<promise<void>> promises(NB_FUTURES);
+    std::vector<future<void>> futures;
+    for (auto const& prom : promises)
+      futures.push_back(prom.get_future());
+
+    auto any = when_any(
+        std::make_move_iterator(futures.begin()),
+        std::make_move_iterator(futures.end()));
+    CHECK(!any.is_ready());
+
+    promises[1].set_value({});
+    promises[2].set_value({});
+
+    CHECK(any.is_ready());
+  }
+
+  SUBCASE("should cancel all other futures when a future gets ready")
+  {
+    auto any = when_any(
+        std::make_move_iterator(futures.begin()),
+        std::make_move_iterator(futures.end()),
+        when_any_options::auto_cancel);
+
+    promises[0].set_value({});
+
+    CHECK(std::all_of(++promises.begin(), promises.end(), [](auto&& p) {
+      return p.get_cancelation_token().is_cancel_requested();
+    }));
+  }
+}
