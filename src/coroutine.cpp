@@ -31,6 +31,18 @@ thread_local void* thread_stack;
 thread_local size_t thread_stacksize;
 }
 
+#ifdef __APPLE__
+stack_bounds get_stack_bounds()
+{
+  if (!thread_stack)
+  {
+    pthread_t self = pthread_self();
+    thread_stack = pthread_get_stackaddr_np(self);
+    thread_stacksize = pthread_get_stacksize_np(self);
+  }
+  return {thread_stack, thread_stacksize};
+}
+#elif __linux__
 stack_bounds get_stack_bounds()
 {
   if (!thread_stack)
@@ -46,6 +58,7 @@ stack_bounds get_stack_bounds()
   }
   return {thread_stack, thread_stacksize};
 }
+#endif
 #endif
 
 }

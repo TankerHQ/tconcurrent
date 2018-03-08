@@ -5,13 +5,19 @@ import os
 
 class TconcurrentConan(ConanFile):
     name = "tconcurrent"
-    version = "0.6"
+    version = "0.7"
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False], "fPIC": [True, False]}
-    default_options = "shared=False", "fPIC=True"
+    options = {"shared": [True, False], "fPIC": [True, False], "sanitizer": ["address", None]}
+    default_options = "shared=False", "fPIC=True", "sanitizer=None"
     repo_url = "ssh://git@10.100.0.1/Tanker/tconcurrent"
     generators = "cmake"
     exports_sources = "CMakeLists.txt", "include/*", "src/*", "test/*"
+
+    @property
+    def sanitizer_flag(self):
+        if self.options.sanitizer:
+            return "-fsanitize=%s" % self.options.sanitizer
+        return None
 
     def requirements(self):
         self.requires("Boost/1.66.0@%s/%s" % (self.user, self.channel))
@@ -38,6 +44,9 @@ class TconcurrentConan(ConanFile):
 
     def build(self):
         cmake = CMake(self)
+        cmake.verbose=True
+        if self.options.sanitizer:
+            cmake.definitions["CONAN_CXX_FLAGS"] = self.sanitizer_flag
         if self.options.shared:
             cmake.definitions["BUILD_SHARED_LIBS"] = "ON"
         if self.options.fPIC:
@@ -48,3 +57,6 @@ class TconcurrentConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["tconcurrent"]
+        if self.options.sanitizer:
+            self.cpp_info.exelinkflags = [self.sanitizer_flag]
+            self.cpp_info.sharedlinkflags = [self.sanitizer_flag]
