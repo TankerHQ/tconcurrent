@@ -5,7 +5,7 @@ import os
 
 class TconcurrentConan(ConanFile):
     name = "tconcurrent"
-    version = "0.8"
+    version = "0.8-r1"
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False], "sanitizer": ["address", None]}
     default_options = "shared=False", "fPIC=True", "sanitizer=None"
