@@ -5,7 +5,7 @@ import os
 
 class TconcurrentConan(ConanFile):
     name = "tconcurrent"
-    version = "0.8-r1"
+    version = "0.8-r2"
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False], "sanitizer": ["address", None]}
     default_options = "shared=False", "fPIC=True", "sanitizer=None"
@@ -20,7 +20,7 @@ class TconcurrentConan(ConanFile):
         return None
 
     def requirements(self):
-        self.requires("Boost/1.66.0@%s/%s" % (self.user, self.channel))
+        self.requires("Boost/1.66.0-r3@%s/%s" % (self.user, self.channel))
         self.requires("libcurl/7.50.3@%s/%s" % (self.user, self.channel))
         self.requires("enum-flags/6df748a@%s/%s" % (self.user, self.channel))
 
