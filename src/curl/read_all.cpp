@@ -2,8 +2,8 @@
 
 #include <boost/algorithm/string.hpp>
 
-#include <tconcurrent/promise.hpp>
 #include <tconcurrent/async.hpp>
+#include <tconcurrent/promise.hpp>
 
 namespace tconcurrent
 {
@@ -115,6 +115,5 @@ future<read_all_result> read_all(multi& multi, std::shared_ptr<request> req)
 
   return fut;
 }
-
 }
 }

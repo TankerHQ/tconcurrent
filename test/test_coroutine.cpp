@@ -1,7 +1,7 @@
 #include <doctest.h>
 
-#include <tconcurrent/coroutine.hpp>
 #include <tconcurrent/async_wait.hpp>
+#include <tconcurrent/coroutine.hpp>
 #include <tconcurrent/promise.hpp>
 #include <tconcurrent/thread_pool.hpp>
 
@@ -163,7 +163,8 @@ TEST_CASE("coroutine cancel propagation")
     CHECK(prom.get_cancelation_token().is_cancel_requested());
     CHECK(f.is_ready());
     CHECK(1 == called);
-  }).get();
+  })
+      .get();
   prom.set_value({});
   CHECK_THROWS_AS(f.get(), operation_canceled);
 }

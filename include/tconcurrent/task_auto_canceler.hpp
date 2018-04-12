@@ -1,8 +1,8 @@
 #ifndef TCONCURRENT_TASK_AUTO_CANCELER_HPP
 #define TCONCURRENT_TASK_AUTO_CANCELER_HPP
 
-#include <vector>
 #include <cassert>
+#include <vector>
 
 #include <tconcurrent/future.hpp>
 #include <tconcurrent/when.hpp>
@@ -17,9 +17,8 @@ public:
     auto const fut = terminate();
     if (!fut.is_ready())
     {
-      assert(
-          false &&
-          "destructing a task_auto_canceler that could not be canceled");
+      assert(false &&
+             "destructing a task_auto_canceler that could not be canceled");
       return;
     }
   }

@@ -1,17 +1,17 @@
 #ifndef TCONCURRENT_DETAIL_SHARED_BASE_HPP
 #define TCONCURRENT_DETAIL_SHARED_BASE_HPP
 
-#include <stdexcept>
-#include <mutex>
 #include <condition_variable>
-#include <vector>
 #include <functional>
+#include <mutex>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 #include <boost/variant.hpp>
 
-#include <tconcurrent/thread_pool.hpp>
 #include <tconcurrent/cancelation_token.hpp>
+#include <tconcurrent/thread_pool.hpp>
 
 namespace tconcurrent
 {
@@ -19,7 +19,8 @@ namespace tconcurrent
 struct broken_promise : std::runtime_error
 {
   broken_promise() : runtime_error("promise is broken")
-  {}
+  {
+  }
 };
 
 struct tvoid
@@ -80,7 +81,7 @@ public:
     finish();
   }
 
-  decltype(auto) operator->() const
+  decltype(auto) operator-> () const
   {
     return _ptr.operator->();
   }
@@ -112,9 +113,17 @@ template <typename R>
 class shared_base
 {
 public:
-  struct v_none {};
-  struct v_value { R value; };
-  struct v_exception { std::exception_ptr exc; };
+  struct v_none
+  {
+  };
+  struct v_value
+  {
+    R value;
+  };
+  struct v_exception
+  {
+    std::exception_ptr exc;
+  };
 
   boost::variant<v_none, v_value, v_exception> _r;
 
@@ -123,8 +132,8 @@ public:
   }
 
   shared_base(cancelation_token_ptr token = nullptr)
-    : _cancelation_token(token ? std::move(token) :
-                                 std::make_shared<cancelation_token>())
+    : _cancelation_token(token ? std::move(token)
+                               : std::make_shared<cancelation_token>())
   {
   }
 
@@ -157,7 +166,7 @@ public:
       std::lock_guard<std::mutex> lock{_mutex};
       if (_r.which() == 0)
         _then.emplace_back(
-            [ name = std::move(name), &e, f = std::forward<F>(f) ]() mutable {
+            [name = std::move(name), &e, f = std::forward<F>(f)]() mutable {
               e.post(std::move(f), std::move(name));
             });
       else
@@ -171,9 +180,8 @@ public:
   template <typename Rcv>
   Rcv get()
   {
-    static_assert(
-        std::is_same<R, std::decay_t<Rcv>>::value,
-        "Rcv must be a R or R const&");
+    static_assert(std::is_same<R, std::decay_t<Rcv>>::value,
+                  "Rcv must be a R or R const&");
 
     std::unique_lock<std::mutex> lock{_mutex};
     while (_r.which() == 0)
@@ -197,14 +205,14 @@ public:
   void wait() const
   {
     std::unique_lock<std::mutex> lock{_mutex};
-    _ready.wait(lock, [&]{ return _r.which() != 0; });
+    _ready.wait(lock, [&] { return _r.which() != 0; });
   }
 
   template <class Rep, class Period>
   void wait_for(std::chrono::duration<Rep, Period> const& dur) const
   {
     std::unique_lock<std::mutex> lock{_mutex};
-    _ready.wait_for(lock, dur, [&]{ return _r.which() != 0; });
+    _ready.wait_for(lock, dur, [&] { return _r.which() != 0; });
   }
 
   std::shared_ptr<cancelation_token> reset_cancelation_token()
@@ -282,7 +290,6 @@ struct shared_base_type_<void>
 
 template <typename T>
 using shared_base_type = typename shared_base_type_<T>::type;
-
 }
 }
 

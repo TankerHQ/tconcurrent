@@ -1,9 +1,9 @@
 #include <doctest.h>
 
-#include <tconcurrent/curl/curl.hpp>
-#include <tconcurrent/promise.hpp>
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/async_wait.hpp>
+#include <tconcurrent/curl/curl.hpp>
+#include <tconcurrent/promise.hpp>
 
 using namespace tconcurrent;
 using namespace tconcurrent::curl;

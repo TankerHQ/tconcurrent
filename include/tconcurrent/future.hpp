@@ -1,9 +1,9 @@
 #ifndef TCONCURRENT_FUTURE_HPP
 #define TCONCURRENT_FUTURE_HPP
 
-#include <utility>
-#include <tconcurrent/detail/util.hpp>
 #include <tconcurrent/detail/shared_base.hpp>
+#include <tconcurrent/detail/util.hpp>
+#include <utility>
 
 namespace tconcurrent
 {
@@ -40,7 +40,6 @@ struct future_value_type<void>
 {
   using type = tvoid;
 };
-
 }
 
 template <typename T>
@@ -57,10 +56,9 @@ struct future_unwrap
 {
 };
 
-template <
-    template <typename> class Fut1,
-    template <typename> class Fut2,
-    typename R>
+template <template <typename> class Fut1,
+          template <typename> class Fut2,
+          typename R>
 struct future_unwrap<Fut1<Fut2<R>>>
 {
   /** Unwrap a nested future
@@ -107,34 +105,32 @@ public:
   auto then(E&& e, Func&& func)
       -> future<std::decay_t<std::result_of_t<Func(this_type&&)>>>
   {
-    return then_impl(std::forward<E>(e), [
-      p = _p,
-      token = _cancelation_token,
-      chain_name = _chain_name,
-      func = std::forward<Func>(func)
-    ]() mutable {
-      this_type fut(p);
-      fut._cancelation_token = token;
-      fut._chain_name = chain_name;
-      return func(std::move(fut));
-    });
+    return then_impl(std::forward<E>(e),
+                     [p = _p,
+                      token = _cancelation_token,
+                      chain_name = _chain_name,
+                      func = std::forward<Func>(func)]() mutable {
+                       this_type fut(p);
+                       fut._cancelation_token = token;
+                       fut._chain_name = chain_name;
+                       return func(std::move(fut));
+                     });
   }
 
   template <typename E, typename Func>
   auto then(E&& e, Func&& func) -> future<
       std::decay_t<std::result_of_t<Func(cancelation_token&, this_type&&)>>>
   {
-    return then_impl(std::forward<E>(e), [
-      p = _p,
-      token = _cancelation_token,
-      chain_name = _chain_name,
-      func = std::forward<Func>(func)
-    ]() mutable {
-      this_type fut(p);
-      fut._cancelation_token = token;
-      fut._chain_name = chain_name;
-      return func(*token, std::move(fut));
-    });
+    return then_impl(std::forward<E>(e),
+                     [p = _p,
+                      token = _cancelation_token,
+                      chain_name = _chain_name,
+                      func = std::forward<Func>(func)]() mutable {
+                       this_type fut(p);
+                       fut._cancelation_token = token;
+                       fut._chain_name = chain_name;
+                       return func(*token, std::move(fut));
+                     });
   }
 
   template <typename Func>
@@ -168,29 +164,27 @@ public:
   auto and_then(E&& e, Func&& func)
       -> future<std::decay_t<std::result_of_t<Func(get_type)>>>
   {
-    return then_impl(std::forward<E>(e), [
-      p = _p,
-      token = _cancelation_token,
-      func = std::forward<Func>(func)
-    ]() mutable {
-      return do_and_then_callback(*p, token.get(), [&] {
-        return func(p->template get<get_type>());
-      });
-    });
+    return then_impl(std::forward<E>(e),
+                     [p = _p,
+                      token = _cancelation_token,
+                      func = std::forward<Func>(func)]() mutable {
+                       return do_and_then_callback(*p, token.get(), [&] {
+                         return func(p->template get<get_type>());
+                       });
+                     });
   }
   template <typename E, typename Func>
   auto and_then(E&& e, Func&& func) -> future<
       std::decay_t<std::result_of_t<Func(cancelation_token&, get_type)>>>
   {
-    return then_impl(std::forward<E>(e), [
-      p = _p,
-      token = _cancelation_token,
-      func = std::forward<Func>(func)
-    ]() mutable {
-      return do_and_then_callback(*p, token.get(), [&] {
-        return func(*token, p->template get<get_type>());
-      });
-    });
+    return then_impl(std::forward<E>(e),
+                     [p = _p,
+                      token = _cancelation_token,
+                      func = std::forward<Func>(func)]() mutable {
+                       return do_and_then_callback(*p, token.get(), [&] {
+                         return func(*token, p->template get<get_type>());
+                       });
+                     });
   }
 
   /// Get a future equivalent to this one but discarding the result value
@@ -332,10 +326,9 @@ protected:
   {
   }
 
-  future_base(
-      shared_pointer p,
-      cancelation_token_ptr cancelation_token,
-      std::string chain_name)
+  future_base(shared_pointer p,
+              cancelation_token_ptr cancelation_token,
+              std::string chain_name)
     : _p(std::move(p))
     , _cancelation_token(std::move(cancelation_token))
     , _chain_name(std::move(chain_name))
@@ -356,10 +349,9 @@ private:
 
     auto pack =
         package<result_type()>(std::forward<Func>(func), _cancelation_token);
-    _p->then(
-        _chain_name + " (" + typeid(Func).name() + ")",
-        std::forward<E>(e),
-        std::move(pack.first));
+    _p->then(_chain_name + " (" + typeid(Func).name() + ")",
+             std::forward<E>(e),
+             std::move(pack.first));
     pack.second._chain_name = _chain_name;
     return std::move(pack.second);
   }
@@ -386,7 +378,6 @@ private:
     }
   }
 };
-
 }
 
 template <typename R>
@@ -420,8 +411,8 @@ public:
   shared_future(future<R>&& fut);
 
 private:
-  using typename base_type::shared_type;
   using typename base_type::shared_pointer;
+  using typename base_type::shared_type;
 
   template <template <typename> class, typename, bool>
   friend class detail::future_base;
@@ -466,8 +457,8 @@ public:
   }
 
 private:
-  using typename base_type::shared_type;
   using typename base_type::shared_pointer;
+  using typename base_type::shared_type;
 
   template <template <typename> class, typename, bool>
   friend class detail::future_base;
@@ -477,8 +468,9 @@ private:
   template <typename T>
   friend struct detail::future_unwrap;
   template <typename S, typename F>
-  friend auto detail::package(
-      F&& f, cancelation_token_ptr token, bool cancelable)
+  friend auto detail::package(F&& f,
+                              cancelation_token_ptr token,
+                              bool cancelable)
       -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
   template <typename T>
   friend class promise;
@@ -496,52 +488,48 @@ private:
 
 template <typename R>
 shared_future<R>::shared_future(future<R>&& fut)
-  : base_type(
-        std::move(fut._p),
-        std::move(fut._cancelation_token),
-        std::move(fut._chain_name))
+  : base_type(std::move(fut._p),
+              std::move(fut._cancelation_token),
+              std::move(fut._chain_name))
 {
 }
 
 template <template <typename> class F, typename R, bool Ref>
 tc::future<void> detail::future_base<F, R, Ref>::to_void()
 {
-  return and_then(get_synchronous_executor(), [](value_type const&){});
+  return and_then(get_synchronous_executor(), [](value_type const&) {});
 }
 
-template <
-    template <typename> class Fut1,
-    template <typename> class Fut2,
-    typename R>
+template <template <typename> class Fut1,
+          template <typename> class Fut2,
+          typename R>
 Fut2<R> detail::future_unwrap<Fut1<Fut2<R>>>::unwrap()
 {
   auto& fut1 = static_cast<future<future<R>>&>(*this);
   auto sb = std::make_shared<typename future<R>::shared_type>(
       fut1._cancelation_token);
-  fut1.then(get_synchronous_executor(),
-           [sb](Fut1<Fut2<R>> fut1) {
-             if (fut1.has_exception())
-               sb->set_exception(fut1.get_exception());
-             else
-             {
-               auto fut2 = fut1.get();
-               cancelation_token_ptr token;
-               if (sb->get_cancelation_token() != fut2._cancelation_token)
-               {
-                 token = sb->get_cancelation_token();
-                 token->push_cancelation_callback(fut2.make_canceler());
-               }
-               fut2.then(get_synchronous_executor(),
-                           [sb, token](Fut2<R> fut2) {
-                             if (token)
-                               token->pop_cancelation_callback();
-                             if (fut2.has_exception())
-                               sb->set_exception(fut2.get_exception());
-                             else
-                               sb->set(fut2.get());
-                           });
-             }
-           });
+  fut1.then(get_synchronous_executor(), [sb](Fut1<Fut2<R>> fut1) {
+    if (fut1.has_exception())
+      sb->set_exception(fut1.get_exception());
+    else
+    {
+      auto fut2 = fut1.get();
+      cancelation_token_ptr token;
+      if (sb->get_cancelation_token() != fut2._cancelation_token)
+      {
+        token = sb->get_cancelation_token();
+        token->push_cancelation_callback(fut2.make_canceler());
+      }
+      fut2.then(get_synchronous_executor(), [sb, token](Fut2<R> fut2) {
+        if (token)
+          token->pop_cancelation_callback();
+        if (fut2.has_exception())
+          sb->set_exception(fut2.get_exception());
+        else
+          sb->set(fut2.get());
+      });
+    }
+  });
 
   auto ret = Fut2<R>(sb);
   ret._chain_name = fut1._chain_name;
@@ -588,7 +576,6 @@ auto make_exceptional_future(E&& err) -> future<T>
   fut._cancelation_token = std::make_shared<cancelation_token>();
   return fut;
 }
-
 }
 
 #include <tconcurrent/packaged_task.hpp>

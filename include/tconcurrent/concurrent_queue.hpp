@@ -1,10 +1,10 @@
 #ifndef TCONCURRENT_CHANNEL_HPP
 #define TCONCURRENT_CHANNEL_HPP
 
-#include <queue>
-#include <mutex>
-#include <vector>
 #include <cassert>
+#include <mutex>
+#include <queue>
+#include <vector>
 
 #include <tconcurrent/promise.hpp>
 
@@ -60,7 +60,6 @@ private:
   std::queue<promise<T>> _waiters;
   std::queue<T> _queue;
 };
-
 }
 
 #endif

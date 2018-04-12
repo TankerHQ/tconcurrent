@@ -19,7 +19,6 @@ struct result_of_<R(Args...)>
 
 template <typename F>
 using result_of_t_ = typename result_of_<F>::type;
-
 }
 }
 

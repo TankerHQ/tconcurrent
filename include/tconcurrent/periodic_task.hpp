@@ -12,7 +12,7 @@
 #ifdef _MSC_VER
 #pragma warning(push)
 // remove dll-interface warning
-#pragma warning(disable:4251)
+#pragma warning(disable : 4251)
 #endif
 
 namespace tconcurrent
@@ -95,7 +95,6 @@ private:
   void reschedule();
   future<void> do_call(cancelation_token& token);
 };
-
 }
 
 #ifdef _MSC_VER

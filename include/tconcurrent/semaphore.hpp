@@ -1,8 +1,8 @@
 #ifndef TCONCURRENT_SEMAPHORE_HPP
 #define TCONCURRENT_SEMAPHORE_HPP
 
-#include <tconcurrent/future.hpp>
 #include <tconcurrent/concurrent_queue.hpp>
+#include <tconcurrent/future.hpp>
 
 namespace tconcurrent
 {
@@ -15,8 +15,7 @@ public:
   public:
     scope_lock(scope_lock const& r) = delete;
     scope_lock& operator=(scope_lock const& r) = delete;
-    scope_lock(scope_lock&& r)
-      : s(std::exchange(r.s, nullptr))
+    scope_lock(scope_lock&& r) : s(std::exchange(r.s, nullptr))
     {
     }
     scope_lock& operator=(scope_lock&& r)
@@ -38,8 +37,7 @@ public:
   private:
     semaphore* s;
 
-    scope_lock(semaphore* s)
-      : s(s)
+    scope_lock(semaphore* s) : s(s)
     {
     }
 
@@ -59,7 +57,8 @@ public:
 
   future<void> acquire()
   {
-    return _queue.pop().and_then(get_synchronous_executor(), [](auto const&){});
+    return _queue.pop().and_then(get_synchronous_executor(),
+                                 [](auto const&) {});
   }
 
   future<scope_lock> get_scope_lock()
@@ -75,11 +74,12 @@ public:
   }
 
 private:
-  struct token {};
+  struct token
+  {
+  };
 
   concurrent_queue<token> _queue;
 };
-
 }
 
 #endif

@@ -23,7 +23,7 @@ TEST_CASE("test thread_pool run work")
 
   thread_pool tp;
   tp.start(1);
-  tp.post([&]{ called = true; });
+  tp.post([&] { called = true; });
   tp.stop();
   CHECK(called);
 }
@@ -39,7 +39,7 @@ TEST_CASE("test thread_pool error work")
   });
 
   tp.start(1);
-  tp.post([&]{ throw 18; });
+  tp.post([&] { throw 18; });
   tp.stop();
   CHECK(called);
 }
@@ -59,7 +59,7 @@ TEST_CASE("test thread_pool task trace [waiting]")
       });
 
   tp.start(1);
-  tp.post([]{ std::this_thread::sleep_for(WaitTime); }, TaskName);
+  tp.post([] { std::this_thread::sleep_for(WaitTime); }, TaskName);
   tp.stop();
   CHECK(called);
 }

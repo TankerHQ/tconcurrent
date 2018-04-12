@@ -23,7 +23,7 @@ TEST_CASE("test periodic task [waiting]")
   unsigned int called = 0;
 
   periodic_task pt;
-  pt.set_callback([&]{ ++called; });
+  pt.set_callback([&] { ++called; });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
   CHECK(pt.is_running());
@@ -58,7 +58,7 @@ TEST_CASE("test periodic task immediate [waiting]")
   unsigned int called = 0;
 
   periodic_task pt;
-  pt.set_callback([&]{ ++called; });
+  pt.set_callback([&] { ++called; });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start(periodic_task::start_immediately);
   async_wait(std::chrono::milliseconds(50)).get();
@@ -109,7 +109,10 @@ TEST_CASE("test periodic task error stop [waiting]")
 
   periodic_task pt;
   pt.set_executor(&tp);
-  pt.set_callback([&]{ ++called; throw 18; });
+  pt.set_callback([&] {
+    ++called;
+    throw 18;
+  });
   pt.set_period(std::chrono::milliseconds(0));
   pt.start(periodic_task::start_immediately);
   async_wait(std::chrono::milliseconds(50)).get();
@@ -135,11 +138,10 @@ TEST_CASE("test periodic task future error stop [waiting]")
 
   periodic_task pt;
   pt.set_executor(&tp);
-  pt.set_callback([&]
-                  {
-                    ++called;
-                    return make_exceptional_future<void>(18);
-                  });
+  pt.set_callback([&] {
+    ++called;
+    return make_exceptional_future<void>(18);
+  });
   pt.set_period(std::chrono::milliseconds(1));
   pt.start();
   CHECK(pt.is_running());
@@ -155,7 +157,7 @@ TEST_CASE("test periodic task stop before start")
   unsigned int called = 0;
 
   periodic_task pt;
-  pt.set_callback([&]{ ++called; });
+  pt.set_callback([&] { ++called; });
   pt.set_period(std::chrono::milliseconds(100));
   pt.start();
   CHECK(pt.is_running());
@@ -170,8 +172,7 @@ void test_periodic_task_start_stop_spam(C&& cb)
   periodic_task pt;
   pt.set_callback(std::forward<C>(cb));
   pt.set_period(std::chrono::milliseconds(10));
-  auto do_start_stop = [&]
-  {
+  auto do_start_stop = [&] {
     for (unsigned int i = 0; i < 1000; ++i)
     {
       try
@@ -200,15 +201,13 @@ TEST_CASE("test periodic task start stop spam [waiting]")
   std::atomic<bool> call{false};
   std::atomic<bool> fail{false};
 
-  test_periodic_task_start_stop_spam(
-      [&]
-      {
-        if (call.exchange(true))
-          fail = true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        if (!call.exchange(false))
-          fail = true;
-      });
+  test_periodic_task_start_stop_spam([&] {
+    if (call.exchange(true))
+      fail = true;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    if (!call.exchange(false))
+      fail = true;
+  });
 
   CHECK(false == fail.load());
   CHECK(false == call.load());
@@ -220,17 +219,15 @@ TEST_CASE("test periodic task future start stop spam [waiting]")
   std::atomic<bool> call{false};
   std::atomic<bool> fail{false};
 
-  test_periodic_task_start_stop_spam(
-      [&]
-      {
-        if (call.exchange(true))
-          fail = true;
-        return async_wait(std::chrono::milliseconds(1))
-            .then([&](future<void> const&) {
-              if (!call.exchange(false))
-                fail = true;
-            });
-      });
+  test_periodic_task_start_stop_spam([&] {
+    if (call.exchange(true))
+      fail = true;
+    return async_wait(std::chrono::milliseconds(1))
+        .then([&](future<void> const&) {
+          if (!call.exchange(false))
+            fail = true;
+        });
+  });
 
   CHECK(false == fail.load());
   CHECK(false == call.load());
@@ -241,7 +238,10 @@ TEST_CASE("test periodic task stop from inside [waiting]")
   unsigned int called = 0;
 
   periodic_task pt;
-  pt.set_callback([&]{ ++called; pt.stop(); });
+  pt.set_callback([&] {
+    ++called;
+    pt.stop();
+  });
   pt.set_period(std::chrono::milliseconds(0));
   pt.start(periodic_task::start_immediately);
   async_wait(std::chrono::milliseconds(10)).get();
@@ -257,10 +257,10 @@ TEST_CASE("test periodic single threaded task stop")
 
   periodic_task pt;
   pt.set_executor(&tp);
-  pt.set_callback([&]{ ++called; });
+  pt.set_callback([&] { ++called; });
   pt.set_period(std::chrono::milliseconds(0));
   pt.start(periodic_task::start_immediately);
-  CHECK_NOTHROW(async(tp, [&]{ pt.stop().get(); }).get());
+  CHECK_NOTHROW(async(tp, [&] { pt.stop().get(); }).get());
   CHECK(!pt.is_running());
   CHECK(0 < called);
 }
@@ -270,7 +270,7 @@ TEST_CASE("test periodic task cancel [waiting]")
   promise<void> prom;
 
   periodic_task pt;
-  pt.set_callback([&]{ return prom.get_future(); });
+  pt.set_callback([&] { return prom.get_future(); });
   pt.set_period(std::chrono::milliseconds(0));
   pt.start(periodic_task::start_immediately);
   CHECK(!prom.get_cancelation_token().is_cancel_requested());
@@ -301,4 +301,3 @@ TEST_CASE("test periodic task cancel no-propagation [waiting]")
   fut2.get();
   CHECK(1 == called);
 }
-

@@ -8,7 +8,7 @@ using namespace tconcurrent;
 TEST_CASE("async should run a task asynchronously")
 {
   bool hasrun = false;
-  auto fut = async([&]{ hasrun = true; });
+  auto fut = async([&] { hasrun = true; });
   CHECK_NOTHROW(fut.get());
   CHECK(hasrun);
 }

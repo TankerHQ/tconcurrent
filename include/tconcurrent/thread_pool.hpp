@@ -2,17 +2,17 @@
 #define TCONCURRENT_THREAD_POOL_H
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <thread>
-#include <functional>
 
-#include <tconcurrent/detail/export.hpp>
 #include <tconcurrent/detail/boost_fwd.hpp>
+#include <tconcurrent/detail/export.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(push)
 // remove dll-interface warning
-#pragma warning(disable:4251)
+#pragma warning(disable : 4251)
 #endif
 
 namespace tconcurrent
@@ -81,7 +81,6 @@ public:
 
 // FIXME do an abstraction so that executors can be passed by value
 TCONCURRENT_EXPORT synchronous_executor& get_synchronous_executor();
-
 }
 
 #ifdef _MSC_VER
