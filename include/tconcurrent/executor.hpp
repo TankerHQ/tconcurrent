@@ -50,6 +50,11 @@ public:
     return _p->signal_error(e);
   }
 
+  explicit operator bool() const
+  {
+    return !!_p;
+  }
+
 private:
   struct impl_base
   {

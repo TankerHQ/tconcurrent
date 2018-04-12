@@ -80,7 +80,7 @@ struct abort_coroutine
 
 struct abort_handler;
 
-using coroutine_controller = std::function<void(struct coroutine_control*)>;
+using coroutine_controller = std::function<void(class coroutine_control*)>;
 using coroutine_t = boost::context::execution_context<coroutine_controller>;
 
 enum class coroutine_status
@@ -326,15 +326,16 @@ using awaiter = detail::coroutine_control;
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
 {
-  using return_type =
+  using return_task_type =
       std::decay_t<decltype(cb(std::declval<detail::coroutine_control&>()))>;
+  using return_type = typename return_task_type::value_type;
 
   auto const fullName = name + " (" + typeid(F).name() + ")";
 
   auto token = std::make_shared<cancelation_token>();
   auto pack = package_cancelable<future<return_type>()>(
       [executor, cb = std::forward<F>(cb), fullName, token]() mutable {
-        auto pack = package<return_type(detail::coroutine_control&)>(
+        auto pack = package<return_task_type(detail::coroutine_control&)>(
             std::move(cb), token);
 
         detail::coroutine_control* cs = new detail::coroutine_control(
@@ -372,26 +373,16 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
 
         f(cs);
 
-        return pack.second.then(tc::get_synchronous_executor(),
-                                detail::abort_handler{cs});
+        return pack.second
+            .and_then(tc::get_synchronous_executor(),
+                      [](auto&& task) { return std::move(task).get(); })
+            .then(tc::get_synchronous_executor(), detail::abort_handler{cs});
       },
       token);
 
   executor.post(std::move(std::get<0>(pack)), fullName);
 
   return std::move(std::get<1>(pack)).update_chain_name(fullName).unwrap();
-}
-
-template <typename F>
-auto async_resumable(F&& cb)
-{
-  return async_resumable({}, get_default_executor(), std::forward<F>(cb));
-}
-
-template <typename F>
-auto async_resumable(std::string const& name, F&& cb)
-{
-  return async_resumable(name, get_default_executor(), std::forward<F>(cb));
 }
 
 inline awaiter& get_current_awaiter()
@@ -407,6 +398,86 @@ inline auto await(Awaitable&& awaitable)
 {
   return get_current_awaiter()(std::forward<Awaitable>(awaitable));
 }
+
+inline void yield()
+{
+  get_current_awaiter().yield();
 }
+
+namespace detail
+{
+template <typename T>
+struct cotask_value
+{
+  T val;
+};
+}
+
+template <typename T>
+class [[nodiscard]] cotask {
+public:
+  using value_type = T;
+
+  cotask(cotask const&) = delete;
+  cotask& operator=(cotask const&) = delete;
+  cotask(cotask &&) = default;
+  cotask& operator=(cotask&&) = default;
+
+  template <typename U>
+  cotask(detail::cotask_value<U> value) : _value(static_cast<U>(value.val))
+  {
+  }
+
+  decltype(auto) get()&&
+  {
+    return std::forward<T>(_value);
+  }
+
+private:
+  T _value;
+};
+
+template <>
+class [[nodiscard]] cotask<void> {
+public:
+  using value_type = void;
+
+  void get()&&
+  {
+  }
+};
+
+template <typename T>
+T&& await(cotask<T>&& task)
+{
+  return std::move(task).get();
+}
+
+inline void await(cotask<void>&&)
+{
+}
+
+namespace detail
+{
+template <typename T>
+auto wrap_task(T&& value)
+{
+  return detail::cotask_value<T&&>{std::forward<T>(value)};
+}
+
+inline cotask<void> wrap_task()
+{
+  return cotask<void>();
+}
+}
+}
+
+#define TC_AWAIT(future) tc::await(future)
+#define TC_YIELD() ::tc::yield()
+#define TC_RETURN(value)                   \
+  do                                       \
+  {                                        \
+    return ::tc::detail::wrap_task(value); \
+  } while (false)
 
 #endif
