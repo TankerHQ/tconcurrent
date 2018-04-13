@@ -2,8 +2,8 @@
 
 #include <boost/thread/tss.hpp>
 
-#include <tconcurrent/thread_pool.hpp>
 #include <tconcurrent/detail/util.hpp>
+#include <tconcurrent/thread_pool.hpp>
 
 #include <boost/asio/io_service.hpp>
 
@@ -39,15 +39,15 @@ thread_local void* current_executor;
 #define GET_THREAD_LOCAL(tl) tl
 #else
 void noopdelete(void*)
-{}
+{
+}
 boost::thread_specific_ptr<void> current_executor(noopdelete);
 #define SET_THREAD_LOCAL(tl, val) tl.reset(val)
 #define GET_THREAD_LOCAL(tl) tl.get()
 #endif
 }
 
-thread_pool::thread_pool()
-  : _p(new impl)
+thread_pool::thread_pool() : _p(new impl)
 {
 }
 
@@ -79,10 +79,7 @@ void thread_pool::start(unsigned int thread_count)
 
   _p->_work = std::make_unique<boost::asio::io_service::work>(_p->_io);
   for (unsigned int i = 0; i < thread_count; ++i)
-    _p->_threads.emplace_back(
-        [this]{
-          run_thread();
-        });
+    _p->_threads.emplace_back([this] { run_thread(); });
 }
 
 void thread_pool::run_thread()
@@ -114,7 +111,7 @@ void thread_pool::run_thread()
 void thread_pool::stop()
 {
   _p->_work = nullptr;
-  for (auto &th : _p->_threads)
+  for (auto& th : _p->_threads)
     th.join();
   _p->_threads.clear();
 }
@@ -143,7 +140,7 @@ void thread_pool::set_task_trace_handler(task_trace_handler_cb cb)
 void thread_pool::post(std::function<void()> work, std::string name)
 {
   assert(!_p->_dead.load());
-  _p->_io.post([ this, work = std::move(work), name = std::move(name) ] {
+  _p->_io.post([this, work = std::move(work), name = std::move(name)] {
     if (_p->_task_trace_handler)
     {
       auto const before = std::chrono::steady_clock::now();
@@ -201,5 +198,4 @@ synchronous_executor& get_synchronous_executor()
   static synchronous_executor e;
   return e;
 }
-
 }

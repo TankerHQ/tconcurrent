@@ -24,7 +24,6 @@ inline future<void> async_wait(std::chrono::steady_clock::duration delay)
 {
   return async_wait(get_default_executor(), delay);
 }
-
 }
 
 #endif

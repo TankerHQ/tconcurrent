@@ -18,9 +18,8 @@ TEST_CASE("test when_all")
     if (i % 2)
       promises[i].set_value({});
 
-  auto all = when_all(
-      std::make_move_iterator(futures.begin()),
-      std::make_move_iterator(futures.end()));
+  auto all = when_all(std::make_move_iterator(futures.begin()),
+                      std::make_move_iterator(futures.end()));
   CHECK(!all.is_ready());
 
   // set all other futures as ready
@@ -39,9 +38,8 @@ TEST_CASE("test when_all")
 TEST_CASE("when_all on empty vector should return a ready future")
 {
   std::vector<future<int>> futures;
-  auto all = when_all(
-      std::make_move_iterator(futures.begin()),
-      std::make_move_iterator(futures.end()));
+  auto all = when_all(std::make_move_iterator(futures.begin()),
+                      std::make_move_iterator(futures.end()));
   CHECK(all.is_ready());
   auto futs = all.get();
   CHECK(0 == futs.size());
@@ -56,9 +54,8 @@ TEST_CASE("when_all should propagate cancel")
   for (auto const& prom : promises)
     futures.push_back(prom.get_future());
 
-  auto all = when_all(
-      std::make_move_iterator(futures.begin()),
-      std::make_move_iterator(futures.end()));
+  auto all = when_all(std::make_move_iterator(futures.begin()),
+                      std::make_move_iterator(futures.end()));
   all.request_cancel();
 
   CHECK(std::all_of(promises.begin(), promises.end(), [](auto& prom) {
@@ -69,9 +66,8 @@ TEST_CASE("when_all should propagate cancel")
 TEST_CASE("when_any on empty vector should return a ready future")
 {
   std::vector<future<int>> futures;
-  auto any = when_any(
-      std::make_move_iterator(futures.begin()),
-      std::make_move_iterator(futures.end()));
+  auto any = when_any(std::make_move_iterator(futures.begin()),
+                      std::make_move_iterator(futures.end()));
   CHECK(any.is_ready());
   auto result = any.get();
   CHECK(size_t(-1) == result.index);
@@ -89,9 +85,8 @@ TEST_CASE("when_any")
 
   SUBCASE("should propagate cancel")
   {
-    auto any = when_any(
-        std::make_move_iterator(futures.begin()),
-        std::make_move_iterator(futures.end()));
+    auto any = when_any(std::make_move_iterator(futures.begin()),
+                        std::make_move_iterator(futures.end()));
     any.request_cancel();
 
     CHECK(std::all_of(promises.begin(), promises.end(), [](auto& prom) {
@@ -101,9 +96,8 @@ TEST_CASE("when_any")
 
   SUBCASE("should get ready when one future is ready")
   {
-    auto any = when_any(
-        std::make_move_iterator(futures.begin()),
-        std::make_move_iterator(futures.end()));
+    auto any = when_any(std::make_move_iterator(futures.begin()),
+                        std::make_move_iterator(futures.end()));
     CHECK(!any.is_ready());
 
     promises[NB_FUTURES / 2].set_value({});
@@ -125,9 +119,8 @@ TEST_CASE("when_any")
   {
     promises[NB_FUTURES / 2].set_value({});
 
-    auto any = when_any(
-        std::make_move_iterator(futures.begin()),
-        std::make_move_iterator(futures.end()));
+    auto any = when_any(std::make_move_iterator(futures.begin()),
+                        std::make_move_iterator(futures.end()));
     CHECK(any.is_ready());
   }
 
@@ -140,9 +133,8 @@ TEST_CASE("when_any")
     for (auto const& prom : promises)
       futures.push_back(prom.get_future());
 
-    auto any = when_any(
-        std::make_move_iterator(futures.begin()),
-        std::make_move_iterator(futures.end()));
+    auto any = when_any(std::make_move_iterator(futures.begin()),
+                        std::make_move_iterator(futures.end()));
     CHECK(!any.is_ready());
 
     promises[1].set_value({});
@@ -153,10 +145,9 @@ TEST_CASE("when_any")
 
   SUBCASE("should cancel all other futures when a future gets ready")
   {
-    auto any = when_any(
-        std::make_move_iterator(futures.begin()),
-        std::make_move_iterator(futures.end()),
-        when_any_options::auto_cancel);
+    auto any = when_any(std::make_move_iterator(futures.begin()),
+                        std::make_move_iterator(futures.end()),
+                        when_any_options::auto_cancel);
 
     promises[0].set_value({});
 

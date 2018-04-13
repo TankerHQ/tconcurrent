@@ -54,7 +54,6 @@ private:
 
   detail::promise_ptr<shared_type> _p;
 };
-
 }
 
 #endif

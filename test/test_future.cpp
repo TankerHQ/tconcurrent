@@ -109,7 +109,7 @@ TEST_CASE("ready future should not have a cancel requested")
 TEST_CASE("then should work on a ready future")
 {
   auto fut = make_ready_future(21);
-  auto fut2 = fut.then([](future<int> val){ return long(val.get()*2); });
+  auto fut2 = fut.then([](future<int> val) { return long(val.get() * 2); });
   static_assert(std::is_same<decltype(fut2)::value_type, long>::value,
                 "then can't deduce future type");
   CHECK(42 == fut2.get());
@@ -128,18 +128,17 @@ TEST_CASE("then should support mutable lambdas")
 TEST_CASE("then should work on exceptional future")
 {
   auto fut = make_exceptional_future<int>(21);
-  auto fut2 = fut.then([&](future<int> const& val)
-                       {
-                         try
-                         {
-                           fut.get();
-                         }
-                         catch (int i)
-                         {
-                           return i * 2;
-                         }
-                         return 0;
-                       });
+  auto fut2 = fut.then([&](future<int> const& val) {
+    try
+    {
+      fut.get();
+    }
+    catch (int i)
+    {
+      return i * 2;
+    }
+    return 0;
+  });
   CHECK(42 == fut2.get());
 }
 
@@ -156,7 +155,7 @@ TEST_CASE("then should work with non-ready future")
   auto fut2 =
       prom.get_future().then([](future<int> val) { return val.get() * 2; });
 
-  std::thread th([&]{ prom.set_value(21); });
+  std::thread th([&] { prom.set_value(21); });
 
   CHECK(42 == fut2.get());
   th.join();
@@ -165,7 +164,7 @@ TEST_CASE("then should work with non-ready future")
 TEST_CASE("and_then should work on a ready future")
 {
   auto fut = make_ready_future(21);
-  auto fut2 = fut.and_then([](int val){ return long(val*2); });
+  auto fut2 = fut.and_then([](int val) { return long(val * 2); });
   static_assert(std::is_same<decltype(fut2)::value_type, long>::value,
                 "and_then can't deduce future type");
   CHECK(42 == fut2.get());
@@ -205,7 +204,8 @@ TEST_CASE("and_then should support throwing continuations")
 TEST_CASE("to_void should work on a ready future")
 {
   auto fut = make_ready_future(42).to_void();
-  static_assert(std::is_same<decltype(fut)::value_type, tvoid>::value, "to_void must give a void future");
+  static_assert(std::is_same<decltype(fut)::value_type, tvoid>::value,
+                "to_void must give a void future");
   CHECK(fut.has_value());
 }
 
@@ -546,9 +546,10 @@ TEST_CASE(
 
   unsigned called = 0;
   auto fut2 = fut1.then([&](cancelation_token& token, future<void> fut) {
-    ++called;
-    CHECK(!token.is_cancel_requested());
-  }).break_cancelation_chain();
+                    ++called;
+                    CHECK(!token.is_cancel_requested());
+                  })
+                  .break_cancelation_chain();
 
   fut2.request_cancel();
   CHECK(!prom.get_cancelation_token().is_cancel_requested());
@@ -563,28 +564,24 @@ TEST_CASE(
 /////////////////////////
 
 static_assert(
-    std::is_same<
-        future<int>,
-        decltype(std::declval<future<future<int>>>().unwrap())>::value,
+    std::is_same<future<int>,
+                 decltype(std::declval<future<future<int>>>().unwrap())>::value,
     "incorrect unwrap signature");
 
-static_assert(
-    std::is_same<
-        future<int>,
-        decltype(std::declval<shared_future<future<int>>>().unwrap())>::value,
-    "incorrect unwrap signature");
+static_assert(std::is_same<future<int>,
+                           decltype(std::declval<shared_future<future<int>>>()
+                                        .unwrap())>::value,
+              "incorrect unwrap signature");
+
+static_assert(std::is_same<shared_future<int>,
+                           decltype(std::declval<future<shared_future<int>>>()
+                                        .unwrap())>::value,
+              "incorrect unwrap signature");
 
 static_assert(
-    std::is_same<
-        shared_future<int>,
-        decltype(std::declval<future<shared_future<int>>>().unwrap())>::value,
-    "incorrect unwrap signature");
-
-static_assert(
-    std::is_same<
-        shared_future<int>,
-        decltype(
-            std::declval<shared_future<shared_future<int>>>().unwrap())>::value,
+    std::is_same<shared_future<int>,
+                 decltype(std::declval<shared_future<shared_future<int>>>()
+                              .unwrap())>::value,
     "incorrect unwrap signature");
 
 TEST_CASE("unwrap should work with nested ready futures")

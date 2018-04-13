@@ -1,8 +1,8 @@
 #include <iostream>
 
-#include <tconcurrent/periodic_task.hpp>
-#include <tconcurrent/packaged_task.hpp>
 #include <tconcurrent/async_wait.hpp>
+#include <tconcurrent/packaged_task.hpp>
+#include <tconcurrent/periodic_task.hpp>
 
 namespace tconcurrent
 {
@@ -126,5 +126,4 @@ future<void> periodic_task::do_call(cancelation_token& token)
       }
   });
 }
-
 }

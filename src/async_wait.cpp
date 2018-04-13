@@ -4,8 +4,8 @@
 
 #include <boost/asio/steady_timer.hpp>
 
-#include <tconcurrent/promise.hpp>
 #include <tconcurrent/packaged_task.hpp>
+#include <tconcurrent/promise.hpp>
 
 namespace tconcurrent
 {
@@ -20,12 +20,10 @@ struct async_wait_data
   std::atomic<bool> fired{false};
 
   template <typename Delay>
-  async_wait_data(boost::asio::io_service& io, Delay delay)
-    : timer(io, delay)
+  async_wait_data(boost::asio::io_service& io, Delay delay) : timer(io, delay)
   {
   }
 };
-
 }
 
 future<void> async_wait(thread_pool& pool,
@@ -36,14 +34,13 @@ future<void> async_wait(thread_pool& pool,
     auto const data =
         std::make_shared<detail::async_wait_data>(pool.get_io_service(), delay);
 
-    data->timer.async_wait(
-        [data](boost::system::error_code const&) mutable {
-          if (!data->fired.exchange(true))
-          {
-            data->prom.get_cancelation_token().pop_cancelation_callback();
-            data->prom.set_value({});
-          }
-        });
+    data->timer.async_wait([data](boost::system::error_code const&) mutable {
+      if (!data->fired.exchange(true))
+      {
+        data->prom.get_cancelation_token().pop_cancelation_callback();
+        data->prom.set_value({});
+      }
+    });
 
     data->prom.get_cancelation_token().push_cancelation_callback([data] {
       if (data->fired.exchange(true))
@@ -82,5 +79,4 @@ future<void> async_wait(thread_pool& pool,
     return std::move(fut);
   }
 }
-
 }

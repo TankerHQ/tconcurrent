@@ -3,9 +3,9 @@
 #include <chrono>
 #include <iostream>
 
-#include <tconcurrent/thread_pool.hpp>
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/async_wait.hpp>
+#include <tconcurrent/thread_pool.hpp>
 
 #include <boost/asio.hpp>
 
@@ -82,8 +82,7 @@ size_t request::write_cb_c(void* ptr, size_t size, size_t nmemb, void* data)
 
 // real code
 
-multi::multi()
-  : multi(get_default_executor().get_io_service())
+multi::multi() : multi(get_default_executor().get_io_service())
 {
 }
 
@@ -186,8 +185,7 @@ curl_socket_t multi::opensocket(curlsocktype purpose,
   if (purpose == CURLSOCKTYPE_IPCXN && address->family == AF_INET)
   {
     // create a tcp socket object
-    std::unique_ptr<async_socket> asocket{
-        new async_socket{_io_service}};
+    std::unique_ptr<async_socket> asocket{new async_socket{_io_service}};
 
     // open it and get the native handle
     boost::system::error_code ec;
@@ -285,8 +283,8 @@ void multi::timer_cb()
 
   if (CURLM_OK != rc)
   {
-    std::cerr << "curl_multi_socket_action failed: "
-              << curl_multi_strerror(rc) << std::endl;
+    std::cerr << "curl_multi_socket_action failed: " << curl_multi_strerror(rc)
+              << std::endl;
     return;
   }
   remove_finished();
@@ -402,7 +400,7 @@ request::request() : _easy(curl_easy_init())
   curl_easy_setopt(_easy.get(), CURLOPT_HEADERDATA, this);
   curl_easy_setopt(_easy.get(), CURLOPT_WRITEFUNCTION, &write_cb_c);
   curl_easy_setopt(_easy.get(), CURLOPT_WRITEDATA, this);
-  //curl_easy_setopt(_easy.get(), CURLOPT_VERBOSE, 1L);
+  // curl_easy_setopt(_easy.get(), CURLOPT_VERBOSE, 1L);
   curl_easy_setopt(_easy.get(), CURLOPT_ERRORBUFFER, &_error[0]);
   curl_easy_setopt(_easy.get(), CURLOPT_PRIVATE, this);
   curl_easy_setopt(_easy.get(), CURLOPT_NOPROGRESS, 1l);
@@ -435,15 +433,14 @@ void request::notify_abort()
 size_t request::header_cb(char* ptr, size_t size, size_t nmemb)
 {
   if (_header_cb)
-    return _header_cb(*this, ptr, size*nmemb);
+    return _header_cb(*this, ptr, size * nmemb);
   else
     return size * nmemb;
 }
 
 size_t request::write_cb(void* ptr, size_t size, size_t nmemb)
 {
-  return _read_cb(*this, ptr, size*nmemb);
+  return _read_cb(*this, ptr, size * nmemb);
 }
-
 }
 }

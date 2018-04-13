@@ -1,13 +1,13 @@
 #include <doctest.h>
 
-#include <tconcurrent/packaged_task.hpp>
 #include <tconcurrent/async.hpp>
+#include <tconcurrent/packaged_task.hpp>
 
 using namespace tconcurrent;
 
 TEST_CASE("packaged_task<void> should give a non-ready future")
 {
-  auto taskfut = package<void()>([]{});
+  auto taskfut = package<void()>([] {});
   auto& task = std::get<0>(taskfut);
   auto& future = std::get<1>(taskfut);
   CHECK(!future.is_ready());
@@ -15,7 +15,7 @@ TEST_CASE("packaged_task<void> should give a non-ready future")
 
 TEST_CASE("packaged_task<void> should set the future when it is run")
 {
-  auto taskfut = package<void()>([]{});
+  auto taskfut = package<void()>([] {});
   auto& task = std::get<0>(taskfut);
   auto& future = std::get<1>(taskfut);
 
@@ -27,7 +27,7 @@ TEST_CASE("packaged_task<void> should set the future when it is run")
 
 TEST_CASE("packaged_task should set the future when it is run")
 {
-  auto taskfut = package<int()>([]{ return 42; });
+  auto taskfut = package<int()>([] { return 42; });
   auto& task = std::get<0>(taskfut);
   auto& future = std::get<1>(taskfut);
   CHECK(!future.is_ready());
@@ -55,7 +55,7 @@ TEST_CASE("packaged_task should copy value if returned by reference")
 
 TEST_CASE("packaged_task should support arguments")
 {
-  auto taskfut = package<int(int)>([](int i){ return i*2; });
+  auto taskfut = package<int(int)>([](int i) { return i * 2; });
   auto& task = std::get<0>(taskfut);
   auto& future = std::get<1>(taskfut);
 
@@ -66,7 +66,7 @@ TEST_CASE("packaged_task should support arguments")
 
 TEST_CASE("packaged_task should handle exceptions")
 {
-  auto taskfut = package<void(int)>([](int i){ throw 42; });
+  auto taskfut = package<void(int)>([](int i) { throw 42; });
   auto& task = std::get<0>(taskfut);
   auto& future = std::get<1>(taskfut);
 
@@ -79,18 +79,18 @@ TEST_CASE("packaged_task should handle exceptions")
 
 TEST_CASE("packaged_task that is not run should be reported as broken promise")
 {
-  auto future = package<void()>([]{}).second;
+  auto future = package<void()>([] {}).second;
   REQUIRE(future.is_ready());
   CHECK_THROWS_AS(future.get(), broken_promise);
 }
 
 TEST_CASE("packaged_task should make future.get() block until it is run")
 {
-  auto taskfut = package<int(int)>([](int i){ return i*2; });
+  auto taskfut = package<int(int)>([](int i) { return i * 2; });
   auto& task = std::get<0>(taskfut);
   auto& future = std::get<1>(taskfut);
 
-  std::thread th([&]{ task(21); });
+  std::thread th([&] { task(21); });
 
   CHECK(42 == future.get()); // may block
   th.join();
@@ -154,8 +154,7 @@ TEST_CASE("packaged_task_result_type should be correct")
   {
     auto f = [](cancelation_token&) -> float { return {}; };
     static_assert(
-        std::is_same<packaged_task_result_type<decltype(f)()>,
-                     float>::value,
+        std::is_same<packaged_task_result_type<decltype(f)()>, float>::value,
         "packaged_task_result_type deduction error");
   }
   {
@@ -169,21 +168,21 @@ TEST_CASE("packaged_task_result_type should be correct")
 
 TEST_CASE("sync should work")
 {
-  auto fut = sync([]{ return 15; });
+  auto fut = sync([] { return 15; });
   CHECK(fut.is_ready());
   CHECK(15 == fut.get());
 }
 
 TEST_CASE("sync should work with void")
 {
-  auto fut = sync([]{});
+  auto fut = sync([] {});
   CHECK(fut.is_ready());
   CHECK_NOTHROW(fut.get());
 }
 
 TEST_CASE("sync should handle exceptions")
 {
-  auto fut = sync([]{ throw 18; });
+  auto fut = sync([] { throw 18; });
   CHECK(fut.is_ready());
   CHECK_THROWS_AS(fut.get(), int);
 }

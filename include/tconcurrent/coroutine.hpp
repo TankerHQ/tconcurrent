@@ -3,8 +3,8 @@
 
 #include <functional>
 
-#include <boost/scope_exit.hpp>
 #include <boost/context/execution_context_v2.hpp>
+#include <boost/scope_exit.hpp>
 
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/packaged_task.hpp>
@@ -51,8 +51,8 @@ stack_bounds get_stack_bounds();
     __sanitizer_start_switch_fiber(                       \
         &fsholder, stack_bounds.stack, stack_bounds.size);
 
-#define TC_SANITIZER_CLOSE_SWITCH_CONTEXT()    \
-    __sanitizer_finish_switch_fiber(fsholder, nullptr, nullptr); \
+#define TC_SANITIZER_CLOSE_SWITCH_CONTEXT()                    \
+  __sanitizer_finish_switch_fiber(fsholder, nullptr, nullptr); \
   }
 
 #define TC_SANITIZER_ENTER_NEW_CONTEXT() \
@@ -74,14 +74,17 @@ stack_bounds get_stack_bounds();
 #endif
 
 /// Thrown inside a coroutine to stop it
-struct abort_coroutine {};
+struct abort_coroutine
+{
+};
 
 struct abort_handler;
 
 using coroutine_controller = std::function<void(struct coroutine_control*)>;
 using coroutine_t = boost::context::execution_context<coroutine_controller>;
 
-enum class coroutine_status {
+enum class coroutine_status
+{
   waiting,
   finished,
   aborted,
@@ -120,25 +123,27 @@ private:
 
   template <typename E, typename F>
   coroutine_control(std::string name, E&& e, F&& f, cancelation_token& token)
-    : name(std::move(name)),
-      executor(std::forward<E>(e)),
-      salloc(boost::context::stack_traits::default_size() * 2),
-      stack(salloc.allocate()),
-      ctx(std::allocator_arg,
+    : name(std::move(name))
+    , executor(std::forward<E>(e))
+    , salloc(boost::context::stack_traits::default_size() * 2)
+    , stack(salloc.allocate())
+    , ctx(std::allocator_arg,
           boost::context::preallocated(stack.sp, stack.size, stack),
           salloc,
-          std::forward<F>(f)),
-      argctx(nullptr),
-      token(token)
-  {}
+          std::forward<F>(f))
+    , argctx(nullptr)
+    , token(token)
+  {
+  }
 
   template <typename Awaitable>
-  typename std::decay_t<Awaitable>::value_type await(
-      Awaitable&& awaitable, bool early_return);
+  typename std::decay_t<Awaitable>::value_type await(Awaitable&& awaitable,
+                                                     bool early_return);
 
   template <typename E, typename F>
-  friend auto ::tconcurrent::async_resumable(
-      std::string const& name, E&& executor, F&& cb);
+  friend auto ::tconcurrent::async_resumable(std::string const& name,
+                                             E&& executor,
+                                             F&& cb);
   friend coroutine_status run_coroutine(coroutine_control* ctrl);
   friend abort_handler;
 };
@@ -151,9 +156,11 @@ inline coroutine_status run_coroutine(coroutine_control* ctrl)
   auto& ptr = get_current_coroutine_ptr();
   auto const previous_coroutine = ptr;
   ptr = ctrl;
-  BOOST_SCOPE_EXIT(&ptr, &previous_coroutine) {
+  BOOST_SCOPE_EXIT(&ptr, &previous_coroutine)
+  {
     ptr = previous_coroutine;
-  } BOOST_SCOPE_EXIT_END
+  }
+  BOOST_SCOPE_EXIT_END
 
   coroutine_controller f;
 
@@ -224,21 +231,19 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
     auto progressing_awaitable =
         std::move(awaitable).update_chain_name(this->name);
 
-    auto canceler = token.make_scope_canceler([this,
-                                               aborted,
-                                               &progressing_awaitable] {
-      assert(get_default_executor().is_in_this_context());
+    auto canceler =
+        token.make_scope_canceler([this, aborted, &progressing_awaitable] {
+          assert(get_default_executor().is_in_this_context());
 
-      progressing_awaitable.request_cancel();
+          progressing_awaitable.request_cancel();
 
-      *aborted = true;
-      // run the coroutine one last time so that it can abort
-      auto const status = run_coroutine(this);
-      (void)status;
-      assert(
-          status == coroutine_status::aborted &&
-          "tc::detail::abort_coroutine must never be caught");
-    });
+          *aborted = true;
+          // run the coroutine one last time so that it can abort
+          auto const status = run_coroutine(this);
+          (void)status;
+          assert(status == coroutine_status::aborted &&
+                 "tc::detail::abort_coroutine must never be caught");
+        });
 
     TC_SANITIZER_OPEN_RETURN_CONTEXT()
     *argctx = std::get<0>((*argctx)(
@@ -269,11 +274,10 @@ struct abort_handler
 {
   detail::coroutine_control* cs;
 
-  template <
-      typename T,
-      std::enable_if_t<
-          std::is_same<typename std::decay_t<T>::result_type, void>::value,
-          int> _ = 0>
+  template <typename T,
+            std::enable_if_t<std::is_same<typename std::decay_t<T>::result_type,
+                                          void>::value,
+                             int> _ = 0>
   auto operator()(T&& fut)
   {
     try
@@ -329,7 +333,7 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
 
   auto token = std::make_shared<cancelation_token>();
   auto pack = package_cancelable<future<return_type>()>(
-      [ &executor, cb = std::forward<F>(cb), fullName, token ]() mutable {
+      [&executor, cb = std::forward<F>(cb), fullName, token]() mutable {
         auto pack = package<return_type(detail::coroutine_control&)>(
             std::move(cb), token);
 
@@ -344,8 +348,10 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
               mycs->argctx = &argctx;
 
               TC_SANITIZER_OPEN_RETURN_CONTEXT();
-              *mycs->argctx = std::move(std::get<0>(argctx([](
-                  detail::coroutine_control* ctrl) { run_coroutine(ctrl); })));
+              *mycs->argctx = std::move(
+                  std::get<0>(argctx([](detail::coroutine_control* ctrl) {
+                    run_coroutine(ctrl);
+                  })));
               TC_SANITIZER_CLOSE_SWITCH_CONTEXT();
 
               cb(*mycs);
@@ -366,8 +372,8 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
 
         f(cs);
 
-        return pack.second.then(
-            tc::get_synchronous_executor(), detail::abort_handler{cs});
+        return pack.second.then(tc::get_synchronous_executor(),
+                                detail::abort_handler{cs});
       },
       token);
 
@@ -401,7 +407,6 @@ inline auto await(Awaitable&& awaitable)
 {
   return get_current_awaiter()(std::forward<Awaitable>(awaitable));
 }
-
 }
 
 #endif

@@ -1,8 +1,8 @@
 #ifndef TCONCURRENT_FUTURE_GROUP_HPP
 #define TCONCURRENT_FUTURE_GROUP_HPP
 
-#include <vector>
 #include <cassert>
+#include <vector>
 
 #include <tconcurrent/future.hpp>
 #include <tconcurrent/when.hpp>

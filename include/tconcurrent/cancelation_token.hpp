@@ -1,12 +1,12 @@
 #ifndef TCONCURRENT_CANCELATION_TOKEN_HPP
 #define TCONCURRENT_CANCELATION_TOKEN_HPP
 
+#include <cassert>
 #include <deque>
 #include <functional>
-#include <mutex>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
-#include <cassert>
 
 namespace tconcurrent
 {
@@ -28,8 +28,8 @@ public:
   {
   public:
     scope_canceler() = default;
-    scope_canceler(
-        std::shared_ptr<cancelation_token> token, cancelation_callback cb)
+    scope_canceler(std::shared_ptr<cancelation_token> token,
+                   cancelation_callback cb)
       : _token(token)
     {
       assert(cb);
@@ -71,9 +71,9 @@ public:
     auto current = [&] {
       scope_lock l(_mutex);
       _do_cancels.pop_back();
-      return _is_cancel_requested && !_do_cancels.empty() ?
-                 _do_cancels.back() :
-                 cancelation_callback{};
+      return _is_cancel_requested && !_do_cancels.empty()
+                 ? _do_cancels.back()
+                 : cancelation_callback{};
     }();
     if (current)
       current();
@@ -106,8 +106,7 @@ public:
     auto f = [&] {
       scope_lock l(_mutex);
       _is_cancel_requested = true;
-      return !_do_cancels.empty() ? _do_cancels.back() :
-                                    cancelation_callback{};
+      return !_do_cancels.empty() ? _do_cancels.back() : cancelation_callback{};
     }();
     if (f)
       f();
@@ -124,7 +123,6 @@ private:
 };
 
 using cancelation_token_ptr = std::shared_ptr<cancelation_token>;
-
 }
 
 #endif

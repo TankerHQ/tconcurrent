@@ -68,4 +68,3 @@ SCENARIO("test semaphore")
     }
   }
 }
-

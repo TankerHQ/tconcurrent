@@ -60,7 +60,6 @@ auto sync(F&& f)
 {
   return async(get_synchronous_executor(), std::forward<F>(f));
 }
-
 }
 
 #endif

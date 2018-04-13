@@ -25,15 +25,18 @@ namespace detail
 
 template <typename T>
 struct is_future : std::false_type
-{};
+{
+};
 
 template <typename T>
 struct is_future<future<T>> : std::true_type
-{};
+{
+};
 
 template <typename T>
 struct is_future<shared_future<T>> : std::true_type
-{};
+{
+};
 
 template <typename F>
 class when_all_callback
@@ -75,17 +78,15 @@ private:
     promise<std::vector<F>> prom;
     cancelation_token::scope_canceler canceler;
 
-    shared(std::vector<F>& futures)
-      : count(0), total(futures.size())
+    shared(std::vector<F>& futures) : count(0), total(futures.size())
     {
       finished_futures.resize(futures.size());
 
       cancelers.reserve(futures.size());
-      std::transform(
-          futures.begin(),
-          futures.end(),
-          std::back_inserter(cancelers),
-          [&](F& future) { return future.make_canceler(); });
+      std::transform(futures.begin(),
+                     futures.end(),
+                     std::back_inserter(cancelers),
+                     [&](F& future) { return future.make_canceler(); });
     }
 
     void request_cancel()
@@ -97,7 +98,6 @@ private:
 
   std::shared_ptr<shared> _p;
 };
-
 }
 
 /** Get a future that will be ready when all the given futures are ready
@@ -159,7 +159,7 @@ public:
     for (unsigned int index = 0; index < _p->futures.size(); ++index)
       _p->futures[index].then(
           get_synchronous_executor(),
-          [ self = *this, index ](auto&& f) mutable { self(index); });
+          [self = *this, index](auto&& f) mutable { self(index); });
   }
 
   void operator()(unsigned int index)
@@ -188,15 +188,13 @@ private:
     promise<result_type> prom;
     cancelation_token::scope_canceler self_canceler;
 
-    shared(std::vector<F> afutures)
-      : futures(std::move(afutures))
+    shared(std::vector<F> afutures) : futures(std::move(afutures))
     {
       future_cancelers.reserve(futures.size());
-      std::transform(
-          futures.begin(),
-          futures.end(),
-          std::back_inserter(future_cancelers),
-          [&](F& future) { return future.make_canceler(); });
+      std::transform(futures.begin(),
+                     futures.end(),
+                     std::back_inserter(future_cancelers),
+                     [&](F& future) { return future.make_canceler(); });
     }
 
     void request_cancel()
@@ -209,7 +207,6 @@ private:
   std::shared_ptr<shared> _p;
   when_any_options _options;
 };
-
 }
 
 /** Get a future that will be ready when any one of the given futures is ready
@@ -226,10 +223,9 @@ private:
 template <typename InputIterator>
 future<when_any_result<
     std::vector<typename std::iterator_traits<InputIterator>::value_type>>>
-when_any(
-    InputIterator first,
-    InputIterator last,
-    when_any_options options = when_any_options::none)
+when_any(InputIterator first,
+         InputIterator last,
+         when_any_options options = when_any_options::none)
 {
   using value_type = typename std::iterator_traits<InputIterator>::value_type;
 

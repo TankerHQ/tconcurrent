@@ -60,6 +60,5 @@ stack_bounds get_stack_bounds()
 }
 #endif
 #endif
-
 }
 }

@@ -33,7 +33,6 @@ struct packaged_task_result_type_<F(Args...)>
 {
   using type = decltype(packaged_task_result_type_2::f<F, Args...>(0));
 };
-
 }
 
 template <typename Call>
@@ -85,12 +84,13 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
       cancelation_token_ptr token,
       F&& f,
       void_t<decltype(std::declval<F>()(std::declval<Args>()...))>* = nullptr)
-    : base_type(std::move(token)),
-      _cancelable(cancelable),
-      // TODO vs2015 doesn't accept a forward for f here...
-      _f([f](cancelation_token&, auto&&... args) mutable {
-        return f(std::forward<decltype(args)>(args)...);
-      })
+    : base_type(std::move(token))
+    , _cancelable(cancelable)
+    ,
+    // TODO vs2015 doesn't accept a forward for f here...
+    _f([f](cancelation_token&, auto&&... args) mutable {
+      return f(std::forward<decltype(args)>(args)...);
+    })
   {
   }
 
@@ -101,9 +101,9 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
       F&& f,
       void_t<decltype(std::declval<F>()(std::declval<cancelation_token&>(),
                                         std::declval<Args>()...))>** = nullptr)
-    : base_type(std::move(token)),
-      _cancelable(cancelable),
-      _f(std::forward<F>(f))
+    : base_type(std::move(token))
+    , _cancelable(cancelable)
+    , _f(std::forward<F>(f))
   {
     assert(_f);
   }
@@ -145,7 +145,6 @@ auto package(F&& f, cancelation_token_ptr token, bool cancelable)
   return std::make_pair(packaged_task<S>(p),
                         future<detail::result_of_t_<S>>(p));
 }
-
 }
 
 template <typename R, typename... Args>
@@ -164,8 +163,9 @@ private:
   detail::promise_ptr<shared_type> _p;
 
   template <typename S, typename F>
-  friend auto detail::package(
-      F&& f, cancelation_token_ptr token, bool cancelable)
+  friend auto detail::package(F&& f,
+                              cancelation_token_ptr token,
+                              bool cancelable)
       -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
 
   explicit packaged_task(std::shared_ptr<detail::shared<R(Args...)>> p)
@@ -178,8 +178,7 @@ template <typename S, typename F>
 auto package(F&& f, cancelation_token_ptr token)
     -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>
 {
-  return detail::package<S>(
-      std::forward<F>(f), token, false);
+  return detail::package<S>(std::forward<F>(f), token, false);
 }
 
 template <typename S, typename F>
@@ -201,7 +200,6 @@ auto package_cancelable(F&& f, cancelation_token_ptr token)
 {
   return detail::package<S>(std::forward<F>(f), token, true);
 }
-
 }
 
 #endif

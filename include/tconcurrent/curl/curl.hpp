@@ -1,15 +1,14 @@
 #ifndef TCONCURRENT_CURL_HPP
 #define TCONCURRENT_CURL_HPP
 
-#include <tconcurrent/future.hpp>
 #include <tconcurrent/detail/boost_fwd.hpp>
+#include <tconcurrent/future.hpp>
 
-#include <map>
-#include <functional>
-#include <memory>
 #include <array>
 #include <curl/curl.h>
-
+#include <functional>
+#include <map>
+#include <memory>
 
 namespace tconcurrent
 {
@@ -236,7 +235,6 @@ struct read_all_result
 };
 
 future<read_all_result> read_all(multi& multi, request_ptr req);
-
 }
 }
 

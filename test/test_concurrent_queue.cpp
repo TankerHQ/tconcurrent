@@ -70,4 +70,3 @@ SCENARIO("test concurrent_queue")
     }
   }
 }
-
