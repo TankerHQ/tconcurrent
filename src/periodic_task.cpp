@@ -1,8 +1,8 @@
-#include <iostream>
+#include <tconcurrent/periodic_task.hpp>
 
 #include <tconcurrent/async_wait.hpp>
 #include <tconcurrent/packaged_task.hpp>
-#include <tconcurrent/periodic_task.hpp>
+#include <tconcurrent/thread_pool.hpp>
 
 namespace tconcurrent
 {
@@ -73,7 +73,7 @@ void periodic_task::reschedule()
   if (_state == State::Stopping)
     return;
 
-  _future = async_wait(*_executor, _period)
+  _future = async_wait(executor(*_executor), _period)
                 .and_then(get_synchronous_executor(),
                           [this](cancelation_token& token, tvoid) {
                             return do_call(token);

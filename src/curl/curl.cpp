@@ -82,7 +82,7 @@ size_t request::write_cb_c(void* ptr, size_t size, size_t nmemb, void* data)
 
 // real code
 
-multi::multi() : multi(get_global_single_thread().get_io_service())
+multi::multi() : multi(get_default_executor().get_io_service())
 {
 }
 
