@@ -3,6 +3,7 @@
 
 #include <tconcurrent/detail/shared_base.hpp>
 #include <tconcurrent/detail/util.hpp>
+#include <tconcurrent/executor.hpp>
 #include <utility>
 
 namespace tconcurrent

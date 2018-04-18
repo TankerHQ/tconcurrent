@@ -1,6 +1,6 @@
 #include <doctest.h>
 
-#include <tconcurrent/concurrent_queue.hpp>
+#include <tconcurrent/thread_pool.hpp>
 
 using namespace tconcurrent;
 
@@ -68,5 +68,5 @@ TEST_CASE("is_in_this_context should work")
 {
   thread_pool tp;
   CHECK_FALSE(tp.is_in_this_context());
-  tp.post([&] { CHECK(get_default_executor().is_in_this_context()); });
+  tp.post([&] { CHECK(get_global_single_thread().is_in_this_context()); });
 }

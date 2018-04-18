@@ -18,6 +18,7 @@ add_library(tconcurrent
   src/async_wait.cpp
   src/periodic_task.cpp
   src/thread_pool.cpp
+  src/executor.cpp
 
   src/curl/curl.cpp
   src/curl/read_all.cpp

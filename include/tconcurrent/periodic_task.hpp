@@ -90,7 +90,7 @@ private:
   future<void> _future;
 
   // TODO very ugly design
-  thread_pool* _executor{&get_default_executor()};
+  thread_pool* _executor{&get_global_single_thread()};
 
   void reschedule();
   future<void> do_call(cancelation_token& token);

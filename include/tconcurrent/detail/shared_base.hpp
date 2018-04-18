@@ -1,6 +1,7 @@
 #ifndef TCONCURRENT_DETAIL_SHARED_BASE_HPP
 #define TCONCURRENT_DETAIL_SHARED_BASE_HPP
 
+#include <atomic>
 #include <condition_variable>
 #include <functional>
 #include <mutex>
@@ -11,7 +12,6 @@
 #include <boost/variant.hpp>
 
 #include <tconcurrent/cancelation_token.hpp>
-#include <tconcurrent/thread_pool.hpp>
 
 namespace tconcurrent
 {
@@ -193,10 +193,11 @@ public:
     {
       std::lock_guard<std::mutex> lock{_mutex};
       if (_r.which() == 0)
-        _then.emplace_back(
-            [name = std::move(name), &e, f = std::forward<F>(f)]() mutable {
-              e.post(std::move(f), std::move(name));
-            });
+        _then.emplace_back([name = std::move(name),
+                            e = std::forward<E>(e),
+                            f = std::forward<F>(f)]() mutable {
+          e.post(std::move(f), std::move(name));
+        });
       else
         resolved = true;
     }
