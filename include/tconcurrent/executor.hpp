@@ -1,6 +1,7 @@
 #ifndef TCONCURRENT_EXECUTOR_HPP
 #define TCONCURRENT_EXECUTOR_HPP
 
+#include <tconcurrent/detail/boost_fwd.hpp>
 #include <tconcurrent/detail/export.hpp>
 
 #include <functional>
@@ -28,11 +29,35 @@ public:
     _p->post(std::move(work), std::move(name));
   }
 
+  boost::asio::io_service& get_io_service()
+  {
+    return _p->get_io_service();
+  }
+
+  bool is_single_threaded()
+  {
+    return _p->is_single_threaded();
+  }
+
+  bool is_in_this_context()
+  {
+    return _p->is_in_this_context();
+  }
+
+  void signal_error(std::exception_ptr const& e)
+  {
+    return _p->signal_error(e);
+  }
+
 private:
   struct impl_base
   {
     virtual ~impl_base() = default;
     virtual void post(std::function<void()>, std::string) = 0;
+    virtual boost::asio::io_service& get_io_service() = 0;
+    virtual bool is_single_threaded() = 0;
+    virtual bool is_in_this_context() = 0;
+    virtual void signal_error(std::exception_ptr const& e) = 0;
   };
 
   template <typename T>
@@ -46,6 +71,26 @@ private:
     void post(std::function<void()> f, std::string name) override
     {
       _context.post(std::move(f), std::move(name));
+    }
+
+    boost::asio::io_service& get_io_service() override
+    {
+      return _context.get_io_service();
+    }
+
+    bool is_single_threaded() override
+    {
+      return _context.is_single_threaded();
+    }
+
+    bool is_in_this_context() override
+    {
+      return _context.is_in_this_context();
+    }
+
+    void signal_error(std::exception_ptr const& e) override
+    {
+      return _context.signal_error(e);
     }
 
   private:
