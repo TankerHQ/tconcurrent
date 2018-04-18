@@ -35,7 +35,7 @@ void periodic_task::start(StartOption opt)
     auto pack = package<future<void>()>(
         [this](cancelation_token& token) { return do_call(token); });
     _future = std::get<1>(pack).unwrap();
-    _executor->post(std::get<0>(pack));
+    _executor.post(std::get<0>(pack));
   }
 }
 
@@ -73,7 +73,7 @@ void periodic_task::reschedule()
   if (_state == State::Stopping)
     return;
 
-  _future = async_wait(executor(*_executor), _period)
+  _future = async_wait(_executor, _period)
                 .and_then(get_synchronous_executor(),
                           [this](cancelation_token& token, tvoid) {
                             return do_call(token);
@@ -97,7 +97,7 @@ future<void> periodic_task::do_call(cancelation_token& token)
   }
   catch (...)
   {
-    _executor->signal_error(std::current_exception());
+    _executor.signal_error(std::current_exception());
   }
 
   scope_lock l(_mutex);
@@ -121,7 +121,7 @@ future<void> periodic_task::do_call(cancelation_token& token)
       }
       catch (...)
       {
-        _executor->signal_error(std::current_exception());
+        _executor.signal_error(std::current_exception());
         _state = State::Stopped;
       }
   });
