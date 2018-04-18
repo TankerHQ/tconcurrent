@@ -4,6 +4,7 @@
 #include <tconcurrent/detail/export.hpp>
 
 #include <functional>
+#include <memory>
 #include <string>
 
 namespace tconcurrent
@@ -13,10 +14,7 @@ class executor
 public:
   template <typename T,
             typename = std::enable_if_t<!std::is_same<T, executor>::value>>
-  executor(T& e)
-    : _post([&e](auto&&... args) {
-      e.post(std::forward<decltype(args)>(args)...);
-    })
+  executor(T& e) : _p(std::make_shared<impl<std::decay_t<T>>>(e))
   {
   }
 
@@ -27,11 +25,34 @@ public:
 
   void post(std::function<void()> work, std::string name = {})
   {
-    _post(std::move(work), std::move(name));
+    _p->post(std::move(work), std::move(name));
   }
 
 private:
-  std::function<void(std::function<void()>, std::string name)> _post;
+  struct impl_base
+  {
+    virtual ~impl_base() = default;
+    virtual void post(std::function<void()>, std::string) = 0;
+  };
+
+  template <typename T>
+  class impl : public impl_base
+  {
+  public:
+    impl(T& context) : _context(context)
+    {
+    }
+
+    void post(std::function<void()> f, std::string name) override
+    {
+      _context.post(std::move(f), std::move(name));
+    }
+
+  private:
+    T& _context;
+  };
+
+  std::shared_ptr<impl_base> _p;
 };
 
 class thread_pool;
