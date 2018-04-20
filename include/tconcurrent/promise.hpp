@@ -14,13 +14,14 @@ class promise
 public:
   using value_type = typename future<T>::value_type;
 
-  promise() : _p(std::make_shared<detail::shared_base<value_type>>())
+  promise()
+    : _p(detail::promise_ptr<detail::shared_base<value_type>>::make_shared())
   {
   }
 
   template <typename F>
   promise(tc::future<F> const& prev)
-    : _p(std::make_shared<detail::shared_base<value_type>>(
+    : _p(detail::promise_ptr<detail::shared_base<value_type>>::make_shared(
           prev._p->get_cancelation_token()))
   {
   }
