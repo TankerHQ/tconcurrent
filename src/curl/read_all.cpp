@@ -102,7 +102,7 @@ future<read_all_result> read_all(multi& multi, std::shared_ptr<request> req)
       ra->_promise = {};
       ra->_req = nullptr;
     };
-    if (get_global_single_thread().is_in_this_context())
+    if (get_default_executor().is_in_this_context())
       doCancel();
     else
       tc::async(doCancel);
