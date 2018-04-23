@@ -132,18 +132,30 @@ template <typename S, typename F>
 auto package(F&& f, cancelation_token_ptr token, bool cancelable)
     -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>
 {
-  auto p = std::make_shared<detail::shared<S>>(
+  auto const p = promise_ptr<detail::shared<S>>::make_shared(
       cancelable, token, std::forward<F>(f));
   if (cancelable)
-    token->push_cancelation_callback([p, token = token.get()] {
-      if (p->_done.exchange(true))
+    token->push_cancelation_callback([p = p.as_shared(),
+                                      token = token.get()]() mutable {
+      // If we got the _done lock just below, the callback may die
+      // asynchronously, setting the promise state to broken_promise. That's why
+      // we lock the promise_ptr before that line.
+      auto const pp = promise_ptr<detail::shared<S>>::try_lock(std::move(p));
+      if (!pp)
+      {
+        // the promise is already dead, this means the callback has run
+        assert(p->_done.load());
         return;
+      }
+      if (pp->_done.exchange(true))
+        return;
+
       token->pop_cancelation_callback();
-      p->set_exception(std::make_exception_ptr(operation_canceled{}));
-      p->_f = nullptr;
+      pp->_f = nullptr;
+      pp->set_exception(std::make_exception_ptr(operation_canceled{}));
     });
   return std::make_pair(packaged_task<S>(p),
-                        future<detail::result_of_t_<S>>(p));
+                        future<detail::result_of_t_<S>>(p.as_shared()));
 }
 }
 
@@ -168,8 +180,7 @@ private:
                               bool cancelable)
       -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
 
-  explicit packaged_task(std::shared_ptr<detail::shared<R(Args...)>> p)
-    : _p(std::move(p))
+  explicit packaged_task(detail::promise_ptr<shared_type> p) : _p(std::move(p))
   {
   }
 };

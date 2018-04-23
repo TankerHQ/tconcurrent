@@ -84,6 +84,15 @@ TEST_CASE("packaged_task that is not run should be reported as broken promise")
   CHECK_THROWS_AS(future.get(), broken_promise);
 }
 
+TEST_CASE(
+    "packaged_task cancelable that is not run should be reported as broken "
+    "promise")
+{
+  auto future = package_cancelable<void()>([] {}).second;
+  REQUIRE(future.is_ready());
+  CHECK_THROWS_AS(future.get(), broken_promise);
+}
+
 TEST_CASE("packaged_task should make future.get() block until it is run")
 {
   auto taskfut = package<int(int)>([](int i) { return i * 2; });
@@ -96,7 +105,7 @@ TEST_CASE("packaged_task should make future.get() block until it is run")
   th.join();
 }
 
-TEST_CASE("packaged_task shouls give a relevant cancelation_token")
+TEST_CASE("packaged_task should give a relevant cancelation_token")
 {
   auto taskfut =
       package<void(bool)>([&](cancelation_token& token, bool cancelreq) {

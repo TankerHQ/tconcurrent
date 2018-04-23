@@ -38,19 +38,11 @@ public:
 
   promise_ptr() = default;
 
-  promise_ptr(shared_ptr_type const& p) : _ptr(p)
-  {
-    _ptr->increment_promise();
-  }
-
-  promise_ptr(shared_ptr_type&& p) : _ptr(std::move(p))
-  {
-    _ptr->increment_promise();
-  }
-
   promise_ptr(promise_ptr const& r) : _ptr(r._ptr)
   {
-    _ptr->increment_promise();
+    auto const ok = _ptr->increment_promise();
+    (void)ok;
+    assert(ok);
   }
   promise_ptr& operator=(promise_ptr const& r)
   {
@@ -58,7 +50,9 @@ public:
     {
       finish();
       _ptr = r._ptr;
-      _ptr->increment_promise();
+      auto const ok = _ptr->increment_promise();
+      (void)ok;
+      assert(ok);
     }
     return *this;
   }
@@ -81,6 +75,11 @@ public:
     finish();
   }
 
+  shared_ptr_type as_shared() const
+  {
+    return _ptr;
+  }
+
   decltype(auto) operator-> () const
   {
     return _ptr.operator->();
@@ -94,9 +93,38 @@ public:
   {
     return _ptr;
   }
+  explicit operator bool() const
+  {
+    return !!_ptr;
+  }
+
+  template <typename P>
+  static promise_ptr try_lock(P&& p)
+  {
+    auto const ok = p->increment_promise();
+    if (!ok)
+      return {};
+    return promise_ptr(std::forward<P>(p));
+  }
+
+  template <typename... Args>
+  static promise_ptr make_shared(Args&&... args)
+  {
+    auto p = std::make_shared<S>(std::forward<Args>(args)...);
+    ++p->_promise_count;
+    return promise_ptr(std::move(p));
+  }
 
 private:
   std::shared_ptr<S> _ptr;
+
+  promise_ptr(shared_ptr_type const& p) : _ptr(p)
+  {
+  }
+
+  promise_ptr(shared_ptr_type&& p) : _ptr(std::move(p))
+  {
+  }
 
   void finish()
   {
@@ -243,9 +271,16 @@ private:
    */
   std::atomic<unsigned int> _promise_count{0};
 
-  void increment_promise()
+  bool increment_promise()
   {
-    ++_promise_count;
+    auto count = _promise_count.load();
+    while (true)
+    {
+      if (count == 0)
+        return false;
+      if (_promise_count.compare_exchange_weak(count, count + 1))
+        return true;
+    }
   }
 
   void decrement_promise()
