@@ -13,6 +13,7 @@ namespace tconcurrent
 class executor
 {
 public:
+  executor() = default;
   template <typename T,
             typename = std::enable_if_t<!std::is_same<T, executor>::value>>
   executor(T& e) : _p(std::make_shared<impl<std::decay_t<T>>>(e))
