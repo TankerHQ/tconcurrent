@@ -319,15 +319,14 @@ using awaiter = detail::coroutine_control;
  * purposes
  * \param cb the callback to run. Its signature should be:
  *
- *     T func(awaiter& await);
+ *     cotask<T> func();
  *
  * \return the future corresponding to the result of the callback
  */
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
 {
-  using return_task_type =
-      std::decay_t<decltype(cb(std::declval<detail::coroutine_control&>()))>;
+  using return_task_type = std::decay_t<decltype(cb())>;
   using return_type = typename return_task_type::value_type;
 
   auto const fullName = name + " (" + typeid(F).name() + ")";
@@ -335,8 +334,7 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
   auto token = std::make_shared<cancelation_token>();
   auto pack = package_cancelable<future<return_type>()>(
       [executor, cb = std::forward<F>(cb), fullName, token]() mutable {
-        auto pack = package<return_task_type(detail::coroutine_control&)>(
-            std::move(cb), token);
+        auto pack = package<return_task_type()>(std::move(cb), token);
 
         detail::coroutine_control* cs = new detail::coroutine_control(
             fullName,
@@ -355,7 +353,7 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
                   })));
               TC_SANITIZER_CLOSE_SWITCH_CONTEXT();
 
-              cb(*mycs);
+              cb();
 
               TC_SANITIZER_EXIT_CONTEXT()
               return argctx;

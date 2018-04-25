@@ -342,10 +342,6 @@ auto operator co_await(tc::shared_future<R>&& f)
 
 namespace tconcurrent
 {
-struct awaiter
-{
-};
-
 namespace detail
 {
 template <typename F, typename R>
@@ -359,8 +355,7 @@ struct task_control
     : cb(std::move(cb)), cotask([& cb = this->cb] {
       try
       {
-        awaiter await;
-        return cb(await);
+        return cb();
       }
       catch (...)
       {
@@ -378,7 +373,7 @@ struct task_control
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
 {
-  using return_task_type = std::decay_t<decltype(cb(std::declval<awaiter&>()))>;
+  using return_task_type = std::decay_t<decltype(cb())>;
   using return_type = typename return_task_type::value_type;
 
   auto const fullName = name + " (" + typeid(F).name() + ")";
