@@ -8,6 +8,7 @@
 
 #include <tconcurrent/detail/boost_fwd.hpp>
 #include <tconcurrent/detail/export.hpp>
+#include <tconcurrent/future.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -29,6 +30,8 @@ public:
   using error_handler_cb = std::function<void(std::exception_ptr const&)>;
   using task_trace_handler_cb = std::function<void(
       std::string const& name, std::chrono::steady_clock::duration dur)>;
+
+  using canceler = std::function<void()>;
 
   thread_pool(thread_pool const&) = delete;
   thread_pool(thread_pool&&) = delete;
@@ -63,24 +66,6 @@ private:
   struct impl;
   std::unique_ptr<impl> _p;
 };
-
-TCONCURRENT_EXPORT thread_pool& get_default_executor();
-TCONCURRENT_EXPORT void start_thread_pool(unsigned int thread_count);
-TCONCURRENT_EXPORT thread_pool& get_background_executor();
-
-/// Executor that runs its work in-place
-class synchronous_executor
-{
-public:
-  template <typename F>
-  void post(F&& work, std::string const& = {})
-  {
-    work();
-  }
-};
-
-// FIXME do an abstraction so that executors can be passed by value
-TCONCURRENT_EXPORT synchronous_executor& get_synchronous_executor();
 }
 
 #ifdef _MSC_VER

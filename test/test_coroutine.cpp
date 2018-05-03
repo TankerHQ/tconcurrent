@@ -29,7 +29,7 @@ TEST_CASE("coroutine on executor")
 {
   thread_pool tp;
   tp.start(1);
-  auto f = async_resumable("test", tp, [&](auto& await) {
+  auto f = async_resumable("test", executor(tp), [&](auto& await) {
     CHECK(tp.is_in_this_context());
     await.yield();
     CHECK(tp.is_in_this_context());

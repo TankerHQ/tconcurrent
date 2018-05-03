@@ -56,9 +56,10 @@ public:
     };
   }
 
-  void set_executor(thread_pool* executor)
+  template <typename E>
+  void set_executor(E&& executor)
   {
-    _executor = executor;
+    _executor = std::forward<E>(executor);
   }
 
   void start(StartOption opt = no_option);
@@ -89,8 +90,7 @@ private:
 
   future<void> _future;
 
-  // TODO very ugly design
-  thread_pool* _executor{&get_default_executor()};
+  executor _executor{get_default_executor()};
 
   void reschedule();
   future<void> do_call(cancelation_token& token);

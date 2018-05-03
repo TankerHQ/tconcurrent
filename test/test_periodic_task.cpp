@@ -76,7 +76,7 @@ TEST_CASE("test periodic task executor [waiting]")
   bool fail{false};
   unsigned int called = 0;
   periodic_task pt;
-  pt.set_executor(&tp);
+  pt.set_executor(tp);
   pt.set_callback([&] {
     if (!tp.is_in_this_context())
       fail = true;
@@ -108,7 +108,7 @@ TEST_CASE("test periodic task error stop [waiting]")
   });
 
   periodic_task pt;
-  pt.set_executor(&tp);
+  pt.set_executor(tp);
   pt.set_callback([&] {
     ++called;
     throw 18;
@@ -137,7 +137,7 @@ TEST_CASE("test periodic task future error stop [waiting]")
   });
 
   periodic_task pt;
-  pt.set_executor(&tp);
+  pt.set_executor(tp);
   pt.set_callback([&] {
     ++called;
     return make_exceptional_future<void>(18);
@@ -256,7 +256,7 @@ TEST_CASE("test periodic single threaded task stop")
   unsigned int called = 0;
 
   periodic_task pt;
-  pt.set_executor(&tp);
+  pt.set_executor(tp);
   pt.set_callback([&] { ++called; });
   pt.set_period(std::chrono::milliseconds(0));
   pt.start(periodic_task::start_immediately);

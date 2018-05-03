@@ -109,7 +109,7 @@ public:
 private:
   std::string name;
 
-  thread_pool& executor;
+  executor executor_;
 
   boost::context::fixedsize_stack salloc;
   boost::context::stack_context stack;
@@ -124,7 +124,7 @@ private:
   template <typename E, typename F>
   coroutine_control(std::string name, E&& e, F&& f, cancelation_token& token)
     : name(std::move(name))
-    , executor(std::forward<E>(e))
+    , executor_(std::forward<E>(e))
     , salloc(boost::context::stack_traits::default_size() * 2)
     , stack(salloc.allocate())
     , ctx(std::allocator_arg,
@@ -233,7 +233,7 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
 
     auto canceler =
         token.make_scope_canceler([this, aborted, &progressing_awaitable] {
-          assert(get_default_executor().is_in_this_context());
+          assert(get_global_single_thread().is_in_this_context());
 
           progressing_awaitable.request_cancel();
 
@@ -250,7 +250,7 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
         [&aborted, &progressing_awaitable, &finished_awaitable, &awaitable](
             coroutine_control* ctrl) {
           progressing_awaitable.then(
-              ctrl->executor,
+              ctrl->executor_,
               [aborted, &finished_awaitable, ctrl](std::decay_t<Awaitable> f) {
                 // cancel was called, the coroutine is already dead and the
                 // memory free
@@ -333,7 +333,7 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
 
   auto token = std::make_shared<cancelation_token>();
   auto pack = package_cancelable<future<return_type>()>(
-      [&executor, cb = std::forward<F>(cb), fullName, token]() mutable {
+      [executor, cb = std::forward<F>(cb), fullName, token]() mutable {
         auto pack = package<return_type(detail::coroutine_control&)>(
             std::move(cb), token);
 

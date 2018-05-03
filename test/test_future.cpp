@@ -1,7 +1,10 @@
-#include <doctest.h>
-
 #include <tconcurrent/future.hpp>
 #include <tconcurrent/promise.hpp>
+#include <tconcurrent/thread_pool.hpp>
+
+#include <doctest.h>
+
+#include <thread>
 
 using namespace tconcurrent;
 
@@ -673,7 +676,8 @@ TEST_CASE("then must support running on specified executor")
   tp.start(1);
   auto f = make_ready_future();
 
-  f.then(tp, [&](future<void> const&) { CHECK(tp.is_in_this_context()); })
+  f.then(executor(tp),
+         [&](future<void> const&) { CHECK(tp.is_in_this_context()); })
       .get();
 }
 
@@ -683,5 +687,6 @@ TEST_CASE("and_then must support running on specified executor")
   tp.start(1);
   auto f = make_ready_future();
 
-  f.and_then(tp, [&](tvoid) { CHECK(tp.is_in_this_context()); }).get();
+  f.and_then(executor(tp), [&](tvoid) { CHECK(tp.is_in_this_context()); })
+      .get();
 }
