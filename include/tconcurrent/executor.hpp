@@ -35,12 +35,12 @@ public:
     return _p->get_io_service();
   }
 
-  bool is_single_threaded()
+  bool is_single_threaded() const
   {
     return _p->is_single_threaded();
   }
 
-  bool is_in_this_context()
+  bool is_in_this_context() const
   {
     return _p->is_in_this_context();
   }
@@ -56,8 +56,8 @@ private:
     virtual ~impl_base() = default;
     virtual void post(std::function<void()>, std::string) = 0;
     virtual boost::asio::io_service& get_io_service() = 0;
-    virtual bool is_single_threaded() = 0;
-    virtual bool is_in_this_context() = 0;
+    virtual bool is_single_threaded() const = 0;
+    virtual bool is_in_this_context() const = 0;
     virtual void signal_error(std::exception_ptr const& e) = 0;
   };
 
@@ -79,12 +79,12 @@ private:
       return _context.get_io_service();
     }
 
-    bool is_single_threaded() override
+    bool is_single_threaded() const override
     {
       return _context.is_single_threaded();
     }
 
-    bool is_in_this_context() override
+    bool is_in_this_context() const override
     {
       return _context.is_in_this_context();
     }
