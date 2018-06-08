@@ -9,6 +9,10 @@
 
 namespace tconcurrent
 {
+template <typename E, typename F>
+auto async_resumable(std::string const& name, E&& executor, F&& cb)
+    -> future<typename std::decay_t<decltype(cb())>::value_type>;
+
 template <typename T>
 class cotask;
 
@@ -142,6 +146,33 @@ public:
 
   using promise_type = detail::task_promise<T>;
 
+  cotask(cotask const&) = delete;
+  cotask& operator=(cotask const&) = delete;
+
+  cotask(cotask&& o) : coro(o.coro), started(o.started)
+  {
+    o.coro = nullptr;
+  }
+  cotask& operator=(cotask&&) = delete;
+
+  ~cotask()
+  {
+    if (coro)
+    {
+      if (started && !coro.done())
+      {
+        assert(!"not done");
+      }
+      coro.destroy();
+    }
+  }
+
+  auto operator co_await() &&
+  {
+    return typename cotask<T>::awaitable{coro};
+  }
+
+private:
   struct awaitable
   {
     std::experimental::coroutine_handle<promise_type> coroutine;
@@ -171,33 +202,14 @@ public:
     }
   };
 
+  std::experimental::coroutine_handle<promise_type> coro;
+  bool started = false;
+
   cotask(std::experimental::coroutine_handle<promise_type> coroutine)
     : coro(coroutine)
   {
   }
 
-  cotask(cotask const&) = delete;
-  cotask& operator=(cotask const&) = delete;
-
-  cotask(cotask&& o) : coro(o.coro), started(o.started)
-  {
-    o.coro = nullptr;
-  }
-  cotask& operator=(cotask&&) = delete;
-
-  ~cotask()
-  {
-    if (coro)
-    {
-      if (started && !coro.done())
-      {
-        assert(!"not done");
-      }
-      coro.destroy();
-    }
-  }
-
-  bool started = false;
   void run()
   {
     started = true;
@@ -235,13 +247,10 @@ public:
     return coro.promise().result();
   }
 
-  auto operator co_await() &&
-  {
-    return typename cotask<T>::awaitable{coro};
-  }
-
-private:
-  std::experimental::coroutine_handle<promise_type> coro;
+  template <typename E, typename F>
+  friend auto async_resumable(std::string const& name, E&& executor, F&& cb)
+      -> future<typename std::decay_t<decltype(cb())>::value_type>;
+  friend detail::task_promise<T>;
 };
 
 namespace detail
@@ -372,6 +381,7 @@ struct task_control
 
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
+    -> future<typename std::decay_t<decltype(cb())>::value_type>
 {
   using return_task_type = std::decay_t<decltype(cb())>;
   using return_type = typename return_task_type::value_type;
