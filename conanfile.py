@@ -1,6 +1,4 @@
 from conans import tools, CMake, ConanFile
-import platform
-import os
 
 
 class TconcurrentConan(ConanFile):
