@@ -1,4 +1,4 @@
-#include <tconcurrent/coroutine.hpp>
+#include <tconcurrent/stackful_coroutine.hpp>
 
 #ifdef TCONCURRENT_SANITIZER
 #include <iostream>

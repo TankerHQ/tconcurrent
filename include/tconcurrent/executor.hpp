@@ -13,6 +13,7 @@ namespace tconcurrent
 class executor
 {
 public:
+  executor() = default;
   template <typename T,
             typename = std::enable_if_t<!std::is_same<T, executor>::value>>
   executor(T& e) : _p(std::make_shared<impl<std::decay_t<T>>>(e))
@@ -34,12 +35,12 @@ public:
     return _p->get_io_service();
   }
 
-  bool is_single_threaded()
+  bool is_single_threaded() const
   {
     return _p->is_single_threaded();
   }
 
-  bool is_in_this_context()
+  bool is_in_this_context() const
   {
     return _p->is_in_this_context();
   }
@@ -49,14 +50,19 @@ public:
     return _p->signal_error(e);
   }
 
+  explicit operator bool() const
+  {
+    return !!_p;
+  }
+
 private:
   struct impl_base
   {
     virtual ~impl_base() = default;
     virtual void post(std::function<void()>, std::string) = 0;
     virtual boost::asio::io_service& get_io_service() = 0;
-    virtual bool is_single_threaded() = 0;
-    virtual bool is_in_this_context() = 0;
+    virtual bool is_single_threaded() const = 0;
+    virtual bool is_in_this_context() const = 0;
     virtual void signal_error(std::exception_ptr const& e) = 0;
   };
 
@@ -78,12 +84,12 @@ private:
       return _context.get_io_service();
     }
 
-    bool is_single_threaded() override
+    bool is_single_threaded() const override
     {
       return _context.is_single_threaded();
     }
 
-    bool is_in_this_context() override
+    bool is_in_this_context() const override
     {
       return _context.is_in_this_context();
     }
@@ -101,7 +107,6 @@ private:
 };
 
 class thread_pool;
-TCONCURRENT_EXPORT thread_pool& get_global_single_thread();
 TCONCURRENT_EXPORT executor get_default_executor();
 TCONCURRENT_EXPORT executor get_background_executor();
 

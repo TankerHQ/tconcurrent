@@ -9,19 +9,22 @@ using namespace tconcurrent;
 
 TEST_CASE("coroutine empty")
 {
-  auto f = async_resumable([](auto& awaiter) {});
+  auto f = async_resumable([]() -> cotask<void> { TC_RETURN(); });
   CHECK_NOTHROW(f.get());
 }
 
 TEST_CASE("coroutine return")
 {
-  auto f = async_resumable([](auto& awaiter) { return 42; });
+  auto f = async_resumable([]() -> cotask<int> { TC_RETURN(42); });
   CHECK(42 == f.get());
 }
 
 TEST_CASE("coroutine throw")
 {
-  auto f = async_resumable([](auto& awaiter) { throw 42; });
+  auto f = async_resumable([]() -> cotask<void> {
+    throw 42;
+    TC_RETURN();
+  });
   CHECK_THROWS_AS(f.get(), int);
 }
 
@@ -29,12 +32,13 @@ TEST_CASE("coroutine on executor")
 {
   thread_pool tp;
   tp.start(1);
-  auto f = async_resumable("test", executor(tp), [&](auto& await) {
+  auto f = async_resumable("test", executor(tp), [&]() -> cotask<void> {
     CHECK(tp.is_in_this_context());
-    await.yield();
+    TC_YIELD();
     CHECK(tp.is_in_this_context());
-    await(tc::async(tp, [] {}));
+    TC_AWAIT(tc::async(tp, [] {}));
     CHECK(tp.is_in_this_context());
+    TC_RETURN();
   });
   f.get();
 }
@@ -42,37 +46,86 @@ TEST_CASE("coroutine on executor")
 TEST_CASE("coroutine wait ready")
 {
   auto ready = make_ready_future();
-  auto f = async_resumable([&](auto& await) {
-    await(ready);
-    return 42;
+  auto f = async_resumable([&]() -> cotask<int> {
+    TC_AWAIT(std::move(ready));
+    TC_RETURN(42);
   });
   CHECK(42 == f.get());
 }
 
 TEST_CASE("coroutine global wait ready")
 {
-  auto ready = make_ready_future();
-  auto f = async_resumable([&](auto& await) {
-    await(ready);
-    return 42;
+  auto f = async_resumable([&]() -> cotask<int> {
+    TC_AWAIT(make_ready_future());
+    TC_RETURN(42);
   });
   CHECK(42 == f.get());
 }
 
 TEST_CASE("coroutine wait ready value")
 {
-  auto ready = make_ready_future(42);
-  auto f = async_resumable([&](auto& await) { return await(ready); });
+  auto f = async_resumable(
+      [&]() -> cotask<int> { TC_RETURN(TC_AWAIT(make_ready_future(42))); });
   CHECK(42 == f.get());
+}
+
+TEST_CASE("coroutine wait ready move-only value")
+{
+  struct S
+  {
+    S(S const&) = delete;
+    S& operator=(S const&) = delete;
+
+    S(S&&) = default;
+    S& operator=(S&&) = default;
+
+    S() = default;
+  };
+
+  auto f = async_resumable(
+      [&]() -> cotask<S> { TC_RETURN(TC_AWAIT(make_ready_future(S{}))); });
+  CHECK_NOTHROW(f.get());
+}
+
+TEST_CASE("coroutine wait ready non default-constructible value")
+{
+  struct S
+  {
+    S(int)
+    {
+    }
+  };
+
+  auto f = async_resumable(
+      [&]() -> cotask<S> { TC_RETURN(TC_AWAIT(make_ready_future(S{18}))); });
+  CHECK_NOTHROW(f.get());
 }
 
 TEST_CASE("coroutine wait")
 {
   promise<void> prom;
-  auto f = async_resumable([&](auto& await) {
-    await(prom.get_future());
-    return 42;
+  auto f = async_resumable([&]() -> cotask<int> {
+    TC_AWAIT(prom.get_future());
+    TC_RETURN(42);
   });
+  prom.set_value({});
+  CHECK(42 == f.get());
+}
+
+// this one is there to trigger valgrind if lifetimes aren't respected
+TEST_CASE("coroutine wait, cb on heap")
+{
+  promise<void> prom;
+  auto const cb = [&, i = 42]() -> cotask<int> {
+    TC_AWAIT(prom.get_future());
+    TC_RETURN(i);
+  };
+  auto heap_cb = std::make_unique<decltype(cb)>(cb);
+
+  auto f = async_resumable(*heap_cb);
+  // expect no crash or valgrind error
+  heap_cb = nullptr;
+
   prom.set_value({});
   CHECK(42 == f.get());
 }
@@ -80,19 +133,55 @@ TEST_CASE("coroutine wait")
 TEST_CASE("coroutine nested")
 {
   promise<int> prom;
-  auto f = async_resumable([&](auto& await) {
-    return await(
-        async_resumable([&](auto& await) { return await(prom.get_future()); }));
+  auto f = async_resumable([&]() -> cotask<int> {
+    TC_RETURN(TC_AWAIT(async_resumable(
+        [&]() -> cotask<int> { TC_RETURN(TC_AWAIT(prom.get_future())); })));
   });
   prom.set_value(42);
   CHECK(42 == f.get());
 }
 
+TEST_CASE("coroutine nested cotask")
+{
+  promise<int> prom;
+  auto f = async_resumable([&]() -> cotask<int> {
+    TC_RETURN(TC_AWAIT(
+        [&]() -> cotask<int> { TC_RETURN(TC_AWAIT(prom.get_future())); }()));
+  });
+  prom.set_value(42);
+  CHECK(42 == f.get());
+}
+
+TEST_CASE("coroutine nested cotask<T&>")
+{
+  auto f = async_resumable([&]() -> cotask<void> {
+             int i = 0;
+             int& ii = TC_AWAIT([&]() -> cotask<int&> { TC_RETURN(i); }());
+             CHECK(&i == &ii);
+             TC_RETURN();
+           })
+               .get();
+}
+
+TEST_CASE("coroutine nested void cotask")
+{
+  promise<void> prom;
+  auto f = async_resumable([&]() -> cotask<void> {
+    TC_AWAIT([&]() -> cotask<void> {
+      TC_AWAIT(prom.get_future());
+      TC_RETURN();
+    }());
+    TC_RETURN();
+  });
+  prom.set_value({});
+  CHECK_NOTHROW(f.get());
+}
+
 TEST_CASE("coroutine wait and throw")
 {
   promise<void> prom;
-  auto f = async_resumable([&](auto& await) {
-    await(prom.get_future());
+  auto f = async_resumable([&]() -> cotask<void> {
+    TC_AWAIT(prom.get_future());
     throw 42;
   });
   prom.set_value({});
@@ -102,9 +191,9 @@ TEST_CASE("coroutine wait and throw")
 TEST_CASE("coroutine wait error")
 {
   promise<void> prom;
-  auto f = async_resumable([&](auto& await) {
-    await(prom.get_future());
-    return 42;
+  auto f = async_resumable([&]() -> cotask<int> {
+    TC_AWAIT(prom.get_future());
+    TC_RETURN(42);
   });
   prom.set_exception(std::make_exception_ptr(42));
   CHECK_THROWS_AS(f.get(), int);
@@ -114,9 +203,9 @@ TEST_CASE("coroutine cancel before run")
 {
   unsigned called = 0;
   async([&] {
-    auto f = async_resumable([&called](awaiter& await) {
+    auto f = async_resumable([&called]() -> cotask<int> {
       ++called;
-      return 42;
+      TC_RETURN(42);
     });
     f.request_cancel();
     REQUIRE(f.is_ready());
@@ -133,14 +222,14 @@ TEST_CASE("coroutine cancel already requested")
   auto fut1 = prom1.get_future();
   promise<void> prom2;
   auto fut2 = prom2.get_future();
-  auto f = async_resumable([&fut1, &fut2](awaiter& await) {
+  auto f = async_resumable([&fut1, &fut2]() -> cotask<int> {
     fut1.get();
-    await(fut2);
-    return 42;
+    TC_AWAIT(std::move(fut2));
+    TC_RETURN(42);
   });
   auto fut3 = async([&] {
     f.request_cancel();
-    CHECK(f.is_ready());
+    REQUIRE(f.is_ready());
     CHECK_THROWS_AS(f.get(), operation_canceled);
   });
   prom1.set_value({});
@@ -154,9 +243,9 @@ TEST_CASE("coroutine cancel propagation")
   auto fut = prom.get_future();
   prom.get_cancelation_token().push_cancelation_callback([&] { ++called; });
   // also test that we can pass mutable callback to async_resumable
-  auto f = async_resumable([&fut](awaiter& await) mutable {
-    await(fut);
-    return 42;
+  auto f = async_resumable([&fut]() mutable -> cotask<int> {
+    TC_AWAIT(std::move(fut));
+    TC_RETURN(42);
   });
   async([&] {
     f.request_cancel();
@@ -174,11 +263,12 @@ TEST_CASE("coroutine yield")
   unsigned progress = 0;
   tc::promise<void> prom;
   auto fut = prom.get_future();
-  auto fut1 = tc::async_resumable([&](tc::awaiter& await) {
+  auto fut1 = tc::async_resumable([&]() -> cotask<void> {
     ++progress;
     fut.wait();
-    await.yield();
+    TC_YIELD();
     ++progress;
+    TC_RETURN();
   });
   // this will be scheduled during the yield
   auto fut2 = tc::async([&] { CHECK(1 == progress); });
@@ -193,11 +283,12 @@ TEST_CASE("coroutine yield cancel before yield")
   std::atomic<unsigned> progress{0};
   tc::promise<void> prom;
   auto fut = prom.get_future();
-  auto fut1 = tc::async_resumable([&](tc::awaiter& await) {
+  auto fut1 = tc::async_resumable([&]() -> cotask<void> {
     ++progress;
     fut.wait();
-    await.yield();
+    TC_YIELD();
     ++progress;
+    TC_RETURN();
   });
   while (progress.load() != 1)
     ;
@@ -212,7 +303,7 @@ TEST_CASE("coroutine yield cancel on yield")
   std::atomic<unsigned> progress{0};
   auto prom = tc::promise<void>();
   tc::future<void> fut1;
-  fut1 = tc::async_resumable([&](tc::awaiter& await) {
+  fut1 = tc::async_resumable([&]() -> cotask<void> {
     tc::async([&] {
       if (++progress != 2)
         CHECK(!"the test is messed up");
@@ -222,8 +313,9 @@ TEST_CASE("coroutine yield cancel on yield")
     });
     if (++progress != 1)
       CHECK(!"the test is messed up");
-    await.yield();
+    TC_YIELD();
     ++progress;
+    TC_RETURN();
   });
   prom.get_future().wait();
   CHECK(2 == progress);
@@ -234,10 +326,11 @@ TEST_CASE("coroutine await move-only type")
 {
   tc::promise<std::unique_ptr<int>> prom;
   auto fut = prom.get_future();
-  auto finished = tc::async_resumable([&](tc::awaiter& await) {
-    auto const ptr = await(fut);
+  auto finished = tc::async_resumable([&]() -> cotask<void> {
+    auto const ptr = TC_AWAIT(std::move(fut));
     REQUIRE(ptr);
     CHECK(42 == *ptr);
+    TC_RETURN();
   });
   prom.set_value(std::make_unique<int>(42));
   finished.get();
