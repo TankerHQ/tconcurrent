@@ -10,6 +10,7 @@ add_executable(test_tconcurrent
   test_coroutine.cpp
   test_future.cpp
   test_future_group.cpp
+  test_job.cpp
   test_packaged_task.cpp
   test_periodic_task.cpp
   test_semaphore.cpp

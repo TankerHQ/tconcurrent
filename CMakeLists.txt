@@ -14,11 +14,13 @@ find_package(Boost 1.61 REQUIRED COMPONENTS system thread context)
 find_package(CURL REQUIRED)
 
 add_library(tconcurrent
-  src/stackful_coroutine.cpp
   src/async_wait.cpp
-  src/periodic_task.cpp
-  src/thread_pool.cpp
+  src/barrier.cpp
   src/executor.cpp
+  src/periodic_task.cpp
+  src/stackful_coroutine.cpp
+  src/stepper.cpp
+  src/thread_pool.cpp
 
   src/curl/curl.cpp
   src/curl/read_all.cpp
