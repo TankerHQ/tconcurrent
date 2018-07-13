@@ -313,76 +313,6 @@ struct abort_handler
 
 using awaiter = detail::coroutine_control;
 
-/** Create a resumable function and schedule it
- *
- * \param name (optional) the name of the coroutine, only used for debugging
- * purposes
- * \param cb the callback to run. Its signature should be:
- *
- *     cotask<T> func();
- *
- * \return the future corresponding to the result of the callback
- */
-template <typename E, typename F>
-auto async_resumable(std::string const& name, E&& executor, F&& cb)
-{
-  using return_task_type = std::decay_t<decltype(cb())>;
-  using return_type = typename return_task_type::value_type;
-
-  auto const fullName = name + " (" + typeid(F).name() + ")";
-
-  auto token = std::make_shared<cancelation_token>();
-  auto pack = package_cancelable<future<return_type>()>(
-      [executor, cb = std::forward<F>(cb), fullName, token]() mutable {
-        auto pack = package<return_task_type()>(std::move(cb), token);
-
-        detail::coroutine_control* cs = new detail::coroutine_control(
-            fullName,
-            executor,
-            [cb = std::move(pack.first), &cs](
-                detail::coroutine_t argctx,
-                detail::coroutine_controller const&) {
-              TC_SANITIZER_ENTER_NEW_CONTEXT();
-              auto mycs = cs;
-              mycs->argctx = &argctx;
-
-              TC_SANITIZER_OPEN_RETURN_CONTEXT();
-              *mycs->argctx = std::move(
-                  std::get<0>(argctx([](detail::coroutine_control* ctrl) {
-                    run_coroutine(ctrl);
-                  })));
-              TC_SANITIZER_CLOSE_SWITCH_CONTEXT();
-
-              cb();
-
-              TC_SANITIZER_EXIT_CONTEXT()
-              return argctx;
-            },
-            *token);
-
-        detail::coroutine_controller f;
-        {
-          TC_SANITIZER_OPEN_SWITCH_CONTEXT(
-              reinterpret_cast<char const*>(cs->stack.sp) - cs->stack.size,
-              cs->stack.size)
-          std::tie(cs->ctx, f) = cs->ctx({});
-          TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
-        }
-
-        f(cs);
-
-        return pack.second
-            .and_then(tc::get_synchronous_executor(),
-                      [](auto&& task) { return std::move(task).get(); })
-            .then(tc::get_synchronous_executor(), detail::abort_handler{cs});
-      },
-      token);
-
-  executor.post(std::move(std::get<0>(pack)), fullName);
-
-  return std::move(std::get<1>(pack)).update_chain_name(fullName).unwrap();
-}
-
 inline awaiter& get_current_awaiter()
 {
   auto ptr = detail::get_current_coroutine_ptr();
@@ -467,6 +397,76 @@ inline cotask<void> wrap_task()
 {
   return cotask<void>();
 }
+}
+
+/** Create a resumable function and schedule it
+ *
+ * \param name (optional) the name of the coroutine, only used for debugging
+ * purposes
+ * \param cb the callback to run. Its signature should be:
+ *
+ *     cotask<T> func();
+ *
+ * \return the future corresponding to the result of the callback
+ */
+template <typename E, typename F>
+auto async_resumable(std::string const& name, E&& executor, F&& cb)
+{
+  using return_task_type = std::decay_t<decltype(cb())>;
+  using return_type = typename return_task_type::value_type;
+
+  auto const fullName = name + " (" + typeid(F).name() + ")";
+
+  auto token = std::make_shared<cancelation_token>();
+  auto pack = package_cancelable<future<return_type>()>(
+      [executor, cb = std::forward<F>(cb), fullName, token]() mutable {
+        auto pack = package<return_task_type()>(std::move(cb), token);
+
+        detail::coroutine_control* cs = new detail::coroutine_control(
+            fullName,
+            executor,
+            [cb = std::move(pack.first), &cs](
+                detail::coroutine_t argctx,
+                detail::coroutine_controller const&) {
+              TC_SANITIZER_ENTER_NEW_CONTEXT();
+              auto mycs = cs;
+              mycs->argctx = &argctx;
+
+              TC_SANITIZER_OPEN_RETURN_CONTEXT();
+              *mycs->argctx = std::move(
+                  std::get<0>(argctx([](detail::coroutine_control* ctrl) {
+                    run_coroutine(ctrl);
+                  })));
+              TC_SANITIZER_CLOSE_SWITCH_CONTEXT();
+
+              cb();
+
+              TC_SANITIZER_EXIT_CONTEXT()
+              return argctx;
+            },
+            *token);
+
+        detail::coroutine_controller f;
+        {
+          TC_SANITIZER_OPEN_SWITCH_CONTEXT(
+              reinterpret_cast<char const*>(cs->stack.sp) - cs->stack.size,
+              cs->stack.size)
+          std::tie(cs->ctx, f) = cs->ctx({});
+          TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
+        }
+
+        f(cs);
+
+        return pack.second
+            .and_then(tc::get_synchronous_executor(),
+                      [](auto&& task) { return std::move(task).get(); })
+            .then(tc::get_synchronous_executor(), detail::abort_handler{cs});
+      },
+      token);
+
+  executor.post(std::move(std::get<0>(pack)), fullName);
+
+  return std::move(std::get<1>(pack)).update_chain_name(fullName).unwrap();
 }
 }
 
