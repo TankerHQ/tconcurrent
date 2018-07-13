@@ -7,12 +7,6 @@
 
 using namespace tconcurrent;
 
-TEST_CASE("coroutine empty")
-{
-  auto f = async_resumable([]() -> cotask<void> { TC_RETURN(); });
-  CHECK_NOTHROW(f.get());
-}
-
 TEST_CASE("coroutine return")
 {
   auto f = async_resumable([]() -> cotask<int> { TC_RETURN(42); });
@@ -38,7 +32,6 @@ TEST_CASE("coroutine on executor")
     CHECK(tp.is_in_this_context());
     TC_AWAIT(tc::async(tp, [] {}));
     CHECK(tp.is_in_this_context());
-    TC_RETURN();
   });
   f.get();
 }
@@ -158,7 +151,6 @@ TEST_CASE("coroutine nested cotask<T&>")
              int i = 0;
              int& ii = TC_AWAIT([&]() -> cotask<int&> { TC_RETURN(i); }());
              CHECK(&i == &ii);
-             TC_RETURN();
            })
                .get();
 }
@@ -167,11 +159,7 @@ TEST_CASE("coroutine nested void cotask")
 {
   promise<void> prom;
   auto f = async_resumable([&]() -> cotask<void> {
-    TC_AWAIT([&]() -> cotask<void> {
-      TC_AWAIT(prom.get_future());
-      TC_RETURN();
-    }());
-    TC_RETURN();
+    TC_AWAIT([&]() -> cotask<void> { TC_AWAIT(prom.get_future()); }());
   });
   prom.set_value({});
   CHECK_NOTHROW(f.get());
@@ -268,7 +256,6 @@ TEST_CASE("coroutine yield")
     fut.wait();
     TC_YIELD();
     ++progress;
-    TC_RETURN();
   });
   // this will be scheduled during the yield
   auto fut2 = tc::async([&] { CHECK(1 == progress); });
@@ -288,7 +275,6 @@ TEST_CASE("coroutine yield cancel before yield")
     fut.wait();
     TC_YIELD();
     ++progress;
-    TC_RETURN();
   });
   while (progress.load() != 1)
     ;
@@ -315,7 +301,6 @@ TEST_CASE("coroutine yield cancel on yield")
       CHECK(!"the test is messed up");
     TC_YIELD();
     ++progress;
-    TC_RETURN();
   });
   prom.get_future().wait();
   CHECK(2 == progress);
@@ -330,7 +315,6 @@ TEST_CASE("coroutine await move-only type")
     auto const ptr = TC_AWAIT(std::move(fut));
     REQUIRE(ptr);
     CHECK(42 == *ptr);
-    TC_RETURN();
   });
   prom.set_value(std::make_unique<int>(42));
   finished.get();

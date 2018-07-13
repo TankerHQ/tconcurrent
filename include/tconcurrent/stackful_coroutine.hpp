@@ -321,12 +321,6 @@ inline awaiter& get_current_awaiter()
   return *ptr;
 }
 
-template <typename Awaitable>
-inline auto await(Awaitable&& awaitable)
-{
-  return get_current_awaiter()(std::forward<Awaitable>(awaitable));
-}
-
 inline void yield()
 {
   get_current_awaiter().yield();
@@ -339,20 +333,19 @@ struct cotask_value
 {
   T val;
 };
-}
 
 template <typename T>
-class [[nodiscard]] cotask {
+class [[nodiscard]] cotask_impl {
 public:
   using value_type = T;
 
-  cotask(cotask const&) = delete;
-  cotask& operator=(cotask const&) = delete;
-  cotask(cotask &&) = default;
-  cotask& operator=(cotask&&) = default;
+  cotask_impl(cotask_impl const&) = delete;
+  cotask_impl& operator=(cotask_impl const&) = delete;
+  cotask_impl(cotask_impl &&) = default;
+  cotask_impl& operator=(cotask_impl&&) = default;
 
   template <typename U>
-  cotask(detail::cotask_value<U> value) : _value(static_cast<U>(value.val))
+  cotask_impl(detail::cotask_value<U> value) : _value(static_cast<U>(value.val))
   {
   }
 
@@ -366,7 +359,7 @@ private:
 };
 
 template <>
-class [[nodiscard]] cotask<void> {
+class [[nodiscard]] cotask_impl<void> {
 public:
   using value_type = void;
 
@@ -376,14 +369,55 @@ public:
 };
 
 template <typename T>
-T&& await(cotask<T>&& task)
+struct task_return_type;
+
+template <typename T>
+struct task_return_type<cotask_impl<T>>
 {
-  return std::move(task).get();
+  using type = typename cotask_impl<T>::value_type;
+};
+
+template <typename T>
+struct extract_value;
+
+template <typename T>
+struct extract_value<cotask_impl<T>>
+{
+  static decltype(auto) get(cotask_impl<T>&& t)
+  {
+    return std::move(t).get();
+  }
+};
+
+template <>
+struct extract_value<void>
+{
+  static void get(tvoid&& t)
+  {
+  }
+};
+
+template <>
+struct task_return_type<void>
+{
+  using type = void;
+};
+
+template <typename T>
+struct cotask_alias
+{
+  using type = cotask_impl<T>;
+};
+
+template <>
+struct cotask_alias<void>
+{
+  using type = void;
+};
 }
 
-inline void await(cotask<void>&&)
-{
-}
+template <typename T>
+using cotask = typename detail::cotask_alias<T>::type;
 
 namespace detail
 {
@@ -413,7 +447,7 @@ template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
 {
   using return_task_type = std::decay_t<decltype(cb())>;
-  using return_type = typename return_task_type::value_type;
+  using return_type = typename detail::task_return_type<return_task_type>::type;
 
   auto const fullName = name + " (" + typeid(F).name() + ")";
 
@@ -459,7 +493,10 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
 
         return pack.second
             .and_then(tc::get_synchronous_executor(),
-                      [](auto&& task) { return std::move(task).get(); })
+                      [](auto&& task) {
+                        return detail::extract_value<return_task_type>::get(
+                            std::move(task));
+                      })
             .then(tc::get_synchronous_executor(), detail::abort_handler{cs});
       },
       token);
@@ -468,9 +505,26 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
 
   return std::move(std::get<1>(pack)).update_chain_name(fullName).unwrap();
 }
+
+namespace detail
+{
+struct await_impl
+{
+  template <typename T>
+  T&& operator,(cotask_impl<T>&& task)
+  {
+    return std::move(task).get();
+  }
+  template <typename Awaitable>
+  auto operator,(Awaitable&& awaitable)
+  {
+    return get_current_awaiter()(std::forward<Awaitable>(awaitable));
+  }
+};
+}
 }
 
-#define TC_AWAIT(future) tc::await(future)
+#define TC_AWAIT(future) (tc::detail::await_impl(), future)
 #define TC_YIELD() ::tc::yield()
 #define TC_RETURN(value)                   \
   do                                       \
