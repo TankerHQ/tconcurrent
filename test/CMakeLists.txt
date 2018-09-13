@@ -28,9 +28,3 @@ if (TCONCURRENT_COROUTINES_TS)
   target_compile_options(test_coroutinests PUBLIC -fcoroutines-ts)
   target_compile_definitions(test_coroutinests PUBLIC TCONCURRENT_COROUTINES_TS)
 endif()
-
-add_executable(test_tconcurrent_curl
-  test_curl.cpp
-)
-target_link_libraries(test_tconcurrent_curl tconcurrent tconcurrent_doctest_main)
-# do not run curl tests since they are flaky because the server send 408 sometimes
