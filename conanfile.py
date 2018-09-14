@@ -19,7 +19,6 @@ class TconcurrentConan(ConanFile):
 
     def requirements(self):
         self.requires("Boost/1.66.0-r3@%s/%s" % (self.user, self.channel))
-        self.requires("libcurl/7.50.3@%s/%s" % (self.user, self.channel))
         self.requires("enum-flags/6df748a@%s/%s" % (self.user, self.channel))
 
     def build_requirements(self):
@@ -32,7 +31,6 @@ class TconcurrentConan(ConanFile):
         if self.options["Boost"].without_context:
             raise Exception("tconcurrent requires Boost.Context")
         self.options["Boost"].shared = self.options.shared
-        self.options["libcurl"].shared = self.options.shared
 
     def imports(self):
         # We have to copy dependencies DLLs for unit tests
