@@ -18,7 +18,7 @@ class TconcurrentConan(ConanFile):
         return None
 
     def requirements(self):
-        self.requires("Boost/1.66.0-r3@%s/%s" % (self.user, self.channel))
+        self.requires("Boost/1.66.0-r4@%s/%s" % (self.user, self.channel))
         self.requires("enum-flags/6df748a@%s/%s" % (self.user, self.channel))
 
     def build_requirements(self):
