@@ -139,7 +139,7 @@ struct task_promise<void> : task_promise_base
 }
 
 template <typename T>
-class cotask
+class [[nodiscard]] cotask
 {
 public:
   using value_type = T;
