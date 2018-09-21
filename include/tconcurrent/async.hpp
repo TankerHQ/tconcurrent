@@ -1,8 +1,8 @@
 #ifndef TCONCURRENT_ASYNC_HPP
 #define TCONCURRENT_ASYNC_HPP
 
+#include <tconcurrent/executor.hpp>
 #include <tconcurrent/packaged_task.hpp>
-#include <tconcurrent/thread_pool.hpp>
 
 namespace tconcurrent
 {
