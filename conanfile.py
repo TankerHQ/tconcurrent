@@ -28,9 +28,14 @@ class TconcurrentConan(ConanFile):
         if tools.cross_building(self.settings):
             del self.settings.compiler.libcxx
 
-        if self.options["Boost"].without_context:
-            raise Exception("tconcurrent requires Boost.Context")
-        self.options["Boost"].shared = self.options.shared
+        if self.settings.os == "Emscripten":
+            self.options["Boost"].with_ssl = False
+            self.options["Boost"].header_only = True
+        else:
+            self.options["Boost"].shared = self.options.shared
+            if self.options["Boost"].without_context:
+                raise Exception("tconcurrent requires Boost.Context")
+
 
     def imports(self):
         # We have to copy dependencies DLLs for unit tests

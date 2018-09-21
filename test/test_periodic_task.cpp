@@ -4,6 +4,11 @@
 #include <tconcurrent/async_wait.hpp>
 #include <tconcurrent/periodic_task.hpp>
 #include <tconcurrent/promise.hpp>
+#ifndef EMSCRIPTEN
+#include <tconcurrent/thread_pool.hpp>
+#endif
+
+#include <thread>
 
 using namespace tconcurrent;
 
@@ -68,6 +73,7 @@ TEST_CASE("test periodic task immediate [waiting]")
   CHECK(1 == called);
 }
 
+#ifndef EMSCRIPTEN
 TEST_CASE("test periodic task executor [waiting]")
 {
   thread_pool tp;
@@ -151,6 +157,7 @@ TEST_CASE("test periodic task future error stop [waiting]")
   REQUIRE(1 == goterror);
   CHECK_THROWS_AS(std::rethrow_exception(holdIt), int);
 }
+#endif
 
 TEST_CASE("test periodic task stop before start")
 {
@@ -249,6 +256,7 @@ TEST_CASE("test periodic task stop from inside [waiting]")
   CHECK(1 == called);
 }
 
+#ifndef EMSCRIPTEN
 TEST_CASE("test periodic single threaded task stop")
 {
   thread_pool tp;
@@ -264,6 +272,7 @@ TEST_CASE("test periodic single threaded task stop")
   CHECK(!pt.is_running());
   CHECK(0 < called);
 }
+#endif
 
 TEST_CASE("test periodic task cancel [waiting]")
 {

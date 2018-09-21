@@ -1,6 +1,8 @@
 #include <tconcurrent/future.hpp>
 #include <tconcurrent/promise.hpp>
+#ifndef EMSCRIPTEN
 #include <tconcurrent/thread_pool.hpp>
+#endif
 
 #include <doctest.h>
 
@@ -667,9 +669,10 @@ TEST_CASE(
 }
 
 /////////////////////////
-// future unwrapping
+// future executor
 /////////////////////////
 
+#ifndef EMSCRIPTEN
 TEST_CASE("then must support running on specified executor")
 {
   thread_pool tp;
@@ -690,3 +693,4 @@ TEST_CASE("and_then must support running on specified executor")
   f.and_then(executor(tp), [&](tvoid) { CHECK(tp.is_in_this_context()); })
       .get();
 }
+#endif

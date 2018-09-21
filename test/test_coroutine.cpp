@@ -3,7 +3,10 @@
 #include <tconcurrent/async_wait.hpp>
 #include <tconcurrent/coroutine.hpp>
 #include <tconcurrent/promise.hpp>
+
+#ifndef EMSCRIPTEN
 #include <tconcurrent/thread_pool.hpp>
+#endif
 
 using namespace tconcurrent;
 
@@ -22,6 +25,7 @@ TEST_CASE("coroutine throw")
   CHECK_THROWS_AS(f.get(), int);
 }
 
+#ifndef EMSCRIPTEN
 TEST_CASE("coroutine on executor")
 {
   thread_pool tp;
@@ -35,6 +39,7 @@ TEST_CASE("coroutine on executor")
   });
   f.get();
 }
+#endif
 
 TEST_CASE("coroutine wait ready")
 {
