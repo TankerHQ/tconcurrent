@@ -3,6 +3,8 @@
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/packaged_task.hpp>
 
+#include <thread>
+
 using namespace tconcurrent;
 
 TEST_CASE("packaged_task<void> should give a non-ready future")

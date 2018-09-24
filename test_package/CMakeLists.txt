@@ -9,4 +9,4 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(tconcurrent_test test.cpp)
-conan_target_link_libraries(tconcurrent_test)
+target_link_libraries(tconcurrent_test PUBLIC CONAN_PKG::tconcurrent)

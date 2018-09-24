@@ -2,7 +2,6 @@
 
 #include <tconcurrent/async_wait.hpp>
 #include <tconcurrent/barrier.hpp>
-#include <tconcurrent/coroutine.hpp>
 #include <tconcurrent/stepper.hpp>
 
 #include <doctest.h>
@@ -175,30 +174,44 @@ TEST_CASE("job never runs more than once [waiting]")
   std::atomic<bool> failed{false};
   std::atomic<bool> calling{false};
   std::atomic<int> nbcall{0};
-  async_resumable([&]() -> cotask<void> {
-    job t([&] {
-      if (calling)
-      {
-        failed = true;
-      }
-      calling = true;
-      ++nbcall;
-      return async_resumable("nested async", [&]() -> cotask<void> {
-        for (int i = 0; i < 10; ++i)
-        {
-          TC_AWAIT(async_wait(std::chrono::milliseconds(50)));
-        }
-        calling = false;
-        TC_RETURN();
-      });
-    });
-    while (nbcall < 10)
+
+  tc::promise<void> done;
+
+  std::shared_ptr<job> t = std::make_shared<job>([&] {
+    if (calling)
     {
-      TC_YIELD();
-      t.trigger();
+      failed = true;
     }
-    TC_RETURN();
-  })
-      .get();
+    calling = true;
+    ++nbcall;
+    tc::future<void> fut = async_wait(std::chrono::milliseconds(50));
+    for (int i = 0; i < 10; ++i)
+      fut = fut.and_then(tc::get_synchronous_executor(),
+                         [](auto const&) {
+                           return async_wait(std::chrono::milliseconds(50));
+                         })
+                .unwrap();
+    return fut.and_then(tc::get_synchronous_executor(),
+                        [&](auto const&) { calling = false; });
+  });
+
+  std::function<void(tc::future<void>)> const reschedule =
+      [&](tc::future<void> fut) {
+        if (nbcall < 10)
+        {
+          fut.then(reschedule);
+          t->trigger();
+        }
+        else
+        {
+          t = nullptr;
+          done.set_value({});
+        }
+      };
+
+  tc::make_ready_future().then(reschedule);
+
+  done.get_future().get();
+
   CHECK(!failed);
 }
