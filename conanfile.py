@@ -3,7 +3,7 @@ from conans import tools, CMake, ConanFile
 
 class TconcurrentConan(ConanFile):
     name = "tconcurrent"
-    version = "0.12"
+    version = "0.14"
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False], "sanitizer": ["address", None]}
     default_options = "shared=False", "fPIC=True", "sanitizer=None"
@@ -18,11 +18,11 @@ class TconcurrentConan(ConanFile):
         return None
 
     def requirements(self):
-        self.requires("Boost/1.66.0-r5@%s/%s" % (self.user, self.channel))
-        self.requires("enum-flags/6df748a@%s/%s" % (self.user, self.channel))
+        self.requires("Boost/1.66.0-r5@tanker/stable")
+        self.requires("enum-flags/6df748a@tanker/stable")
 
     def build_requirements(self):
-        self.build_requires("doctest/1.2.6@%s/%s" % (self.user, self.channel))
+        self.build_requires("doctest/1.2.6@tanker/stable")
 
     def configure(self):
         if tools.cross_building(self.settings):
