@@ -15,4 +15,3 @@ tanker/stable:
   when: manual
   tags:
     - linux
-    - debian9
