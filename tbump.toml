@@ -19,3 +19,7 @@ tag_template = "v{new_version}"
 [[file]]
 src = "conanfile.py"
 search = 'version = "{current_version}"'
+
+[[file]]
+src = ".gitlab-ci.yml"
+search = '    - python3 -m pipenv run conan upload tconcurrent/{current_version}@tanker/stable --remote godzilla'
