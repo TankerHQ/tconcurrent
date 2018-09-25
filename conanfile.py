@@ -3,7 +3,7 @@ from conans import tools, CMake, ConanFile
 
 class TconcurrentConan(ConanFile):
     name = "tconcurrent"
-    version = "0.13"
+    version = "0.14"
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False], "sanitizer": ["address", None]}
     default_options = "shared=False", "fPIC=True", "sanitizer=None"
