@@ -78,7 +78,8 @@ struct abort_coroutine
 {
 };
 
-struct abort_handler;
+template <typename T>
+struct coroutine_finish;
 
 using coroutine_controller = std::function<void(class coroutine_control*)>;
 using coroutine_t = boost::context::execution_context<coroutine_controller>;
@@ -145,7 +146,8 @@ private:
                                              E&& executor,
                                              F&& cb);
   friend coroutine_status run_coroutine(coroutine_control* ctrl);
-  friend abort_handler;
+  template <typename T>
+  friend struct coroutine_finish;
 };
 
 TCONCURRENT_EXPORT
@@ -269,46 +271,6 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
     throw operation_canceled{};
   return finished_awaitable.get();
 }
-
-struct abort_handler
-{
-  detail::coroutine_control* cs;
-
-  template <typename T,
-            std::enable_if_t<std::is_same<typename std::decay_t<T>::result_type,
-                                          void>::value,
-                             int> _ = 0>
-  auto operator()(T&& fut)
-  {
-    try
-    {
-      fut.get();
-    }
-    catch (detail::abort_coroutine)
-    {
-      cs->aborted = true;
-      throw operation_canceled{};
-    }
-  }
-
-  template <
-      typename T,
-      std::enable_if_t<
-          !std::is_same<typename std::decay_t<T>::result_type, void>::value,
-          int> _ = 0>
-  auto operator()(T&& fut)
-  {
-    try
-    {
-      return fut.get();
-    }
-    catch (detail::abort_coroutine)
-    {
-      cs->aborted = true;
-      throw operation_canceled{};
-    }
-  }
-};
 }
 
 using awaiter = detail::coroutine_control;
@@ -377,26 +339,6 @@ struct task_return_type<cotask_impl<T>>
   using type = typename cotask_impl<T>::value_type;
 };
 
-template <typename T>
-struct extract_value;
-
-template <typename T>
-struct extract_value<cotask_impl<T>>
-{
-  static decltype(auto) get(cotask_impl<T>&& t)
-  {
-    return std::move(t).get();
-  }
-};
-
-template <>
-struct extract_value<void>
-{
-  static void get(tvoid&& t)
-  {
-  }
-};
-
 template <>
 struct task_return_type<void>
 {
@@ -413,6 +355,44 @@ template <>
 struct cotask_alias<void>
 {
   using type = void;
+};
+
+template <typename T>
+struct coroutine_finish
+{
+  detail::coroutine_control* cs;
+
+  auto operator()(future<cotask_impl<T>>&& fut)
+  {
+    try
+    {
+      return fut.get().get();
+    }
+    catch (detail::abort_coroutine)
+    {
+      cs->aborted = true;
+      throw operation_canceled{};
+    }
+  }
+};
+
+template <>
+struct coroutine_finish<void>
+{
+  detail::coroutine_control* cs;
+
+  void operator()(future<void>&& fut)
+  {
+    try
+    {
+      fut.get();
+    }
+    catch (detail::abort_coroutine)
+    {
+      cs->aborted = true;
+      throw operation_canceled{};
+    }
+  }
 };
 }
 
@@ -467,10 +447,8 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
               mycs->argctx = &argctx;
 
               TC_SANITIZER_OPEN_RETURN_CONTEXT();
-              *mycs->argctx = std::move(
-                  std::get<0>(argctx([](detail::coroutine_control* ctrl) {
-                    run_coroutine(ctrl);
-                  })));
+              *mycs->argctx =
+                  std::move(std::get<0>(argctx(&detail::run_coroutine)));
               TC_SANITIZER_CLOSE_SWITCH_CONTEXT();
 
               cb();
@@ -491,13 +469,8 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
 
         f(cs);
 
-        return pack.second
-            .and_then(tc::get_synchronous_executor(),
-                      [](auto&& task) {
-                        return detail::extract_value<return_task_type>::get(
-                            std::move(task));
-                      })
-            .then(tc::get_synchronous_executor(), detail::abort_handler{cs});
+        return pack.second.then(tc::get_synchronous_executor(),
+                                detail::coroutine_finish<return_type>{cs});
       },
       token);
 
