@@ -8,7 +8,7 @@ tanker/stable:
     - python3 -m pipenv run conan user --clean tanker
     - python3 -m pipenv run conan user --remote godzilla --password ${CONAN_GODZILLA_TANKER_PASSWORD} tanker
     - python3 -m pipenv run conan export . tanker/stable
-    - python3 -m pipenv run conan upload tconcurrent/0.14@tanker/stable --remote godzilla
+    - python3 -m pipenv run conan upload tconcurrent/0.15@tanker/stable --remote godzilla
   only:
     - tags
   when: manual
