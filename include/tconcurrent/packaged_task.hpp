@@ -128,6 +128,41 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
   }
 };
 
+template <typename S>
+class packaged_task_canceler
+{
+public:
+  packaged_task_canceler(std::shared_ptr<shared<S>> p,
+                         cancelation_token* cancelation_token)
+    : _p(std::move(p)), _token(cancelation_token)
+  {
+  }
+
+  void operator()()
+  {
+    // If we got the _done lock just below, the callback may die
+    // asynchronously, setting the promise state to broken_promise. That's why
+    // we lock the promise_ptr before that line.
+    auto const pp = promise_ptr<detail::shared<S>>::try_lock(std::move(_p));
+    if (!pp)
+    {
+      // the promise is already dead, this means the callback has run
+      assert(_p->_done.load());
+      return;
+    }
+    if (pp->_done.exchange(true))
+      return;
+
+    _token->pop_cancelation_callback();
+    pp->_f = nullptr;
+    pp->set_exception(std::make_exception_ptr(operation_canceled{}));
+  }
+
+private:
+  std::shared_ptr<shared<S>> _p;
+  cancelation_token* _token;
+};
+
 template <typename S, typename F>
 auto package(F&& f, cancelation_token_ptr token, bool cancelable)
     -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>
@@ -135,25 +170,8 @@ auto package(F&& f, cancelation_token_ptr token, bool cancelable)
   auto const p = promise_ptr<detail::shared<S>>::make_shared(
       cancelable, token, std::forward<F>(f));
   if (cancelable)
-    token->push_cancelation_callback([p = p.as_shared(),
-                                      token = token.get()]() mutable {
-      // If we got the _done lock just below, the callback may die
-      // asynchronously, setting the promise state to broken_promise. That's why
-      // we lock the promise_ptr before that line.
-      auto const pp = promise_ptr<detail::shared<S>>::try_lock(std::move(p));
-      if (!pp)
-      {
-        // the promise is already dead, this means the callback has run
-        assert(p->_done.load());
-        return;
-      }
-      if (pp->_done.exchange(true))
-        return;
-
-      token->pop_cancelation_callback();
-      pp->_f = nullptr;
-      pp->set_exception(std::make_exception_ptr(operation_canceled{}));
-    });
+    token->push_cancelation_callback(
+        packaged_task_canceler<S>{p.as_shared(), token.get()});
   return std::make_pair(packaged_task<S>(p),
                         future<detail::result_of_t_<S>>(p.as_shared()));
 }
