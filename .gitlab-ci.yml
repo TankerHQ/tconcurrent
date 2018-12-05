@@ -3,17 +3,30 @@ before_script:
 
 stages:
   - build
+  - deploy
 
 build/linux:
   stage: build
   tags:
     - linux
   script:
-    - dmenv run -- python run-ci.py --profile gcc8
+    - dmenv run -- python run-ci.py build-and-test --profile gcc8
 
 build/macos:
   stage: build
   tags:
     - macos
   script:
-    - dmenv run -- python run-ci.py --profile macos
+    - dmenv run -- python run-ci.py build-and-test --profile macos
+
+mirror:
+  tags:
+    - linux
+  stage: deploy
+  only:
+    - /\Av[0-9.]+\z/   # public release tags only
+    - master
+  except:
+    - schedules
+  script:
+    - dmenv run python run-ci.py mirror
