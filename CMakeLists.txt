@@ -30,8 +30,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     src/executor_emscripten.cpp
   )
 else()
-  find_package(Boost 1.61 REQUIRED COMPONENTS system thread context)
-
   list(APPEND tconcurrent_SRC
     src/async_wait.cpp
     src/executor.cpp
@@ -39,10 +37,7 @@ else()
     src/thread_pool.cpp
   )
   list(APPEND tconcurrent_LIBS
-    # Keep components, to avoid linking with everything
-    Boost::system
-    Boost::thread
-    Boost::context
+    CONAN_PKG::Boost
     CONAN_PKG::enum-flags
   )
 endif()
