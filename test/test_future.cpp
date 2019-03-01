@@ -61,20 +61,20 @@ TEST_CASE("future<void> should work")
 
 TEST_CASE("exceptional future")
 {
-  auto future = make_exceptional_future<int>("FAIL");
+  auto future = make_exceptional_future<int>(std::invalid_argument{"kaboom"});
   CHECK(future.is_ready());
   CHECK(!future.has_value());
   CHECK(future.has_exception());
-  CHECK_THROWS_AS(future.get(), char*);
+  CHECK_THROWS_AS(future.get(), std::invalid_argument);
 }
 
 TEST_CASE("exceptional future<void>")
 {
-  auto future = make_exceptional_future<void>("FAIL");
+  auto future = make_exceptional_future<void>(std::invalid_argument{"kaboom"});
   CHECK(future.is_ready());
   CHECK(!future.has_value());
   CHECK(future.has_exception());
-  CHECK_THROWS_AS(future.get(), char*);
+  CHECK_THROWS_AS(future.get(), std::invalid_argument);
 }
 
 TEST_CASE("future.wait_for should timeout properly [waiting]")
