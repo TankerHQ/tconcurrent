@@ -2,7 +2,7 @@
 doctest/2.0.1@tanker/testing
 
 [requires]
-Boost/1.66.0@tanker/testing
+Boost/1.68.0@tanker/testing
 enum-flags/0.1a@tanker/testing
 
 [generators]

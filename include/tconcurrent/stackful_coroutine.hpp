@@ -21,6 +21,15 @@
 #include <sanitizer/common_interface_defs.h>
 #endif
 
+#if __cplusplus >= 201703L
+#define TCONCURRENT_NODISCARD [[nodiscard]]
+#elif defined(__GNUG__)
+#define TCONCURRENT_NODISCARD __attribute__((warn_unused_result))
+#else
+#define TCONCURRENT_NODISCARD
+#endif
+
+
 namespace tconcurrent
 {
 template <typename E, typename F>
@@ -297,7 +306,7 @@ struct cotask_value
 };
 
 template <typename T>
-class [[nodiscard]] cotask_impl {
+class TCONCURRENT_NODISCARD cotask_impl {
 public:
   using value_type = T;
 
@@ -321,7 +330,7 @@ private:
 };
 
 template <>
-class [[nodiscard]] cotask_impl<void> {
+class TCONCURRENT_NODISCARD cotask_impl<void> {
 public:
   using value_type = void;
 
