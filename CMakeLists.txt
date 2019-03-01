@@ -12,6 +12,30 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 
 set(tconcurrent_SRC
+  include/tconcurrent/async.hpp
+  include/tconcurrent/async_wait.hpp
+  include/tconcurrent/barrier.hpp
+  include/tconcurrent/cancelation_token.hpp
+  include/tconcurrent/concurrent_queue.hpp
+  include/tconcurrent/coroutine.hpp
+  include/tconcurrent/detail/boost_fwd.hpp
+  include/tconcurrent/detail/export.hpp
+  include/tconcurrent/detail/shared_base.hpp
+  include/tconcurrent/detail/util.hpp
+  include/tconcurrent/executor.hpp
+  include/tconcurrent/future.hpp
+  include/tconcurrent/future_group.hpp
+  include/tconcurrent/job.hpp
+  include/tconcurrent/packaged_task.hpp
+  include/tconcurrent/periodic_task.hpp
+  include/tconcurrent/promise.hpp
+  include/tconcurrent/semaphore.hpp
+  include/tconcurrent/stackful_coroutine.hpp
+  include/tconcurrent/stackless_coroutine.hpp
+  include/tconcurrent/stepper.hpp
+  include/tconcurrent/task_auto_canceler.hpp
+  include/tconcurrent/thread_pool.hpp
+  include/tconcurrent/when.hpp
   src/barrier.cpp
   src/periodic_task.cpp
   src/stepper.cpp
