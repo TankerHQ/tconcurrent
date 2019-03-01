@@ -1,3 +1,5 @@
+image: tanker.local:5000/ci-cpp:latest
+
 before_script:
   - dmenv install
 
