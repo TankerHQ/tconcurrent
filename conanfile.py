@@ -6,8 +6,18 @@ class TconcurrentConan(ConanFile):
     name = "tconcurrent"
     version = "0.17"
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False], "fPIC": [True, False], "sanitizer": ["address", None], "coroutinests": [True, False]}
-    default_options = "shared=False", "fPIC=True", "sanitizer=None", "coroutinests=False"
+    options = {
+        "shared": [True, False],
+        "fPIC": [True, False],
+        "sanitizer": ["address", None],
+        "coroutinests": [True, False],
+    }
+    default_options = (
+        "shared=False",
+        "fPIC=True",
+        "sanitizer=None",
+        "coroutinests=False",
+    )
     repo_url = "git@10.100.0.1:Tanker/tconcurrent"
     generators = "cmake"
 
