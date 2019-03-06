@@ -1,5 +1,4 @@
 from conans import tools, CMake, ConanFile
-import os
 
 
 class TconcurrentConan(ConanFile):
@@ -11,12 +10,14 @@ class TconcurrentConan(ConanFile):
         "fPIC": [True, False],
         "sanitizer": ["address", None],
         "coroutinests": [True, False],
+        "coverage": [True, False],
     }
     default_options = (
         "shared=False",
         "fPIC=True",
         "sanitizer=None",
         "coroutinests=False",
+        "coverage=False",
     )
     exports_sources = "CMakeLists.txt", "src", "include", "test"
     generators = "cmake"
@@ -27,9 +28,20 @@ class TconcurrentConan(ConanFile):
             return "-fsanitize=%s" % self.options.sanitizer
         return None
 
+    @property
+    def should_build_tests(self):
+        develop = self.develop
+        cross_building = tools.cross_building(self.settings)
+        emscripten = self.settings.os == "Emscripten"
+        return develop and (not cross_building) and (not emscripten)
+
     def requirements(self):
         self.requires("Boost/1.68.0@tanker/testing")
         self.requires("enum-flags/0.1a@tanker/testing")
+
+    def build_requirements(self):
+        if self.should_build_tests:
+            self.build_requires("doctest/2.0.1@tanker/testing")
 
     def configure(self):
         if self.settings.os == "Emscripten":
@@ -54,7 +66,9 @@ class TconcurrentConan(ConanFile):
             cmake.definitions["CONAN_CXX_FLAGS"] = self.sanitizer_flag
         cmake.definitions["BUILD_SHARED_LIBS"] = self.options.shared
         cmake.definitions["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.fPIC
-        cmake.definitions["BUILD_TESTING"] = "OFF"
+        cmake.definitions["BUILD_TESTING"] = self.should_build_tests
+        cmake.definitions["WITH_COVERAGE"] = self.options.coverage
+        cmake.configure()
         cmake.build()
         cmake.install()
 
