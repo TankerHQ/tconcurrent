@@ -18,7 +18,7 @@ class TconcurrentConan(ConanFile):
         "sanitizer=None",
         "coroutinests=False",
     )
-    repo_url = "git@10.100.0.1:Tanker/tconcurrent"
+    exports_sources = "CMakeLists.txt", "src", "include", "test"
     generators = "cmake"
 
     @property
@@ -55,7 +55,6 @@ class TconcurrentConan(ConanFile):
         cmake.definitions["BUILD_SHARED_LIBS"] = self.options.shared
         cmake.definitions["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.fPIC
         cmake.definitions["BUILD_TESTING"] = "OFF"
-        cmake.configure(source_dir=self.name)
         cmake.build()
         cmake.install()
 
