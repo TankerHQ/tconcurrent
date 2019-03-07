@@ -10,6 +10,32 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
+option(WITH_COVERAGE "Enable coverage" OFF)
+
+
+# CMAKE_C_FLAGS and the like are _strings_, not lists.
+# So, we need a macro so that we can rewrite the values
+# in place, and avoid appending the flags twice
+macro(tconcurrent_add_flags var flags)
+  string(FIND "${${var}}" ${flags} _res)
+  if(${_res} EQUAL "-1")
+    set(${var} "${${var}} ${flags}")
+  endif()
+endmacro()
+
+if(${WITH_COVERAGE})
+  if(WIN32)
+    message(WARNING "WITH_COVERAGE ignored on Windows")
+  else()
+    message(STATUS "Building with coverage")
+    tconcurrent_add_flags(CMAKE_C_FLAGS "--coverage")
+    tconcurrent_add_flags(CMAKE_CXX_FLAGS "--coverage")
+    tconcurrent_add_flags(CMAKE_EXE_LINKER_FLAGS "--coverage")
+    tconcurrent_add_flags(CMAKE_SHARED_LINKER_FLAGS "--coverage")
+    tconcurrent_add_flags(CMAKE_MODULE_LINKER_FLAGS "--coverage")
+  endif()
+endif()
+
 
 set(tconcurrent_SRC
   include/tconcurrent/async.hpp

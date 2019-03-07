@@ -39,3 +39,25 @@ if (TCONCURRENT_COROUTINES_TS)
   target_compile_options(test_coroutinests PUBLIC -fcoroutines-ts)
   target_compile_definitions(test_coroutinests PUBLIC TCONCURRENT_COROUTINES_TS)
 endif()
+
+
+if(WITH_COVERAGE)
+  set(COVERAGE_FILE ${CMAKE_BINARY_DIR}/coverage.info)
+  add_custom_target(coverage
+    COMMAND lcov
+      --base-directory ${CMAKE_BINARY_DIR}
+      --directory ${CMAKE_BINARY_DIR}
+      --capture
+      --rc lcov_branch_coverage=1
+      --output-file ${COVERAGE_FILE}
+    COMMAND lcov
+      --remove ${COVERAGE_FILE} */usr/include* boost* */.conan/* */test/* */Test/* *test-helpers/*
+      --rc lcov_branch_coverage=1
+      --output-file ${COVERAGE_FILE}
+    COMMAND genhtml
+      ${CMAKE_BINARY_DIR}/coverage.info
+      --branch-coverage
+      --output-directory ${CMAKE_BINARY_DIR}/coverage
+    USES_TERMINAL
+  )
+endif()

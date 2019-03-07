@@ -7,19 +7,84 @@ stages:
   - build
   - deploy
 
-build/linux:
+.build:
   stage: build
-  tags:
-    - linux
+  except:
+    - schedules
+
+build/linux:
+  extends: .build
+  tags: [linux]
   script:
-    - dmenv run -- python run-ci.py build-and-test --profile gcc8
+    - dmenv run -- python run-ci.py build-and-test --profile gcc8-release
 
 build/macos:
-  stage: build
-  tags:
-    - macos
+  extends: .build
+  tags: [macos]
   script:
-    - dmenv run -- python run-ci.py build-and-test --profile macos
+    - dmenv run -- python run-ci.py build-and-test --profile macos-release
+
+build/windows:
+  extends: .build
+  tags: [windows]
+  script:
+    - dmenv run -- python run-ci.py build-and-test --profile vs2017-release
+
+
+.deploy:
+  stage: deploy
+  except:
+    - schedules
+  when: manual
+  only:
+    - tags
+
+deploy/linux:
+  extends: .deploy
+  tags: [linux]
+  script:
+    - dmenv run -- python run-ci.py deploy
+
+deploy/macos:
+  extends: .deploy
+  tags: [macos]
+  script:
+    - dmenv run -- python run-ci.py deploy
+
+deploy/windows:
+  extends: .deploy
+  tags: [windown]
+  script:
+    - dmenv run -- python run-ci.py deploy
+
+coverage:
+  stage: build
+  only:
+    - schedules
+  script:
+    - dmenv run -- python run-ci.py build-and-test --profile gcc8 --coverage
+    - mv build/gcc8/x86_64/Release/coverage coverage
+  tags:
+    - linux
+  artifacts:
+    paths:
+      - coverage/
+    expire_in: 7 days
+
+pages:
+  stage: deploy
+  only:
+    - schedules
+  dependencies:
+    - coverage
+  script:
+    - mv coverage/ public/
+  artifacts:
+    paths:
+      - public
+    expire_in: 7 days
+  tags:
+    - linux
 
 mirror:
   tags:
