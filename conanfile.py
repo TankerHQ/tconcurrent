@@ -19,7 +19,7 @@ class TconcurrentConan(ConanFile):
         "coroutinests=False",
         "coverage=False",
     )
-    exports_sources = "CMakeLists.txt", "src", "include", "test"
+    exports_sources = "CMakeLists.txt", "src/*", "include/*", "test/*"
     generators = "cmake"
 
     @property
@@ -50,9 +50,6 @@ class TconcurrentConan(ConanFile):
             self.options["Boost"].shared = self.options.shared
             if self.options["Boost"].without_context:
                 raise Exception("tconcurrent requires Boost.Context")
-
-    def source(self):
-        self.run("git clone %s --branch v%s" % (self.repo_url, self.version))
 
     def imports(self):
         # We have to copy dependencies DLLs for unit tests
