@@ -53,7 +53,7 @@ deploy/macos:
 
 deploy/windows:
   extends: .deploy
-  tags: [windown]
+  tags: [windows]
   script:
     - dmenv run -- python run-ci.py --isolate-conan-user-home deploy
 

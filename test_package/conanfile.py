@@ -22,11 +22,10 @@ class TconcurrentTestConan(ConanFile):
 
     def test(self):
         if tools.cross_building(self.settings):
-            assert(os.path.exists(os.path.join("bin", "tconcurrent_test")))
-        else:
-            env = ""
-            if self.settings.os == "Macos":
-                env = "DYLD_FALLBACK_LIBRARY_PATH= DYLD_LIBRARY_PATH=./bin"
-            elif self.settings.os == "Linux":
-                env = "LD_LIBRARY_PATH=./bin"
-            self.run("%s .%sbin%stconcurrent_test" % (env, os.sep, os.sep))
+            return
+        env = ""
+        if self.settings.os == "Macos":
+            env = "DYLD_FALLBACK_LIBRARY_PATH= DYLD_LIBRARY_PATH=./bin"
+        elif self.settings.os == "Linux":
+            env = "LD_LIBRARY_PATH=./bin"
+        self.run("%s .%sbin%stconcurrent_test" % (env, os.sep, os.sep))
