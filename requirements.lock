@@ -6,7 +6,7 @@ astroid==2.2.5
 attrs==19.1.0
 bottle==0.12.16
 certifi==2019.3.9
-cffi==1.11.6
+cffi==1.12.2
 chardet==3.0.4
 cli-ui==0.9.1
 colorama==0.4.1
