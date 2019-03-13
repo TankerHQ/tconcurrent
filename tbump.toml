@@ -1,0 +1,27 @@
+[version]
+current = "dev"
+
+regex = '''
+  (dev)
+  |
+  (
+    (?P<major>\d+)
+    \.
+    (?P<minor>\d+)
+    \.
+    (?P<patch>\d+)
+    (
+      -
+      (?P<lifecycle>alpha|beta|r)
+      (?P<release>\d+)
+    )?
+  )
+'''
+
+[git]
+message_template = "Bump to {new_version}"
+tag_template = "v{new_version}"
+
+[[file]]
+src = "conanfile.py"
+search = 'version = "{current_version}"'
