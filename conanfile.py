@@ -44,12 +44,10 @@ class TconcurrentConan(ConanFile):
             self.build_requires("doctest/2.0.1@tanker/testing")
 
     def configure(self):
-        if self.settings.os == "Emscripten":
-            self.options["Boost"].header_only = True
-        else:
-            self.options["Boost"].shared = self.options.shared
-            if self.options["Boost"].without_context:
-                raise Exception("tconcurrent requires Boost.Context")
+        if self.settings.os != "Emscripten" and self.options["Boost"].without_context:
+            raise Exception("tconcurrent requires Boost.Context")
+        if self.options.coroutinests and self.settings.compiler != "clang":
+            raise Exception("Coroutines TS is only supported by clang at the moment")
 
     def imports(self):
         # We have to copy dependencies DLLs for unit tests
@@ -76,6 +74,7 @@ class TconcurrentConan(ConanFile):
             self.cpp_info.sharedlinkflags = [self.sanitizer_flag]
         if self.options.coroutinests:
             self.cpp_info.defines.append("TCONCURRENT_COROUTINES_TS=1")
+            self.cpp_info.cppflags.append("-fcoroutines-ts")
 
     def package_id(self):
         self.info.options.coroutinests = "ANY"
