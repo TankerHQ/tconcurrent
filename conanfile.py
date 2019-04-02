@@ -41,7 +41,7 @@ class TconcurrentConan(ConanFile):
 
     def build_requirements(self):
         if self.should_build_tests:
-            self.build_requires("doctest/2.0.1@tanker/testing")
+            self.build_requires("doctest/2.2.3@tanker/testing")
 
     def configure(self):
         if self.settings.os != "Emscripten" and self.options["Boost"].without_context:
@@ -77,4 +77,4 @@ class TconcurrentConan(ConanFile):
             self.cpp_info.cppflags.append("-fcoroutines-ts")
 
     def package_id(self):
-        self.info.options.coroutinests = "ANY"
+        del self.info.options.coroutinests
