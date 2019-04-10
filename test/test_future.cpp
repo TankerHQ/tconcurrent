@@ -50,6 +50,13 @@ TEST_CASE("shared_future should not move its result out")
   CHECK(42 == *future.get());
 }
 
+TEST_CASE("shared_future should throw its exception twice")
+{
+  auto future = make_exceptional_future<void>(42).to_shared();
+  CHECK_THROWS_AS(future.get(), int);
+  CHECK_THROWS_AS(future.get(), int);
+}
+
 TEST_CASE("future<void> should work")
 {
   auto future = make_ready_future();

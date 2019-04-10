@@ -216,7 +216,7 @@ public:
     while (_r.which() == 0)
       _ready.wait(lock);
     if (_r.which() == 2)
-      std::rethrow_exception(std::move(boost::get<v_exception>(_r).exc));
+      std::rethrow_exception(boost::get<v_exception>(_r).exc);
     // this may or may not move depending on Rcv being a reference or not
     return std::move(boost::get<v_value>(_r).value);
   }
