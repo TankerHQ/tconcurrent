@@ -314,13 +314,14 @@ struct cotask_value
 };
 
 template <typename T>
-class TCONCURRENT_NODISCARD cotask_impl {
+class TCONCURRENT_NODISCARD cotask_impl
+{
 public:
   using value_type = T;
 
   cotask_impl(cotask_impl const&) = delete;
   cotask_impl& operator=(cotask_impl const&) = delete;
-  cotask_impl(cotask_impl &&) = default;
+  cotask_impl(cotask_impl&&) = default;
   cotask_impl& operator=(cotask_impl&&) = default;
 
   template <typename U>
@@ -328,7 +329,7 @@ public:
   {
   }
 
-  decltype(auto) get()&&
+  decltype(auto) get() &&
   {
     return std::forward<T>(_value);
   }
@@ -338,11 +339,12 @@ private:
 };
 
 template <>
-class TCONCURRENT_NODISCARD cotask_impl<void> {
+class TCONCURRENT_NODISCARD cotask_impl<void>
+{
 public:
   using value_type = void;
 
-  void get()&&
+  void get() &&
   {
   }
 };

@@ -142,8 +142,7 @@ struct task_promise<void> : task_promise_base
 }
 
 template <typename T>
-class [[nodiscard]] cotask
-{
+class [[nodiscard]] cotask {
 public:
   using value_type = T;
 
@@ -152,7 +151,7 @@ public:
   cotask(cotask const&) = delete;
   cotask& operator=(cotask const&) = delete;
 
-  cotask(cotask&& o) : coro(o.coro), started(o.started)
+  cotask(cotask && o) : coro(o.coro), started(o.started)
   {
     o.coro = nullptr;
   }
@@ -170,7 +169,7 @@ public:
     }
   }
 
-  auto operator co_await() &&
+  auto operator co_await()&&
   {
     return typename cotask<T>::awaitable{coro};
   }
@@ -220,13 +219,13 @@ private:
   }
 
   template <typename E>
-  void set_executor(E&& executor)
+  void set_executor(E && executor)
   {
     coro.promise().executor = std::forward<E>(executor);
   }
 
   template <typename F>
-  void set_continuation(F&& cont)
+  void set_continuation(F && cont)
   {
     coro.promise().cont = std::forward<F>(cont);
   }
@@ -256,7 +255,7 @@ private:
 
   template <typename E, typename F>
   friend auto async_resumable(std::string const& name, E&& executor, F&& cb)
-      -> future<typename std::decay_t<decltype(cb())>::value_type>;
+      ->future<typename std::decay_t<decltype(cb())>::value_type>;
   friend detail::task_promise<T>;
 };
 
