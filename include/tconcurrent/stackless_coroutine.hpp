@@ -18,6 +18,9 @@ class cotask;
 
 namespace detail
 {
+void assert_no_cancel_in_catch();
+void assert_no_co_await_in_catch();
+
 struct task_promise_base
 {
   struct final_awaitable
@@ -230,6 +233,10 @@ private:
 
   void cancel()
   {
+#ifndef TCONCURRENT_ALLOW_CANCEL_IN_CATCH
+    detail::assert_no_cancel_in_catch();
+#endif
+
     auto const executor = coro.promise().executor;
     assert((!executor || executor.is_in_this_context()) &&
            "cancelation is not supported cross-executor");
@@ -308,6 +315,8 @@ struct future_awaiter
 
   bool await_ready()
   {
+    detail::assert_no_co_await_in_catch();
+
     if (input.is_ready())
     {
       output = std::move(input);

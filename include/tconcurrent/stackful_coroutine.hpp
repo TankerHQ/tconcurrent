@@ -29,6 +29,9 @@
 #define TCONCURRENT_NODISCARD
 #endif
 
+#ifdef TCONCURRENT_ALLOW_CANCEL_IN_CATCH
+#error TCONCURRENT_ALLOW_CANCEL_IN_CATCH is not allowed when compiling in the non-coroutines-TS mode.
+#endif
 
 namespace tconcurrent
 {
@@ -81,6 +84,8 @@ stack_bounds get_stack_bounds();
 #define TC_SANITIZER_EXIT_CONTEXT()
 
 #endif
+
+void assert_not_in_catch();
 
 /// Thrown inside a coroutine to stop it
 struct abort_coroutine
@@ -229,6 +234,8 @@ template <typename Awaitable>
 typename std::decay_t<Awaitable>::value_type coroutine_control::await(
     Awaitable&& awaitable, bool early_return)
 {
+  assert_not_in_catch();
+
   using FutureType = std::decay_t<Awaitable>;
 
   FutureType finished_awaitable;
@@ -244,6 +251,7 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
 
     auto canceler =
         token.make_scope_canceler([this, aborted, &progressing_awaitable] {
+          assert_not_in_catch();
           assert(get_default_executor().is_in_this_context());
 
           progressing_awaitable.request_cancel();
