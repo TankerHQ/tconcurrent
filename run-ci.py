@@ -48,12 +48,8 @@ def main() -> None:
             # When a macOS runner runs the tests, the ones waiting for a specific time will wait longer than requested.
             # Thus the tests fail. Funny thing is that they pass when running them by hand, on the slave...
             ctest_flags.append("--test-case-exclude=*[waiting]*")
-        ci.cpp.check(
-            args.profile,
-            coverage=args.coverage,
-            run_tests=True,
-            ctest_flags=ctest_flags,
-        )
+        built_path = ci.cpp.build(args.profile, coverage=args.coverage)
+        ci.cpp.check(built_path, coverage=args.coverage, ctest_flags=ctest_flags)
     elif args.command == "deploy":
         git_tag = os.environ["CI_COMMIT_TAG"]
         version = ci.version_from_git_tag(git_tag)
