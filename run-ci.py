@@ -7,6 +7,7 @@ from path import Path
 import ci
 import ci.android
 import ci.cpp
+import ci.conan
 import ci.ios
 import ci.mail
 import ci.git
@@ -27,7 +28,7 @@ def main() -> None:
 
     args = parser.parse_args()
     if args.home_isolation:
-        ci.cpp.set_home_isolation()
+        ci.conan.set_home_isolation()
 
     ci.cpp.update_conan_config()
 
