@@ -254,15 +254,15 @@ public:
   /// Return true if the future has a result value or an exception
   bool is_ready() const noexcept
   {
-    return _p && _p->_r.which() != 0;
+    return _p && _p->_r.index() != 0;
   }
   bool has_value() const noexcept
   {
-    return _p && _p->_r.which() == 1;
+    return _p && _p->_r.index() == 1;
   }
   bool has_exception() const noexcept
   {
-    return _p && _p->_r.which() == 2;
+    return _p && _p->_r.index() == 2;
   }
   /// Return false if the future has been default constructed or moved-from
   bool is_valid() const noexcept
@@ -363,8 +363,8 @@ private:
                                    cancelation_token* token,
                                    Func&& cb)
   {
-    assert(p._r.which() != 0);
-    if (p._r.which() == 1)
+    assert(p._r.index() != 0);
+    if (p._r.index() == 1)
     {
       if (token && token->is_cancel_requested())
         throw operation_canceled();
@@ -373,7 +373,7 @@ private:
     }
     else
     {
-      assert(p._r.which() == 2);
+      assert(p._r.index() == 2);
       p.template get<value_type const&>(); // rethrow to set the future to error
       assert(false && "unreachable code");
       std::terminate();

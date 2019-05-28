@@ -7,6 +7,8 @@
 
 #include <tconcurrent/promise.hpp>
 
+#include <algorithm>
+
 namespace tconcurrent
 {
 enum class when_any_options

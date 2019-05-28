@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include <boost/variant.hpp>
+#include <mpark/variant.hpp>
 
 #include <tconcurrent/cancelation_token.hpp>
 
@@ -153,7 +153,7 @@ public:
     std::exception_ptr exc;
   };
 
-  boost::variant<v_none, v_value, v_exception> _r;
+  mpark::variant<v_none, v_value, v_exception> _r;
 
   shared_base(nocancel_tag)
   {
@@ -168,7 +168,7 @@ public:
   virtual ~shared_base()
   {
     assert(_promise_count.load() == 0);
-    assert(_r.which() != 0);
+    assert(_r.index() != 0);
   }
 
   void set(R const& r)
@@ -192,7 +192,7 @@ public:
 
     {
       std::lock_guard<std::mutex> lock{_mutex};
-      if (_r.which() == 0)
+      if (_r.index() == 0)
         _then.emplace_back([name = std::move(name),
                             e = std::forward<E>(e),
                             f = std::forward<F>(f)]() mutable {
@@ -213,35 +213,35 @@ public:
                   "Rcv must be a R or R const&");
 
     std::unique_lock<std::mutex> lock{_mutex};
-    while (_r.which() == 0)
+    while (_r.index() == 0)
       _ready.wait(lock);
-    if (_r.which() == 2)
-      std::rethrow_exception(boost::get<v_exception>(_r).exc);
+    if (_r.index() == 2)
+      std::rethrow_exception(mpark::get<v_exception>(_r).exc);
     // this may or may not move depending on Rcv being a reference or not
-    return std::move(boost::get<v_value>(_r).value);
+    return std::move(mpark::get<v_value>(_r).value);
   }
 
   std::exception_ptr const& get_exception()
   {
     std::unique_lock<std::mutex> lock{_mutex};
-    while (_r.which() == 0)
+    while (_r.index() == 0)
       _ready.wait(lock);
-    if (_r.which() == 1)
+    if (_r.index() == 1)
       throw std::logic_error("this future has a value");
-    return boost::get<v_exception>(_r).exc;
+    return mpark::get<v_exception>(_r).exc;
   }
 
   void wait() const
   {
     std::unique_lock<std::mutex> lock{_mutex};
-    _ready.wait(lock, [&] { return _r.which() != 0; });
+    _ready.wait(lock, [&] { return _r.index() != 0; });
   }
 
   template <class Rep, class Period>
   void wait_for(std::chrono::duration<Rep, Period> const& dur) const
   {
     std::unique_lock<std::mutex> lock{_mutex};
-    _ready.wait_for(lock, dur, [&] { return _r.which() != 0; });
+    _ready.wait_for(lock, dur, [&] { return _r.index() != 0; });
   }
 
   std::shared_ptr<cancelation_token> reset_cancelation_token()
@@ -287,14 +287,14 @@ private:
   void decrement_promise()
   {
     assert(_promise_count.load() > 0);
-    if (--_promise_count == 0 && _r.which() == 0)
+    if (--_promise_count == 0 && _r.index() == 0)
       set_exception(std::make_exception_ptr(broken_promise{}));
   }
 
   template <typename F>
   void finish(F&& setval)
   {
-    assert(_r.which() == 0 && "state already set");
+    assert(_r.index() == 0 && "state already set");
 
     std::vector<std::function<void()>> then;
     {

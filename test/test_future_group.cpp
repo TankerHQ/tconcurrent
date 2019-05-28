@@ -2,6 +2,8 @@
 
 #include <tconcurrent/future_group.hpp>
 
+#include <algorithm>
+
 using namespace tconcurrent;
 
 TEST_CASE("test future_group empty")

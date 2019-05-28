@@ -75,6 +75,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   list(APPEND tconcurrent_LIBS
     CONAN_PKG::Boost
     CONAN_PKG::enum-flags
+    CONAN_PKG::variant
   )
   list(APPEND tconcurrent_SRC
     src/async_wait_emscripten.cpp
@@ -90,6 +91,7 @@ else()
   list(APPEND tconcurrent_LIBS
     CONAN_PKG::Boost
     CONAN_PKG::enum-flags
+    CONAN_PKG::variant
   )
 endif()
 
