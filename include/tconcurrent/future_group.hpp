@@ -7,6 +7,8 @@
 #include <tconcurrent/future.hpp>
 #include <tconcurrent/when.hpp>
 
+#include <algorithm>
+
 namespace tconcurrent
 {
 class future_group

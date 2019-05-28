@@ -2,6 +2,8 @@
 
 #include <tconcurrent/thread_pool.hpp>
 
+#include <iostream>
+
 using namespace tconcurrent;
 
 TEST_CASE("test thread_pool do nothing")

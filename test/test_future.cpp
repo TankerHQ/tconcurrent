@@ -6,6 +6,9 @@
 
 #include <doctest.h>
 
+#include <cstring>
+
+#include <iostream>
 #include <thread>
 
 using namespace tconcurrent;
@@ -261,7 +264,7 @@ TEST_CASE("then should set task name to chain name")
   fut.get();
   // only compare the beginning of the string because future appends the type of
   // the lambda to the name
-  CHECK(ChainName == e.name.substr(0, strlen(ChainName)));
+  CHECK(ChainName == e.name.substr(0, std::strlen(ChainName)));
 }
 
 /////////////////////////
