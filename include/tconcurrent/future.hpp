@@ -507,7 +507,7 @@ template <template <typename> class Fut1,
           typename R>
 Fut2<R> detail::future_unwrap<Fut1<Fut2<R>>>::unwrap()
 {
-  auto& fut1 = static_cast<future<future<R>>&>(*this);
+  auto& fut1 = static_cast<Fut1<Fut2<R>>&>(*this);
   auto sb = std::make_shared<typename future<R>::shared_type>(
       fut1._cancelation_token);
   fut1.then(get_synchronous_executor(), [sb](Fut1<Fut2<R>> fut1) {

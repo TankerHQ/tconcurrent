@@ -678,6 +678,15 @@ TEST_CASE(
   CHECK(prom2.get_cancelation_token().is_cancel_requested());
 }
 
+TEST_CASE("unwrap should work with future<shared_future>")
+{
+  shared_future<int> fut1{make_ready_future(18)};
+  future<shared_future<int>> fut2{make_ready_future(fut1)};
+  auto unwrapped = fut2.unwrap();
+  CHECK(unwrapped.is_ready());
+  CHECK(18 == unwrapped.get());
+}
+
 /////////////////////////
 // future executor
 /////////////////////////
