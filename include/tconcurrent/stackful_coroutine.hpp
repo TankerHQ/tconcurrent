@@ -41,26 +41,28 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb);
 namespace detail
 {
 
+class coroutine_control;
+
 #ifdef TCONCURRENT_SANITIZER
 
 struct stack_bounds
 {
-  void* stack;
+  void const* stack;
   size_t size;
 };
 
-stack_bounds get_stack_bounds();
+stack_bounds get_stack_bounds(coroutine_control* ctrl);
 
 #define TC_SANITIZER_OPEN_SWITCH_CONTEXT(stack, stacksize) \
   {                                                        \
     void* fsholder;                                        \
     __sanitizer_start_switch_fiber(&fsholder, stack, stacksize);
 
-#define TC_SANITIZER_OPEN_RETURN_CONTEXT()                \
-  {                                                       \
-    void* fsholder;                                       \
-    auto const stack_bounds = detail::get_stack_bounds(); \
-    __sanitizer_start_switch_fiber(                       \
+#define TC_SANITIZER_OPEN_RETURN_CONTEXT(ctrl)                \
+  {                                                           \
+    void* fsholder;                                           \
+    auto const stack_bounds = detail::get_stack_bounds(ctrl); \
+    __sanitizer_start_switch_fiber(                           \
         &fsholder, stack_bounds.stack, stack_bounds.size);
 
 #define TC_SANITIZER_CLOSE_SWITCH_CONTEXT()                    \
@@ -70,18 +72,18 @@ stack_bounds get_stack_bounds();
 #define TC_SANITIZER_ENTER_NEW_CONTEXT() \
   __sanitizer_finish_switch_fiber(nullptr, nullptr, nullptr)
 
-#define TC_SANITIZER_EXIT_CONTEXT()                     \
-  auto const stack_bounds = detail::get_stack_bounds(); \
-  __sanitizer_start_switch_fiber(                       \
+#define TC_SANITIZER_EXIT_CONTEXT(ctrl)                     \
+  auto const stack_bounds = detail::get_stack_bounds(ctrl); \
+  __sanitizer_start_switch_fiber(                           \
       nullptr, stack_bounds.stack, stack_bounds.size);
 
 #else
 
 #define TC_SANITIZER_OPEN_SWITCH_CONTEXT(stack, stacksize)
-#define TC_SANITIZER_OPEN_RETURN_CONTEXT()
+#define TC_SANITIZER_OPEN_RETURN_CONTEXT(ctrl)
 #define TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
 #define TC_SANITIZER_ENTER_NEW_CONTEXT()
-#define TC_SANITIZER_EXIT_CONTEXT()
+#define TC_SANITIZER_EXIT_CONTEXT(ctrl)
 
 #endif
 
@@ -136,6 +138,8 @@ private:
 
   bool aborted = false;
 
+  coroutine_control* previous_coroutine = nullptr;
+
   template <typename E, typename F>
   coroutine_control(std::string name, E&& e, F&& f, cancelation_token& token)
     : name(std::move(name))
@@ -159,6 +163,9 @@ private:
   friend auto ::tconcurrent::async_resumable(std::string const& name,
                                              E&& executor,
                                              F&& cb);
+#ifdef TCONCURRENT_SANITIZER
+  friend stack_bounds get_stack_bounds(coroutine_control* ctrl);
+#endif
   friend coroutine_status run_coroutine(coroutine_control* ctrl);
   template <typename T>
   friend struct coroutine_finish;
@@ -170,11 +177,15 @@ detail::coroutine_control*& get_current_coroutine_ptr();
 inline coroutine_status run_coroutine(coroutine_control* ctrl)
 {
   auto& ptr = get_current_coroutine_ptr();
+  assert(!ctrl->previous_coroutine);
   auto const previous_coroutine = ptr;
+  ctrl->previous_coroutine = previous_coroutine;
   ptr = ctrl;
-  BOOST_SCOPE_EXIT(&ptr, &previous_coroutine)
+  BOOST_SCOPE_EXIT(&ptr, &ctrl, &previous_coroutine)
   {
     ptr = previous_coroutine;
+    if (ctrl)
+      ctrl->previous_coroutine = nullptr;
   }
   BOOST_SCOPE_EXIT_END
 
@@ -192,6 +203,7 @@ inline coroutine_status run_coroutine(coroutine_control* ctrl)
     auto const status =
         ctrl->aborted ? coroutine_status::aborted : coroutine_status::finished;
     delete ctrl;
+    ctrl = nullptr;
     return status;
   }
   f(ctrl);
@@ -264,7 +276,7 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
                  "tc::detail::abort_coroutine must never be caught");
         });
 
-    TC_SANITIZER_OPEN_RETURN_CONTEXT()
+    TC_SANITIZER_OPEN_RETURN_CONTEXT(this)
     *argctx = std::get<0>((*argctx)(
         [&aborted, &progressing_awaitable, &finished_awaitable, &awaitable](
             coroutine_control* ctrl) {
@@ -465,14 +477,14 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
               auto mycs = cs;
               mycs->argctx = &argctx;
 
-              TC_SANITIZER_OPEN_RETURN_CONTEXT();
+              TC_SANITIZER_OPEN_RETURN_CONTEXT(mycs);
               *mycs->argctx =
                   std::move(std::get<0>(argctx(&detail::run_coroutine)));
               TC_SANITIZER_CLOSE_SWITCH_CONTEXT();
 
               cb();
 
-              TC_SANITIZER_EXIT_CONTEXT()
+              TC_SANITIZER_EXIT_CONTEXT(mycs)
               return argctx;
             },
             *token);

@@ -3,6 +3,7 @@
 #include <tconcurrent/async_wait.hpp>
 #include <tconcurrent/coroutine.hpp>
 #include <tconcurrent/promise.hpp>
+#include <tconcurrent/stepper.hpp>
 
 #ifndef EMSCRIPTEN
 #include <tconcurrent/thread_pool.hpp>
@@ -208,24 +209,44 @@ TEST_CASE("coroutine cancel before run")
   CHECK(0 == called);
 }
 
-TEST_CASE("coroutine cancel already requested")
+TEST_CASE("coroutine cancel already started")
 {
-  unsigned called = 0;
-  promise<void> prom1;
-  auto fut1 = prom1.get_future();
-  promise<void> prom2;
-  auto fut2 = prom2.get_future();
-  auto f = async_resumable([&fut1, &fut2]() -> cotask<int> {
-    fut1.get();
-    TC_AWAIT(std::move(fut2));
+  stepper step;
+  promise<void> never_ready_prom;
+  auto never_ready = never_ready_prom.get_future();
+  auto coroutine_future = async_resumable([&]() -> cotask<int> {
+    step(2);
+    TC_AWAIT(std::move(never_ready));
     TC_RETURN(42);
   });
   auto fut3 = async([&] {
-    f.request_cancel();
-    REQUIRE(f.is_ready());
-    CHECK_THROWS_AS(f.get(), operation_canceled);
+    step(3);
+    coroutine_future.request_cancel();
+    REQUIRE(coroutine_future.is_ready());
+    CHECK_THROWS_AS(coroutine_future.get(), operation_canceled);
   });
-  prom1.set_value({});
+  step(1);
+  fut3.get();
+}
+
+TEST_CASE("coroutine cancel already started from another coroutine")
+{
+  stepper step;
+  promise<void> never_ready_prom;
+  auto never_ready = never_ready_prom.get_future();
+  auto coroutine_future = async_resumable([&]() -> cotask<int> {
+    step(2);
+    TC_AWAIT(std::move(never_ready));
+    TC_RETURN(42);
+  });
+  auto fut3 = async_resumable([&]() -> cotask<void> {
+    step(3);
+    coroutine_future.request_cancel();
+    REQUIRE(coroutine_future.is_ready());
+    CHECK_THROWS_AS(coroutine_future.get(), operation_canceled);
+    TC_RETURN();
+  });
+  step(1);
   fut3.get();
 }
 

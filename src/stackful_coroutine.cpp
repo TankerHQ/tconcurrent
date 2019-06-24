@@ -30,31 +30,49 @@ thread_local size_t thread_stacksize;
 }
 
 #ifdef __APPLE__
-stack_bounds get_stack_bounds()
+stack_bounds get_stack_bounds(coroutine_control* ctrl)
 {
-  if (!thread_stack)
+  if (ctrl->previous_coroutine)
   {
-    pthread_t self = pthread_self();
-    thread_stack = pthread_get_stackaddr_np(self);
-    thread_stacksize = pthread_get_stacksize_np(self);
+    return {reinterpret_cast<char const*>(ctrl->previous_coroutine->stack.sp) -
+                ctrl->previous_coroutine->stack.size,
+            ctrl->stack.size};
   }
-  return {thread_stack, thread_stacksize};
+  else
+  {
+    if (!thread_stack)
+    {
+      pthread_t self = pthread_self();
+      thread_stack = pthread_get_stackaddr_np(self);
+      thread_stacksize = pthread_get_stacksize_np(self);
+    }
+    return {thread_stack, thread_stacksize};
+  }
 }
 #elif __linux__
-stack_bounds get_stack_bounds()
+stack_bounds get_stack_bounds(coroutine_control* ctrl)
 {
-  if (!thread_stack)
+  if (ctrl->previous_coroutine)
   {
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    if (pthread_getattr_np(pthread_self(), &attr) != 0)
-      std::cerr << "ERROR: failed to get main thread stack, can't annotate "
-                   "stack switch, sanitizer false positives will follow"
-                << std::endl;
-    pthread_attr_getstack(&attr, &thread_stack, &thread_stacksize);
-    pthread_attr_destroy(&attr);
+    return {reinterpret_cast<char const*>(ctrl->previous_coroutine->stack.sp) -
+                ctrl->previous_coroutine->stack.size,
+            ctrl->stack.size};
   }
-  return {thread_stack, thread_stacksize};
+  else
+  {
+    if (!thread_stack)
+    {
+      pthread_attr_t attr;
+      pthread_attr_init(&attr);
+      if (pthread_getattr_np(pthread_self(), &attr) != 0)
+        std::cerr << "ERROR: failed to get main thread stack, can't annotate "
+                     "stack switch, sanitizer false positives will follow"
+                  << std::endl;
+      pthread_attr_getstack(&attr, &thread_stack, &thread_stacksize);
+      pthread_attr_destroy(&attr);
+    }
+    return {thread_stack, thread_stacksize};
+  }
 }
 #endif
 #endif
