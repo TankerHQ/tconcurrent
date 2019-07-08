@@ -179,7 +179,7 @@ TEST_CASE(
   step(5);
 }
 
-TEST_CASE("canceling should be instantaneous")
+TEST_CASE("canceling should be synchronous on single thread")
 {
   async([&] {
     int called = 0;
@@ -190,6 +190,31 @@ TEST_CASE("canceling should be instantaneous")
     CHECK(called == 0);
   })
       .get();
+}
+
+TEST_CASE("destroying should cancel future jobs")
+{
+  stepper step;
+  auto pjob = new job([&] {
+    step(2);
+    step(5);
+    return make_ready_future();
+  });
+
+  auto fut_ok = pjob->trigger();
+  step(1);
+  step(3);
+  auto fut_pending = pjob->trigger();
+  step(4);
+  delete pjob;
+
+  CHECK_NOTHROW(fut_ok.get());
+  // This is a flaky test, we try to trigger a race condition. If the following
+  // future resolves, it likely means that the test failed to trigger the race
+  // condition we want to test, it's probably not a bug in the production code.
+  // If this test gets too flaky, add a sleep just before the return
+  // make_ready_future in the job's lambda above.
+  CHECK_THROWS_AS(fut_pending.get(), operation_canceled);
 }
 
 TEST_CASE("job never runs more than once [waiting]")
