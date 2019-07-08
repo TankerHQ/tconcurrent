@@ -23,8 +23,6 @@
 
 #if __cplusplus >= 201703L
 #define TCONCURRENT_NODISCARD [[nodiscard]]
-#elif defined(__GNUG__)
-#define TCONCURRENT_NODISCARD __attribute__((warn_unused_result))
 #else
 #define TCONCURRENT_NODISCARD
 #endif
