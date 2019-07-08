@@ -53,7 +53,7 @@ TEST_CASE("trigger job a second time while it runs")
 }
 
 TEST_CASE(
-    "trigger job a third time during the first run should run the job only "
+    "triggering job a third time during the first run should run the job only "
     "twice")
 {
   barrier b1(2);
@@ -80,6 +80,29 @@ TEST_CASE(
   CHECK(called < 3);
 }
 
+struct abort_test
+{
+};
+
+TEST_CASE("trigger should forward the task exception")
+{
+  job t([&] {
+    throw abort_test{};
+    return make_ready_future();
+  });
+
+  auto fut = t.trigger();
+  CHECK_THROWS_AS(fut.get(), abort_test);
+}
+
+TEST_CASE("trigger should forward the asynchronous task exception")
+{
+  job t([&] { return make_exceptional_future<void>(abort_test{}); });
+
+  auto fut = t.trigger();
+  CHECK_THROWS_AS(fut.get(), abort_test);
+}
+
 TEST_CASE("trigger_success should not get ready when the task fails")
 {
   job t([&] {
@@ -88,7 +111,7 @@ TEST_CASE("trigger_success should not get ready when the task fails")
   });
 
   auto fut = t.trigger_success();
-  t.trigger().get();
+  t.trigger().wait();
   CHECK(!fut.is_ready());
 }
 
@@ -98,7 +121,7 @@ TEST_CASE(
   job t([&] { return make_exceptional_future<void>("fail"); });
 
   auto fut = t.trigger_success();
-  t.trigger().get();
+  t.trigger().wait();
   CHECK(!fut.is_ready());
 }
 
@@ -118,7 +141,7 @@ TEST_CASE("trigger_success should not get ready until the task succeeds")
   });
 
   auto fut = t.trigger_success();
-  t.trigger().get();
+  t.trigger().wait();
 
   CHECK(!fut.is_ready());
 
