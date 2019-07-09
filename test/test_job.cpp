@@ -53,7 +53,7 @@ TEST_CASE("trigger job a second time while it runs")
 }
 
 TEST_CASE(
-    "trigger job a third time during the first run should run the job only "
+    "triggering job a third time during the first run should run the job only "
     "twice")
 {
   barrier b1(2);
@@ -80,6 +80,29 @@ TEST_CASE(
   CHECK(called < 3);
 }
 
+struct abort_test
+{
+};
+
+TEST_CASE("trigger should forward the task exception")
+{
+  job t([&] {
+    throw abort_test{};
+    return make_ready_future();
+  });
+
+  auto fut = t.trigger();
+  CHECK_THROWS_AS(fut.get(), abort_test);
+}
+
+TEST_CASE("trigger should forward the asynchronous task exception")
+{
+  job t([&] { return make_exceptional_future<void>(abort_test{}); });
+
+  auto fut = t.trigger();
+  CHECK_THROWS_AS(fut.get(), abort_test);
+}
+
 TEST_CASE("trigger_success should not get ready when the task fails")
 {
   job t([&] {
@@ -88,7 +111,7 @@ TEST_CASE("trigger_success should not get ready when the task fails")
   });
 
   auto fut = t.trigger_success();
-  t.trigger().get();
+  t.trigger().wait();
   CHECK(!fut.is_ready());
 }
 
@@ -98,7 +121,7 @@ TEST_CASE(
   job t([&] { return make_exceptional_future<void>("fail"); });
 
   auto fut = t.trigger_success();
-  t.trigger().get();
+  t.trigger().wait();
   CHECK(!fut.is_ready());
 }
 
@@ -118,7 +141,7 @@ TEST_CASE("trigger_success should not get ready until the task succeeds")
   });
 
   auto fut = t.trigger_success();
-  t.trigger().get();
+  t.trigger().wait();
 
   CHECK(!fut.is_ready());
 
@@ -156,7 +179,7 @@ TEST_CASE(
   step(5);
 }
 
-TEST_CASE("canceling should be instantaneous")
+TEST_CASE("canceling should be synchronous on single thread")
 {
   async([&] {
     int called = 0;
@@ -167,6 +190,31 @@ TEST_CASE("canceling should be instantaneous")
     CHECK(called == 0);
   })
       .get();
+}
+
+TEST_CASE("destroying should cancel future jobs")
+{
+  stepper step;
+  auto pjob = new job([&] {
+    step(2);
+    step(5);
+    return make_ready_future();
+  });
+
+  auto fut_ok = pjob->trigger();
+  step(1);
+  step(3);
+  auto fut_pending = pjob->trigger();
+  step(4);
+  delete pjob;
+
+  CHECK_NOTHROW(fut_ok.get());
+  // This is a flaky test, we try to trigger a race condition. If the following
+  // future resolves, it likely means that the test failed to trigger the race
+  // condition we want to test, it's probably not a bug in the production code.
+  // If this test gets too flaky, add a sleep just before the return
+  // make_ready_future in the job's lambda above.
+  CHECK_THROWS_AS(fut_pending.get(), operation_canceled);
 }
 
 TEST_CASE("job never runs more than once [waiting]")

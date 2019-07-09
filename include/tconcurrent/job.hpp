@@ -91,7 +91,7 @@ private:
                             scope_lock _(_mutex);
                             assert(_scheduled);
                             if (_stopping)
-                              return tc::make_ready_future();
+                              throw tc::operation_canceled{};
                             return reschedule();
                           })
                     .unwrap();
@@ -107,7 +107,7 @@ private:
                assert(_scheduled);
                _scheduled = false;
                if (_stopping)
-                 return tc::make_ready_future();
+                 throw tc::operation_canceled{};
                assert(!_running);
                _running = true;
                pendingPromises = _successPromises.size();
@@ -116,26 +116,26 @@ private:
              {
                return _cb().then(
                    tc::get_synchronous_executor(),
-                   [this, pendingPromises](tc::future<void> const& fut) {
+                   [this, pendingPromises](tc::future<void> fut) {
                      scope_lock _(_mutex);
                      // _running may already be false if the task has
                      // been canceled too soon
                      _running = false;
-                     if (fut.has_value())
-                     {
-                       for (size_t i = 0; i < pendingPromises; ++i)
-                         _successPromises[i].set_value({});
-                       _successPromises.erase(
-                           _successPromises.begin(),
-                           _successPromises.begin() + pendingPromises);
-                     }
+                     if (!fut.has_value())
+                       fut.get(); // throw the exception
+
+                     for (size_t i = 0; i < pendingPromises; ++i)
+                       _successPromises[i].set_value({});
+                     _successPromises.erase(
+                         _successPromises.begin(),
+                         _successPromises.begin() + pendingPromises);
                    });
              }
              catch (...)
              {
                scope_lock _(_mutex);
                _running = false;
-               return tc::make_ready_future();
+               throw;
              }
            })
         .unwrap();
