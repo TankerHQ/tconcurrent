@@ -11,18 +11,28 @@ namespace tconcurrent
 {
 namespace lazy
 {
+struct operation_canceled
+{
+};
+
 struct cancelation_token
 {
+  std::mutex mutex;
   bool canceled = false;
   std::function<void()> cancel;
 
   void request_cancel()
   {
-    if (cancel)
-      cancel();
+    auto canceler = [&] {
+      std::lock_guard<std::mutex> l(mutex);
+      return cancel;
+    }();
+    if (canceler)
+      canceler();
   }
   void reset()
   {
+    std::lock_guard<std::mutex> l(mutex);
     cancel = nullptr;
   }
 };
@@ -57,6 +67,11 @@ struct then_promise
     p_.get_cancelation_token()->reset();
     p_.set_error(std::forward<E>(e));
   }
+  void set_done()
+  {
+    p_.get_cancelation_token()->reset();
+    p_.set_done();
+  }
 };
 
 template <typename P, typename F>
@@ -87,6 +102,11 @@ struct then2_promise
   {
     p_.get_cancelation_token()->reset();
     p_.set_error(std::forward<E>(e));
+  }
+  void set_done()
+  {
+    p_.get_cancelation_token()->reset();
+    p_.set_done();
   }
 };
 
@@ -125,6 +145,10 @@ struct sync_promise
   {
     _set<1>(std::forward<E>(e));
   }
+  void set_done()
+  {
+    _set<1>(std::make_exception_ptr(operation_canceled()));
+  }
 };
 
 struct sink_promise
@@ -137,6 +161,9 @@ struct sink_promise
   void set_error(E&& e)
   {
     std::terminate();
+  }
+  void set_done()
+  {
   }
 };
 }
