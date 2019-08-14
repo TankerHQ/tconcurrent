@@ -1,12 +1,11 @@
 #undef __GTHREADS
 
+#include <tconcurrent/lazy/async_wait.hpp>
 #include <tconcurrent/lazy/sync_wait.hpp>
 #include <tconcurrent/lazy/then.hpp>
 
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/async_wait.hpp>
-
-#include <boost/asio/steady_timer.hpp>
 
 #include <doctest.h>
 
@@ -30,44 +29,6 @@ auto async_algo(T task)
 {
   return lazy::then(task, [] { return 10; });
 }
-
-template <typename P>
-struct async_wait_data
-{
-  boost::asio::steady_timer timer;
-  P prom;
-  std::atomic<bool> fired{false};
-
-  template <typename Delay>
-  async_wait_data(boost::asio::io_service& io, Delay delay, P&& p)
-    : timer(io, delay), prom(std::forward<P>(p))
-  {
-  }
-};
-
-auto async_wait_lazy(executor executor,
-                     std::chrono::steady_clock::duration delay)
-{
-  return [&io_service = executor.get_io_service(), delay](auto p) mutable {
-    auto const data = std::make_shared<async_wait_data<decltype(p)>>(
-        io_service, delay, std::move(p));
-
-    data->prom.get_cancelation_token()->cancel = [data] {
-      if (data->fired.exchange(true))
-        return;
-
-      data->timer.cancel();
-      data->prom.set_done();
-    };
-
-    data->timer.async_wait([data](boost::system::error_code const&) mutable {
-      if (data->fired.exchange(true))
-        return;
-
-      data->prom.set_value();
-    });
-  };
-}
 }
 
 TEST_CASE("lazy")
@@ -76,11 +37,11 @@ TEST_CASE("lazy")
   auto f = async_algo(n);
   auto f2 = lazy::then(f, [](int i) { return 10 + i; });
   auto f3 = lazy::async_then(f2, [](auto& p, int i) {
-    lazy::then(async_wait_lazy(get_default_executor(), 100ms),
+    lazy::then(lazy::async_wait(get_default_executor(), 100ms),
                [i] { return i + 10; })(p);
   });
   auto f4 = lazy::async_then(f3, [](auto& p, int i) {
-    lazy::then(async_wait_lazy(get_default_executor(), 100ms),
+    lazy::then(lazy::async_wait(get_default_executor(), 100ms),
                [i] { return i + 10; })(p);
   });
   lazy::cancelation_token c;
