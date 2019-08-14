@@ -21,6 +21,9 @@ struct then_receiver
   template <typename... V>
   void set_value(V... vs)
   {
+    if (p_.get_cancelation_token()->canceled)
+      return set_done();
+
     p_.get_cancelation_token()->reset();
     try
     {
@@ -56,6 +59,9 @@ struct async_then_receiver
   template <typename... V>
   void set_value(V... vs)
   {
+    if (p_.get_cancelation_token()->canceled)
+      return set_done();
+
     p_.get_cancelation_token()->reset();
     try
     {
