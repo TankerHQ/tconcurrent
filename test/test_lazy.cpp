@@ -4,6 +4,8 @@
 #include <tconcurrent/lazy/sync_wait.hpp>
 #include <tconcurrent/lazy/then.hpp>
 
+#include <tconcurrent/coroutine.hpp>
+
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/async_wait.hpp>
 
@@ -40,13 +42,19 @@ TEST_CASE("lazy")
     lazy::then(lazy::async_wait(get_default_executor(), 100ms),
                [i] { return i + 10; })(p);
   });
+  // auto f4 = lazy::async_then(f3, [](auto& p, int i) {
+  //   lazy::then(lazy::async_wait(get_default_executor(), 100ms),
+  //              [i] { return i + 10; })(p);
+  // });
   auto f4 = lazy::async_then(f3, [](auto& p, int i) {
-    lazy::then(lazy::async_wait(get_default_executor(), 100ms),
-               [i] { return i + 10; })(p);
+    lazy::run_resumable([=]() -> cotask<int> {
+      TC_AWAIT(async_wait(100ms));
+      TC_RETURN(i + 10);
+    })(p);
   });
   lazy::cancelation_token c;
   CHECK(lazy::sync_wait<int>(f4, c) == 40);
-  async_wait(50ms).then([&](auto const&) { c.request_cancel(); });
+  // async_wait(50ms).then([&](auto const&) { c.request_cancel(); });
   // async_wait(150ms).then([&](auto const&) { c.request_cancel(); });
-  CHECK_THROWS_AS(lazy::sync_wait<int>(f4, c), lazy::operation_canceled);
+  // CHECK_THROWS_AS(lazy::sync_wait<int>(f4, c), lazy::operation_canceled);
 }

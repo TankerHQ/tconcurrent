@@ -13,7 +13,6 @@ set(test_tconcurrent_SRC
   test_future.cpp
   test_future_group.cpp
   test_job.cpp
-  test_lazy.cpp
   test_packaged_task.cpp
   test_periodic_task.cpp
   test_semaphore.cpp
@@ -34,7 +33,7 @@ add_test(NAME test_tconcurrent COMMAND test_tconcurrent)
 
 if (TCONCURRENT_COROUTINES_TS)
   add_executable(test_coroutinests
-    test_coroutine.cpp
+  test_lazy.cpp
   )
   target_link_libraries(test_coroutinests tconcurrent tconcurrent_doctest_main)
   target_compile_options(test_coroutinests PUBLIC -fcoroutines-ts)

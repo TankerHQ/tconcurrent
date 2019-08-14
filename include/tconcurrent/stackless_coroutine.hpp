@@ -188,10 +188,8 @@ private:
     {
       return coroutine.promise().result();
     }
-    template <typename R>
-    bool await_suspend(
-        std::experimental::coroutine_handle<detail::task_promise<R>>
-            caller_awaiter)
+    template <typename P>
+    bool await_suspend(std::experimental::coroutine_handle<P> caller_awaiter)
     {
       coroutine.promise().executor = caller_awaiter.promise().executor;
       coroutine.resume();
@@ -418,6 +416,111 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
   executor.post(std::move(std::get<0>(pack)), fullName);
 
   return std::move(std::get<1>(pack)).update_chain_name(fullName).unwrap();
+}
+
+namespace lazy
+{
+struct sink_task;
+
+struct sink_promise
+{
+  sink_promise() = default;
+  sink_promise(sink_promise const&) = delete;
+  sink_promise(sink_promise&&) = delete;
+  sink_promise& operator=(sink_promise const&) = delete;
+  sink_promise& operator=(sink_promise&&) = delete;
+
+  auto initial_suspend()
+  {
+    return std::experimental::suspend_always{};
+  }
+  auto final_suspend()
+  {
+    return std::experimental::suspend_never{};
+  }
+  void unhandled_exception()
+  {
+    std::terminate();
+  }
+  void rethrow_if_needed()
+  {
+  }
+
+  void return_void()
+  {
+  }
+  void result()
+  {
+  }
+
+  sink_task get_return_object();
+
+  executor executor;
+};
+
+struct sink_task
+{
+public:
+  using promise_type = sink_promise;
+
+  sink_task(sink_task const&) = delete;
+  sink_task& operator=(sink_task const&) = delete;
+
+  sink_task(sink_task&& o) : coro(o.coro)
+  {
+    o.coro = nullptr;
+  }
+  sink_task& operator=(sink_task&&) = delete;
+
+  // private:
+  std::experimental::coroutine_handle<promise_type> coro;
+
+  sink_task(std::experimental::coroutine_handle<promise_type> coroutine)
+    : coro(coroutine)
+  {
+  }
+};
+
+sink_task sink_promise::get_return_object()
+{
+  return sink_task{
+      std::experimental::coroutine_handle<sink_promise>::from_promise(*this)};
+}
+
+// this class is the equivalent of an auto lambda with a capture, but that thing
+// makes clang 8 crash, so we define one manually
+template <typename F>
+struct run
+{
+  F cb;
+
+  template <typename P>
+  void operator()(P&& p)
+  {
+    // XXX mega leak
+    auto l = new auto([p = std::forward<decltype(p)>(p),
+                       cb = std::forward<F>(cb)]() mutable -> sink_task {
+      try
+      {
+        p.set_value(co_await cb());
+      }
+      catch (...)
+      {
+        p.set_error(std::current_exception());
+      }
+    });
+    auto task = (*l)();
+    // XXX
+    task.coro.promise().executor = get_default_executor();
+    task.coro.resume();
+  }
+};
+
+template <typename F>
+auto run_resumable(F&& cb)
+{
+  return run<F>{cb};
+}
 }
 
 namespace detail

@@ -60,6 +60,7 @@ class TconcurrentConan(ConanFile):
         cmake = CMake(self)
         if self.options.sanitizer:
             cmake.definitions["CONAN_CXX_FLAGS"] = self.sanitizer_flag
+        cmake.definitions["TCONCURRENT_COROUTINES_TS"] = self.options.coroutinests
         cmake.definitions["BUILD_SHARED_LIBS"] = self.options.shared
         cmake.definitions["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.fPIC
         cmake.definitions["BUILD_TESTING"] = self.should_build_tests
