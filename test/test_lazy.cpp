@@ -55,6 +55,6 @@ TEST_CASE("lazy")
   lazy::cancelation_token c;
   CHECK(lazy::sync_wait<int>(f4, c) == 40);
   // async_wait(50ms).then([&](auto const&) { c.request_cancel(); });
-  // async_wait(150ms).then([&](auto const&) { c.request_cancel(); });
-  // CHECK_THROWS_AS(lazy::sync_wait<int>(f4, c), lazy::operation_canceled);
+  async_wait(150ms).then([&](auto const&) { c.request_cancel(); });
+  CHECK_THROWS_AS(lazy::sync_wait<int>(f4, c), lazy::operation_canceled);
 }

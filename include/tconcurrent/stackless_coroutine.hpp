@@ -3,6 +3,7 @@
 
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/future.hpp>
+#include <tconcurrent/lazy/then.hpp>
 #include <tconcurrent/promise.hpp>
 
 #include <experimental/coroutine>
@@ -174,7 +175,7 @@ public:
     return typename cotask<T>::awaitable{coro};
   }
 
-private:
+  // private:
   struct awaitable
   {
     std::experimental::coroutine_handle<promise_type> coroutine;
@@ -385,39 +386,6 @@ struct task_control
 };
 }
 
-template <typename E, typename F>
-auto async_resumable(std::string const& name, E&& executor, F&& cb)
-    -> future<typename std::decay_t<decltype(cb())>::value_type>
-{
-  using return_task_type = std::decay_t<decltype(cb())>;
-  using return_type = typename return_task_type::value_type;
-
-  auto const fullName = name + " (" + typeid(F).name() + ")";
-
-  auto token = std::make_shared<cancelation_token>();
-
-  auto ctrl =
-      std::make_shared<detail::task_control<std::decay_t<F>, return_type>>(
-          std::forward<F>(cb));
-  ctrl->cotask.set_executor(executor);
-
-  auto pack = package_cancelable<future<return_type>()>(
-      [ctrl = std::move(ctrl), token] {
-        auto pack = package<return_type()>(
-            [ctrl] { return ctrl->cotask.get(); }, token);
-        ctrl->cotask.set_continuation(std::move(std::get<0>(pack)));
-        ctrl->cotask.run();
-        ctrl->canceler = token->make_scope_canceler(
-            [& cotask = ctrl->cotask] { cotask.cancel(); });
-        return std::move(std::get<1>(pack));
-      },
-      token);
-
-  executor.post(std::move(std::get<0>(pack)), fullName);
-
-  return std::move(std::get<1>(pack)).update_chain_name(fullName).unwrap();
-}
-
 namespace lazy
 {
 struct sink_task;
@@ -481,46 +449,159 @@ public:
   }
 };
 
-sink_task sink_promise::get_return_object()
+inline sink_task sink_promise::get_return_object()
 {
   return sink_task{
       std::experimental::coroutine_handle<sink_promise>::from_promise(*this)};
 }
 
-// this class is the equivalent of an auto lambda with a capture, but that thing
-// makes clang 8 crash, so we define one manually
-template <typename F>
-struct run
+template <typename R>
+struct runner
 {
+  template <typename P, typename F>
+  cotask<void> run(P&& p, F&& cb)
+  {
+    p.set_value(co_await cb());
+  }
+};
+
+template <typename P, typename F, typename R>
+struct sink_coro
+{
+  P p;
   F cb;
 
-  template <typename P>
-  void operator()(P&& p)
+  std::shared_ptr<sink_coro> keep_alive;
+  sink_task this_task;
+
+  template <typename PP, typename FF>
+  sink_coro(PP&& p, FF&& cb)
+    : p(std::forward<PP>(p)), cb(std::forward<FF>(cb)), this_task(run())
   {
-    // XXX mega leak
-    auto l = new auto([p = std::forward<decltype(p)>(p),
-                       cb = std::forward<F>(cb)]() mutable -> sink_task {
-      try
-      {
-        p.set_value(co_await cb());
-      }
-      catch (...)
-      {
-        p.set_error(std::current_exception());
-      }
-    });
-    auto task = (*l)();
-    // XXX
-    task.coro.promise().executor = get_default_executor();
-    task.coro.resume();
+  }
+
+  sink_task run()
+  {
+    try
+    {
+      p.set_value(co_await cb());
+    }
+    catch (...)
+    {
+      p.set_error(std::current_exception());
+    }
+    keep_alive = nullptr;
+  }
+
+  void cancel()
+  {
+#ifndef TCONCURRENT_ALLOW_CANCEL_IN_CATCH
+    detail::assert_no_cancel_in_catch();
+#endif
+
+    if (!this_task.coro)
+      return;
+
+    auto const executor = this_task.coro.promise().executor;
+    assert((!executor || executor.is_in_this_context()) &&
+           "cancelation is not supported cross-executor");
+
+    if (this_task.coro.done())
+      return;
+
+    this_task.coro.destroy();
+    this_task.coro = nullptr;
+    p.set_done();
+    keep_alive = nullptr;
+  }
+};
+
+template <typename P, typename F>
+struct sink_coro<P, F, void>
+{
+  P p;
+  F cb;
+
+  std::shared_ptr<sink_coro> keep_alive;
+  sink_task this_task;
+
+  template <typename PP, typename FF>
+  sink_coro(PP&& p, FF&& cb)
+    : p(std::forward<PP>(p)), cb(std::forward<FF>(cb)), this_task(run())
+  {
+  }
+
+  sink_task run()
+  {
+    try
+    {
+      co_await cb();
+      p.set_value();
+    }
+    catch (...)
+    {
+      p.set_error(std::current_exception());
+    }
+    keep_alive = nullptr;
+  }
+
+  void cancel()
+  {
+#ifndef TCONCURRENT_ALLOW_CANCEL_IN_CATCH
+    detail::assert_no_cancel_in_catch();
+#endif
+
+    if (!this_task.coro)
+      return;
+
+    auto const executor = this_task.coro.promise().executor;
+    assert((!executor || executor.is_in_this_context()) &&
+           "cancelation is not supported cross-executor");
+
+    if (this_task.coro.done())
+      return;
+
+    this_task.coro.destroy();
+    this_task.coro = nullptr;
+    p.set_done();
+    keep_alive = nullptr;
   }
 };
 
 template <typename F>
 auto run_resumable(F&& cb)
 {
-  return run<F>{cb};
+  using return_task_type = std::decay_t<decltype(cb())>;
+  using return_type = typename return_task_type::value_type;
+
+  return [cb = std::forward<F>(cb)](auto&& p) mutable {
+    auto l = std::make_shared<
+        sink_coro<std::decay_t<decltype(p)>, std::decay_t<F>, return_type>>(
+        std::forward<decltype(p)>(p), std::move(cb));
+    l->keep_alive = l;
+    l->p.get_cancelation_token()->cancel = [l] { l->cancel(); };
+    l->this_task.coro.promise().executor = get_default_executor();
+    l->this_task.coro.resume();
+  };
 }
+}
+
+template <typename E, typename F>
+auto async_resumable(std::string const& name, E&& executor, F&& cb)
+    -> future<typename std::decay_t<decltype(cb())>::value_type>
+{
+  using return_task_type = std::decay_t<decltype(cb())>;
+  using return_type = typename return_task_type::value_type;
+
+  auto const run_async = [executor](auto p) mutable {
+    executor.post([p = std::move(p)]() mutable { p.set_value(); });
+  };
+  auto const task =
+      lazy::async_then(run_async, lazy::run_resumable(std::forward<F>(cb)));
+  auto pack = future_from_lazy<return_type>(task);
+  std::get<0>(pack)();
+
+  return std::move(std::get<1>(pack));
 }
 
 namespace detail

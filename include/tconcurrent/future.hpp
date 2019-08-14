@@ -4,6 +4,8 @@
 #include <tconcurrent/detail/shared_base.hpp>
 #include <tconcurrent/detail/util.hpp>
 #include <tconcurrent/executor.hpp>
+#include <tconcurrent/lazy/cancelation_token.hpp>
+
 #include <utility>
 
 namespace tconcurrent
@@ -458,7 +460,7 @@ public:
     return shared_future<R>(std::move(*this));
   }
 
-private:
+  // private:
   using typename base_type::shared_pointer;
   using typename base_type::shared_type;
 
@@ -577,6 +579,69 @@ auto make_exceptional_future(E&& err) -> future<T>
   future<T> fut(std::move(sb));
   fut._cancelation_token = std::make_shared<cancelation_token>();
   return fut;
+}
+
+template <class T>
+struct shared_receiver_p : public detail::shared_base<T>
+{
+  lazy::cancelation_token cancelation_token;
+  cancelation_token::scope_canceler canceler;
+
+  shared_receiver_p()
+  {
+    canceler = this->get_cancelation_token()->make_scope_canceler([this] {
+      if (cancelation_token.cancel)
+        cancelation_token.cancel();
+    });
+  }
+};
+
+template <class T>
+struct shared_receiver
+{
+  detail::promise_ptr<shared_receiver_p<T>> shared =
+      detail::promise_ptr<shared_receiver_p<T>>::make_shared();
+
+  auto get_cancelation_token()
+  {
+    return &shared->cancelation_token;
+  }
+  void set_value()
+  {
+    shared->set(tvoid{});
+  }
+  template <typename V>
+  void set_value(V&& val)
+  {
+    shared->set(std::forward<V>(val));
+  }
+  template <typename E>
+  void set_error(E&& e)
+  {
+    shared->set_exception(std::forward<E>(e));
+  }
+  void set_done()
+  {
+    shared->set_exception(std::make_exception_ptr(operation_canceled()));
+  }
+};
+
+template <typename T, typename Sender>
+auto future_from_lazy(Sender&& task)
+{
+  shared_receiver<typename detail::future_value_type<T>::type> receiver;
+  return std::make_tuple(
+      [task = std::forward<Sender>(task), receiver]() mutable {
+        try
+        {
+          task(receiver);
+        }
+        catch (...)
+        {
+          receiver.set_error(std::current_exception());
+        }
+      },
+      future<T>(receiver.shared.as_shared()));
 }
 }
 
