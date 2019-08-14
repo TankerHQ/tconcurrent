@@ -1,6 +1,7 @@
 #undef __GTHREADS
 
-#include <tconcurrent/lazy/sr.hpp>
+#include <tconcurrent/lazy/sync_wait.hpp>
+#include <tconcurrent/lazy/then.hpp>
 
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/async_wait.hpp>
@@ -74,11 +75,11 @@ TEST_CASE("lazy")
   auto n = run_async();
   auto f = async_algo(n);
   auto f2 = lazy::then(f, [](int i) { return 10 + i; });
-  auto f3 = lazy::then2(f2, [](auto& p, int i) {
+  auto f3 = lazy::async_then(f2, [](auto& p, int i) {
     lazy::then(async_wait_lazy(get_default_executor(), 100ms),
                [i] { return i + 10; })(p);
   });
-  auto f4 = lazy::then2(f3, [](auto& p, int i) {
+  auto f4 = lazy::async_then(f3, [](auto& p, int i) {
     lazy::then(async_wait_lazy(get_default_executor(), 100ms),
                [i] { return i + 10; })(p);
   });
