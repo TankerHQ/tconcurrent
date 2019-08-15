@@ -606,20 +606,24 @@ struct shared_receiver
   }
   void set_value()
   {
+    get_cancelation_token()->reset();
     shared->set(tvoid{});
   }
   template <typename V>
   void set_value(V&& val)
   {
+    get_cancelation_token()->reset();
     shared->set(std::forward<V>(val));
   }
   template <typename E>
   void set_error(E&& e)
   {
+    get_cancelation_token()->reset();
     shared->set_exception(std::forward<E>(e));
   }
   void set_done()
   {
+    get_cancelation_token()->reset();
     shared->set_exception(std::make_exception_ptr(operation_canceled()));
   }
 };
