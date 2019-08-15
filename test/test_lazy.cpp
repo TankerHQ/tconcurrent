@@ -47,7 +47,7 @@ TEST_CASE("lazy")
   //              [i] { return i + 10; })(p);
   // });
   auto f4 = lazy::async_then(f3, [](auto& p, int i) {
-    lazy::run_resumable([=]() -> cotask<int> {
+    lazy::run_resumable(get_default_executor(), [=]() -> cotask<int> {
       TC_AWAIT(async_wait(100ms));
       TC_RETURN(i + 10);
     })(p);

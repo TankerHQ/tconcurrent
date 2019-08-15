@@ -568,18 +568,19 @@ struct sink_coro<P, F, void>
   }
 };
 
-template <typename F>
-auto run_resumable(F&& cb)
+template <typename E, typename F>
+auto run_resumable(E&& executor, F&& cb)
 {
   using return_task_type = std::decay_t<decltype(cb())>;
   using return_type = typename return_task_type::value_type;
 
-  return [cb = std::forward<F>(cb)](auto&& p) mutable {
+  return [executor = std::forward<E>(executor),
+          cb = std::forward<F>(cb)](auto&& p) mutable {
     auto l = std::make_shared<
         sink_coro<std::decay_t<decltype(p)>, std::decay_t<F>, return_type>>(
         std::forward<decltype(p)>(p), std::move(cb));
     l->keep_alive = l;
-    l->this_task.coro.promise().executor = get_default_executor();
+    l->this_task.coro.promise().executor = std::move(executor);
     l->this_task.coro.resume();
     l->p.get_cancelation_token()->set_canceler([l] { l->cancel(); });
   };
@@ -593,11 +594,21 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
   using return_task_type = std::decay_t<decltype(cb())>;
   using return_type = typename return_task_type::value_type;
 
-  auto const run_async = [executor](auto p) mutable {
-    executor.post([p = std::move(p)]() mutable { p.set_value(); });
+  auto const run_async = [executor](auto&& p) mutable {
+    auto fired = std::make_shared<std::atomic<bool>>(false);
+    p.get_cancelation_token()->set_canceler([p, fired]() mutable {
+      if (fired->exchange(true))
+        return;
+      p.set_done();
+    });
+    executor.post([p, fired]() mutable {
+      if (fired->exchange(true))
+        return;
+      p.set_value();
+    });
   };
-  auto const task =
-      lazy::async_then(run_async, lazy::run_resumable(std::forward<F>(cb)));
+  auto const task = lazy::async_then(
+      run_async, lazy::run_resumable(executor, std::forward<F>(cb)));
   auto pack = future_from_lazy<return_type>(task);
   std::get<0>(pack)();
 
