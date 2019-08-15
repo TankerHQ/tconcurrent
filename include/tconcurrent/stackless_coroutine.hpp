@@ -582,7 +582,9 @@ auto run_resumable(E&& executor, F&& cb)
     l->keep_alive = l;
     l->this_task.coro.promise().executor = std::move(executor);
     l->this_task.coro.resume();
-    l->p.get_cancelation_token()->set_canceler([l] { l->cancel(); });
+    // if the coro is not dead yet
+    if (l->keep_alive)
+      l->p.get_cancelation_token()->set_canceler([l] { l->cancel(); });
   };
 }
 }
