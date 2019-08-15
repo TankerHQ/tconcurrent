@@ -589,6 +589,17 @@ auto run_resumable(E&& executor, F&& cb)
 }
 }
 
+template <typename P>
+struct run_async_data
+{
+  P p;
+  std::atomic<bool> fired{false};
+
+  run_async_data(P&& p) : p(std::forward<P>(p))
+  {
+  }
+};
+
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
     -> future<typename std::decay_t<decltype(cb())>::value_type>
@@ -597,16 +608,17 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
   using return_type = typename return_task_type::value_type;
 
   auto const run_async = [executor](auto&& p) mutable {
-    auto fired = std::make_shared<std::atomic<bool>>(false);
-    p.get_cancelation_token()->set_canceler([p, fired]() mutable {
-      if (fired->exchange(true))
+    auto data = std::make_shared<run_async_data<std::decay_t<decltype(p)>>>(
+        std::forward<decltype(p)>(p));
+    data->p.get_cancelation_token()->set_canceler([data]() mutable {
+      if (data->fired.exchange(true))
         return;
-      p.set_done();
+      data->p.set_done();
     });
-    executor.post([p, fired]() mutable {
-      if (fired->exchange(true))
+    executor.post([data]() mutable {
+      if (data->fired.exchange(true))
         return;
-      p.set_value();
+      data->p.set_value();
     });
   };
   auto const task = lazy::async_then(
