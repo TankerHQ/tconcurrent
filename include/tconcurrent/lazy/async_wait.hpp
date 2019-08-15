@@ -38,19 +38,19 @@ auto async_wait(executor executor, std::chrono::steady_clock::duration delay)
     auto const data = std::make_shared<details::async_wait_data<decltype(p)>>(
         io_service, delay, std::move(p));
 
-    data->prom.get_cancelation_token()->cancel = [data] {
-      if (data->fired.exchange(true))
-        return;
-
-      data->timer.cancel();
-      data->prom.set_done();
-    };
-
     data->timer.async_wait([data](boost::system::error_code const&) mutable {
       if (data->fired.exchange(true))
         return;
 
       data->prom.set_value();
+    });
+
+    data->prom.get_cancelation_token()->set_canceler([data] {
+      if (data->fired.exchange(true))
+        return;
+
+      data->timer.cancel();
+      data->prom.set_done();
     });
   };
 }

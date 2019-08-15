@@ -579,9 +579,9 @@ auto run_resumable(F&& cb)
         sink_coro<std::decay_t<decltype(p)>, std::decay_t<F>, return_type>>(
         std::forward<decltype(p)>(p), std::move(cb));
     l->keep_alive = l;
-    l->p.get_cancelation_token()->cancel = [l] { l->cancel(); };
     l->this_task.coro.promise().executor = get_default_executor();
     l->this_task.coro.resume();
+    l->p.get_cancelation_token()->set_canceler([l] { l->cancel(); });
   };
 }
 }

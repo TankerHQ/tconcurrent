@@ -589,10 +589,8 @@ struct shared_receiver_p : public detail::shared_base<T>
 
   shared_receiver_p()
   {
-    canceler = this->get_cancelation_token()->make_scope_canceler([this] {
-      if (cancelation_token.cancel)
-        cancelation_token.cancel();
-    });
+    canceler = this->get_cancelation_token()->make_scope_canceler(
+        [this] { cancelation_token.request_cancel(); });
   }
 };
 
