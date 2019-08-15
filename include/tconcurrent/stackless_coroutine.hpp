@@ -410,14 +410,8 @@ struct sink_promise
   {
     std::terminate();
   }
-  void rethrow_if_needed()
-  {
-  }
 
   void return_void()
-  {
-  }
-  void result()
   {
   }
 
