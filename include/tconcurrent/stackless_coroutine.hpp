@@ -566,13 +566,12 @@ auto run_resumable(E&& executor, Awaitable&& awaitable)
   using return_type = typename Awaitable::value_type;
 
   return [executor = std::forward<E>(executor),
-          awaitable =
-              new auto(std::forward<Awaitable>(awaitable))](auto&& p) mutable {
+          awaitable = std::forward<Awaitable>(awaitable)](auto&& p) mutable {
     auto l =
         std::make_shared<sink_coro<std::decay_t<decltype(p)>, return_type>>(
             std::forward<decltype(p)>(p));
     l->keep_alive = l;
-    l->coro = l->run(std::move(*awaitable)).coro;
+    l->coro = l->run(std::move(awaitable)).coro;
     l->coro.promise().executor = std::move(executor);
     l->coro.resume();
     // if the coro is not dead yet
@@ -614,13 +613,13 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
       data->p.set_value();
     });
   };
-  auto const task = lazy::async_then(
+  auto task = lazy::async_then(
       run_async,
       lazy::run_resumable(executor,
                           ([](std::decay_t<F> cb) -> cotask<return_type> {
                             co_return co_await cb();
                           })(std::forward<F>(cb))));
-  auto pack = future_from_lazy<return_type>(task);
+  auto pack = future_from_lazy<return_type>(std::move(task));
   std::get<0>(pack)();
 
   return std::move(std::get<1>(pack));
