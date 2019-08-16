@@ -459,26 +459,25 @@ struct runner
   }
 };
 
-template <typename P, typename F, typename R>
+template <typename P, typename R>
 struct sink_coro
 {
   P p;
-  F cb;
 
+  std::experimental::coroutine_handle<sink_promise> coro;
   std::shared_ptr<sink_coro> keep_alive;
-  sink_task this_task;
 
-  template <typename PP, typename FF>
-  sink_coro(PP&& p, FF&& cb)
-    : p(std::forward<PP>(p)), cb(std::forward<FF>(cb)), this_task(run())
+  template <typename PP>
+  sink_coro(PP&& p) : p(std::forward<PP>(p))
   {
   }
 
-  sink_task run()
+  template <typename Awaitable>
+  sink_task run(Awaitable awaitable)
   {
     try
     {
-      p.set_value(co_await cb());
+      p.set_value(co_await std::move(awaitable));
     }
     catch (...)
     {
@@ -493,43 +492,42 @@ struct sink_coro
     detail::assert_no_cancel_in_catch();
 #endif
 
-    if (!this_task.coro)
+    if (!coro)
       return;
 
-    auto const executor = this_task.coro.promise().executor;
+    auto const executor = coro.promise().executor;
     assert((!executor || executor.is_in_this_context()) &&
            "cancelation is not supported cross-executor");
 
-    if (this_task.coro.done())
+    if (coro.done())
       return;
 
-    this_task.coro.destroy();
-    this_task.coro = nullptr;
+    coro.destroy();
+    coro = nullptr;
     p.set_done();
     keep_alive = nullptr;
   }
 };
 
-template <typename P, typename F>
-struct sink_coro<P, F, void>
+template <typename P>
+struct sink_coro<P, void>
 {
   P p;
-  F cb;
 
+  std::experimental::coroutine_handle<sink_promise> coro;
   std::shared_ptr<sink_coro> keep_alive;
-  sink_task this_task;
 
-  template <typename PP, typename FF>
-  sink_coro(PP&& p, FF&& cb)
-    : p(std::forward<PP>(p)), cb(std::forward<FF>(cb)), this_task(run())
+  template <typename PP>
+  sink_coro(PP&& p) : p(std::forward<PP>(p))
   {
   }
 
-  sink_task run()
+  template <typename Awaitable>
+  sink_task run(Awaitable awaitable)
   {
     try
     {
-      co_await cb();
+      co_await std::move(awaitable);
       p.set_value();
     }
     catch (...)
@@ -545,37 +543,38 @@ struct sink_coro<P, F, void>
     detail::assert_no_cancel_in_catch();
 #endif
 
-    if (!this_task.coro)
+    if (!coro)
       return;
 
-    auto const executor = this_task.coro.promise().executor;
+    auto const executor = coro.promise().executor;
     assert((!executor || executor.is_in_this_context()) &&
            "cancelation is not supported cross-executor");
 
-    if (this_task.coro.done())
+    if (coro.done())
       return;
 
-    this_task.coro.destroy();
-    this_task.coro = nullptr;
+    coro.destroy();
+    coro = nullptr;
     p.set_done();
     keep_alive = nullptr;
   }
 };
 
-template <typename E, typename F>
-auto run_resumable(E&& executor, F&& cb)
+template <typename E, typename Awaitable>
+auto run_resumable(E&& executor, Awaitable&& awaitable)
 {
-  using return_task_type = std::decay_t<decltype(cb())>;
-  using return_type = typename return_task_type::value_type;
+  using return_type = typename Awaitable::value_type;
 
   return [executor = std::forward<E>(executor),
-          cb = std::forward<F>(cb)](auto&& p) mutable {
-    auto l = std::make_shared<
-        sink_coro<std::decay_t<decltype(p)>, std::decay_t<F>, return_type>>(
-        std::forward<decltype(p)>(p), std::move(cb));
+          awaitable =
+              new auto(std::forward<Awaitable>(awaitable))](auto&& p) mutable {
+    auto l =
+        std::make_shared<sink_coro<std::decay_t<decltype(p)>, return_type>>(
+            std::forward<decltype(p)>(p));
     l->keep_alive = l;
-    l->this_task.coro.promise().executor = std::move(executor);
-    l->this_task.coro.resume();
+    l->coro = l->run(std::move(*awaitable)).coro;
+    l->coro.promise().executor = std::move(executor);
+    l->coro.resume();
     // if the coro is not dead yet
     if (l->keep_alive)
       l->p.get_cancelation_token()->set_canceler([l] { l->cancel(); });
@@ -616,7 +615,11 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
     });
   };
   auto const task = lazy::async_then(
-      run_async, lazy::run_resumable(executor, std::forward<F>(cb)));
+      run_async,
+      lazy::run_resumable(executor,
+                          ([](std::decay_t<F> cb) -> cotask<return_type> {
+                            co_return co_await cb();
+                          })(std::forward<F>(cb))));
   auto pack = future_from_lazy<return_type>(task);
   std::get<0>(pack)();
 

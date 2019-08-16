@@ -34,7 +34,7 @@ add_test(NAME test_tconcurrent COMMAND test_tconcurrent)
 if (TCONCURRENT_COROUTINES_TS)
   add_executable(test_coroutinests
     test_coroutine.cpp
-  test_lazy.cpp
+    test_lazy.cpp
   )
   target_link_libraries(test_coroutinests tconcurrent tconcurrent_doctest_main)
   target_compile_options(test_coroutinests PUBLIC -fcoroutines-ts)
