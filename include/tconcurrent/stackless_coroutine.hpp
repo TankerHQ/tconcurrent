@@ -600,14 +600,15 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
   using return_type = typename return_task_type::value_type;
 
   auto const run_async = [executor](auto&& p) mutable {
-    auto data = std::make_shared<run_async_data<std::decay_t<decltype(p)>>>(
+    auto data = std::make_unique<run_async_data<std::decay_t<decltype(p)>>>(
         std::forward<decltype(p)>(p));
-    data->p.get_cancelation_token()->set_canceler([data]() mutable {
-      if (data->fired.exchange(true))
-        return;
-      data->p.set_done();
-    });
-    executor.post([data]() mutable {
+    data->p.get_cancelation_token()->set_canceler(
+        [data = data.get()]() mutable {
+          if (data->fired.exchange(true))
+            return;
+          data->p.set_done();
+        });
+    executor.post([data = std::move(data)]() mutable {
       if (data->fired.exchange(true))
         return;
       data->p.set_value();
@@ -616,9 +617,9 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
   auto task = lazy::async_then(
       run_async,
       lazy::run_resumable(executor,
-                          ([](std::decay_t<F> cb) -> cotask<return_type> {
+                          [](std::decay_t<F> cb) -> cotask<return_type> {
                             co_return co_await cb();
-                          })(std::forward<F>(cb))));
+                          }(std::forward<F>(cb))));
   auto pack = future_from_lazy<return_type>(std::move(task));
   std::get<0>(pack)();
 
