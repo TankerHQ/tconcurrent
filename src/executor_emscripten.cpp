@@ -1,5 +1,6 @@
 #include <tconcurrent/executor.hpp>
 
+#include <tconcurrent/function2.hpp>
 #include <tconcurrent/thread_pool.hpp>
 
 #include <emscripten.h>
@@ -21,10 +22,10 @@ namespace
 class default_execution_context
 {
 public:
-  void post(std::function<void()> f, std::string name)
+  void post(fu2::unique_function<void()> f, std::string name)
   {
     EM_ASM_({ setTimeout(function() { Module._tc_executor_do_call($0); }, 0); },
-            new auto(f));
+            new auto(std::move(f)));
   }
 
   boost::asio::io_service& get_io_service()
