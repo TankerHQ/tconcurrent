@@ -452,10 +452,37 @@ inline sink_task sink_promise::get_return_object()
 template <typename R>
 struct runner
 {
-  template <typename P, typename F>
-  cotask<void> run(P&& p, F&& cb)
+  template <typename Coro, typename Awaitable>
+  static sink_task run(Coro& c, Awaitable awaitable)
   {
-    p.set_value(co_await cb());
+    try
+    {
+      c.p.set_value(co_await std::move(awaitable));
+    }
+    catch (...)
+    {
+      c.p.set_error(std::current_exception());
+    }
+    c.keep_alive = nullptr;
+  }
+};
+
+template <>
+struct runner<void>
+{
+  template <typename Coro, typename Awaitable>
+  static sink_task run(Coro& c, Awaitable awaitable)
+  {
+    try
+    {
+      co_await std::move(awaitable);
+      c.p.set_value();
+    }
+    catch (...)
+    {
+      c.p.set_error(std::current_exception());
+    }
+    c.keep_alive = nullptr;
   }
 };
 
@@ -470,71 +497,6 @@ struct sink_coro
   template <typename PP>
   sink_coro(PP&& p) : p(std::forward<PP>(p))
   {
-  }
-
-  template <typename Awaitable>
-  sink_task run(Awaitable awaitable)
-  {
-    try
-    {
-      p.set_value(co_await std::move(awaitable));
-    }
-    catch (...)
-    {
-      p.set_error(std::current_exception());
-    }
-    keep_alive = nullptr;
-  }
-
-  void cancel()
-  {
-#ifndef TCONCURRENT_ALLOW_CANCEL_IN_CATCH
-    detail::assert_no_cancel_in_catch();
-#endif
-
-    if (!coro)
-      return;
-
-    auto const executor = coro.promise().executor;
-    assert((!executor || executor.is_in_this_context()) &&
-           "cancelation is not supported cross-executor");
-
-    if (coro.done())
-      return;
-
-    coro.destroy();
-    coro = nullptr;
-    p.set_done();
-    keep_alive = nullptr;
-  }
-};
-
-template <typename P>
-struct sink_coro<P, void>
-{
-  P p;
-
-  std::experimental::coroutine_handle<sink_promise> coro;
-  std::shared_ptr<sink_coro> keep_alive;
-
-  template <typename PP>
-  sink_coro(PP&& p) : p(std::forward<PP>(p))
-  {
-  }
-
-  template <typename Awaitable>
-  sink_task run(Awaitable awaitable)
-  {
-    try
-    {
-      co_await std::move(awaitable);
-      p.set_value();
-    }
-    catch (...)
-    {
-      p.set_error(std::current_exception());
-    }
-    keep_alive = nullptr;
   }
 
   void cancel()
@@ -571,7 +533,7 @@ auto run_resumable(E&& executor, Awaitable&& awaitable)
         std::make_shared<sink_coro<std::decay_t<decltype(p)>, return_type>>(
             std::forward<decltype(p)>(p));
     l->keep_alive = l;
-    l->coro = l->run(std::move(awaitable)).coro;
+    l->coro = runner<return_type>::run(*l, std::move(awaitable)).coro;
     l->coro.promise().executor = std::move(executor);
     l->coro.resume();
     // if the coro is not dead yet
