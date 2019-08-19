@@ -65,7 +65,6 @@ struct async_then_receiver
     p_.get_cancelation_token()->reset();
     try
     {
-      // XXX can't move p because we use it in catch, what should we do?
       fun_(p_, std::forward<V>(vs)...);
     }
     catch (...)

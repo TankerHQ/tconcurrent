@@ -629,21 +629,18 @@ struct shared_receiver
 };
 
 template <typename T, typename Sender>
-auto future_from_lazy(Sender&& task)
+auto submit_to_future(Sender&& task)
 {
   shared_receiver<typename detail::future_value_type<T>::type> receiver;
-  return std::make_tuple(
-      [task = std::forward<Sender>(task), receiver]() mutable {
-        try
-        {
-          task(receiver);
-        }
-        catch (...)
-        {
-          receiver.set_error(std::current_exception());
-        }
-      },
-      future<T>(receiver.shared.as_shared()));
+  try
+  {
+    task(receiver);
+  }
+  catch (...)
+  {
+    receiver.set_error(std::current_exception());
+  }
+  return future<T>(receiver.shared.as_shared());
 }
 }
 

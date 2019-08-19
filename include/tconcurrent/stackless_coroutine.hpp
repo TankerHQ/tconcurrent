@@ -3,6 +3,7 @@
 
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/future.hpp>
+#include <tconcurrent/lazy/async.hpp>
 #include <tconcurrent/lazy/then.hpp>
 #include <tconcurrent/promise.hpp>
 
@@ -358,34 +359,6 @@ auto operator co_await(tc::shared_future<R>&& f)
 
 namespace tconcurrent
 {
-namespace detail
-{
-template <typename F, typename R>
-struct task_control
-{
-  F cb;
-  cotask<R> cotask;
-  cancelation_token::scope_canceler canceler;
-
-  task_control(F cb)
-    : cb(std::move(cb)), cotask([& cb = this->cb] {
-      try
-      {
-        return cb();
-      }
-      catch (...)
-      {
-        throw std::runtime_error(std::string(typeid(F).name()) +
-                                 " is not a coroutine, got exception");
-      }
-    }())
-  {
-  }
-
-  task_control(task_control&&) = default;
-};
-}
-
 namespace lazy
 {
 struct sink_task;
@@ -425,22 +398,7 @@ struct sink_task
 public:
   using promise_type = sink_promise;
 
-  sink_task(sink_task const&) = delete;
-  sink_task& operator=(sink_task const&) = delete;
-
-  sink_task(sink_task&& o) : coro(o.coro)
-  {
-    o.coro = nullptr;
-  }
-  sink_task& operator=(sink_task&&) = delete;
-
-  // private:
   std::experimental::coroutine_handle<promise_type> coro;
-
-  sink_task(std::experimental::coroutine_handle<promise_type> coroutine)
-    : coro(coroutine)
-  {
-  }
 };
 
 inline sink_task sink_promise::get_return_object()
@@ -502,7 +460,7 @@ struct sink_coro
   void cancel()
   {
 #ifndef TCONCURRENT_ALLOW_CANCEL_IN_CATCH
-    detail::assert_no_cancel_in_catch();
+    ::tconcurrent::detail::assert_no_cancel_in_catch();
 #endif
 
     if (!coro)
@@ -543,17 +501,6 @@ auto run_resumable(E&& executor, Awaitable&& awaitable)
 }
 }
 
-template <typename P>
-struct run_async_data
-{
-  P p;
-  std::atomic<bool> fired{false};
-
-  run_async_data(P&& p) : p(std::forward<P>(p))
-  {
-  }
-};
-
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
     -> future<typename std::decay_t<decltype(cb())>::value_type>
@@ -561,31 +508,13 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
   using return_task_type = std::decay_t<decltype(cb())>;
   using return_type = typename return_task_type::value_type;
 
-  auto const run_async = [executor](auto&& p) mutable {
-    auto data = std::make_unique<run_async_data<std::decay_t<decltype(p)>>>(
-        std::forward<decltype(p)>(p));
-    data->p.get_cancelation_token()->set_canceler(
-        [data = data.get()]() mutable {
-          if (data->fired.exchange(true))
-            return;
-          data->p.set_done();
-        });
-    executor.post([data = std::move(data)]() mutable {
-      if (data->fired.exchange(true))
-        return;
-      data->p.set_value();
-    });
-  };
   auto task = lazy::async_then(
-      run_async,
+      lazy::async(executor),
       lazy::run_resumable(executor,
                           [](std::decay_t<F> cb) -> cotask<return_type> {
                             co_return co_await cb();
                           }(std::forward<F>(cb))));
-  auto pack = future_from_lazy<return_type>(std::move(task));
-  std::get<0>(pack)();
-
-  return std::move(std::get<1>(pack));
+  return submit_to_future<return_type>(std::move(task));
 }
 
 namespace detail
