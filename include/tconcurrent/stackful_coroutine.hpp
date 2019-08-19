@@ -1,7 +1,7 @@
 #ifndef TCONCURRENT_STACKFUL_COROUTINE_HPP
 #define TCONCURRENT_STACKFUL_COROUTINE_HPP
 
-#include <functional>
+#include <tconcurrent/function2.hpp>
 
 #include <boost/context/execution_context_v2.hpp>
 #include <boost/scope_exit.hpp>
@@ -100,7 +100,7 @@ struct abort_coroutine
 template <typename T>
 struct coroutine_finish;
 
-using coroutine_controller = std::function<void(class coroutine_control*)>;
+using coroutine_controller = fu2::function<void(coroutine_control*)>;
 using coroutine_t = boost::context::execution_context<coroutine_controller>;
 
 enum class coroutine_status
@@ -434,8 +434,10 @@ auto run_resumable(E&& executor, F&& cb)
               mycs->token = p.get_cancelation_token();
 
               TC_SANITIZER_OPEN_RETURN_CONTEXT(mycs);
-              *mycs->argctx = std::move(
-                  std::get<0>(argctx(&tconcurrent::detail::run_coroutine)));
+              *mycs->argctx = std::move(std::get<0>(
+                  argctx([](tconcurrent::detail::coroutine_control* c) {
+                    tconcurrent::detail::run_coroutine(c);
+                  })));
               TC_SANITIZER_CLOSE_SWITCH_CONTEXT();
 
               try
