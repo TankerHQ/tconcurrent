@@ -44,7 +44,7 @@ class TconcurrentConan(ConanFile):
         self.requires("enum-flags/0.1a@tanker/testing")
         self.requires("variant/1.3.0@tanker/testing")
         if self.is_mingw:
-            self.requires("mingw-threads/86ca7d@tanker/testing")
+            self.requires("mingw-threads/1.0.0@tanker/testing")
 
     def build_requirements(self):
         if self.should_build_tests:
