@@ -29,6 +29,10 @@ class TconcurrentConan(ConanFile):
         return None
 
     @property
+    def is_mingw(self):
+        return self.settings.os == "Windows" and self.settings.compiler == "gcc"
+
+    @property
     def should_build_tests(self):
         develop = self.develop
         cross_building = tools.cross_building(self.settings)
@@ -39,6 +43,8 @@ class TconcurrentConan(ConanFile):
         self.requires("Boost/1.68.0@tanker/testing")
         self.requires("enum-flags/0.1a@tanker/testing")
         self.requires("variant/1.3.0@tanker/testing")
+        if self.is_mingw:
+            self.requires("mingw-threads/86ca7d@tanker/testing")
 
     def build_requirements(self):
         if self.should_build_tests:

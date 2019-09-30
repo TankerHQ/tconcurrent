@@ -2,12 +2,18 @@
 #define TCONCURRENT_DETAIL_SHARED_BASE_HPP
 
 #include <atomic>
-#include <condition_variable>
 #include <functional>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#ifdef __MINGW32__
+#include <mingw-threads/mingw.condition_variable.h>
+#include <mingw-threads/mingw.mutex.h>
+#else
+#include <condition_variable>
+#include <mutex>
+#endif
 
 #include <mpark/variant.hpp>
 

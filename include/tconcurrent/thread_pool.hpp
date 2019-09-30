@@ -4,7 +4,12 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+
+#ifdef __MINGW32__
+#include <mingw-threads/mingw.thread.h>
+#else
 #include <thread>
+#endif
 
 #include <tconcurrent/detail/boost_fwd.hpp>
 #include <tconcurrent/detail/export.hpp>

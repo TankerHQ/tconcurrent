@@ -2,8 +2,13 @@
 #define TCONCURRENT_PERIODIC_TASK_HPP
 
 #include <chrono>
-#include <mutex>
 #include <type_traits>
+
+#ifdef __MINGW32__
+#include <mingw-threads/mingw.mutex.h>
+#else
+#include <mutex>
+#endif
 
 #include <tconcurrent/future.hpp>
 

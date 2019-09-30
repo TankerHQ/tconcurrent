@@ -1,7 +1,12 @@
 #pragma once
 
+#ifdef __MINGW32__
+#include <mingw-threads/mingw.condition_variable.h>
+#include <mingw-threads/mingw.mutex.h>
+#else
 #include <condition_variable>
 #include <mutex>
+#endif
 
 namespace tconcurrent
 {
