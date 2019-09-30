@@ -31,7 +31,7 @@ def main() -> None:
     if args.home_isolation:
         ci.conan.set_home_isolation()
 
-    ci.cpp.update_conan_config()
+    ci.conan.update_config()
 
     if args.command == "build-and-test":
         src_path = Path.getcwd()
