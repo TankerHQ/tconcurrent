@@ -11,6 +11,7 @@ class TconcurrentConan(ConanFile):
         "sanitizer": ["address", None],
         "coroutinests": [True, False],
         "coverage": [True, False],
+        "mingw_stdmutex_recursion_checks": [True, False],
     }
     default_options = (
         "shared=False",
@@ -18,6 +19,7 @@ class TconcurrentConan(ConanFile):
         "sanitizer=None",
         "coroutinests=False",
         "coverage=False",
+        "mingw_stdmutex_recursion_checks=False",
     )
     exports_sources = "CMakeLists.txt", "src/*", "include/*", "test/*"
     generators = "cmake"
@@ -66,6 +68,8 @@ class TconcurrentConan(ConanFile):
         cmake = CMake(self)
         if self.options.sanitizer:
             cmake.definitions["CONAN_CXX_FLAGS"] = self.sanitizer_flag
+        if self.is_mingw:
+            cmake.definitions["CMAKE_STDMUTEX_RECURSION_CHECKS"] = self.options.mingw_stdmutex_recursion_checks
         cmake.definitions["BUILD_SHARED_LIBS"] = self.options.shared
         cmake.definitions["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.fPIC
         cmake.definitions["BUILD_TESTING"] = self.should_build_tests
