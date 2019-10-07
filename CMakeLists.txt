@@ -99,10 +99,23 @@ else()
   endif()
 endif()
 
+if(CMAKE_STDMUTEX_RECURSION_CHECKS)
+  set(TCONCURRENT_STDMUTEX_RECURSION_CHECKS 1)
+else()
+  set(TCONCURRENT_STDMUTEX_RECURSION_CHECKS 0)
+endif()
+
+configure_file(
+  ${PROJECT_SOURCE_DIR}/include/tconcurrent/detail/stdmutex.hpp.in
+  ${CMAKE_CURRENT_BINARY_DIR}/generated/include/tconcurrent/detail/stdmutex.hpp
+  @ONLY
+)
+
 add_library(tconcurrent ${tconcurrent_SRC})
 
 target_include_directories(tconcurrent PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated/include>
   $<INSTALL_INTERFACE:include>
 )
 
@@ -119,8 +132,9 @@ install(TARGETS tconcurrent
   ARCHIVE DESTINATION lib
 )
 
-install(DIRECTORY include
+install(DIRECTORY include ${CMAKE_CURRENT_BINARY_DIR}/generated/include
   DESTINATION .
+  FILES_MATCHING PATTERN "*.hpp"
 )
 
 install(EXPORT tconcurrent

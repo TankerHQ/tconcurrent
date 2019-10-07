@@ -1,12 +1,8 @@
 #pragma once
 
-#include <functional>
+#include <tconcurrent/detail/stdmutex.hpp>
 
-#ifdef __MINGW32__
-#include <mingw-threads/mingw.mutex.h>
-#else
-#include <mutex>
-#endif
+#include <functional>
 
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/future.hpp>

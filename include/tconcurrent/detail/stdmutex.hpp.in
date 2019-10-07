@@ -1,0 +1,20 @@
+#ifndef TCONCURRENT_DETAIL_STDMUTEX_HPP
+#define TCONCURRENT_DETAIL_STDMUTEX_HPP
+
+#ifdef __MINGW32__
+// Prevent unexpected std::mutex ABI breakage when users have a different NDEBUG or STDMUTEX_RECURSION_CHECKS value
+// This header was generated with TCONCURRENT_STDMUTEX_RECURSION_CHECKS == @TCONCURRENT_STDMUTEX_RECURSION_CHECKS@
+#if defined(STDMUTEX_RECURSION_CHECKS) && STDMUTEX_RECURSION_CHECKS != @TCONCURRENT_STDMUTEX_RECURSION_CHECKS@
+#error "STDMUTEX_RECURSION_CHECKS is part of the mingw ABI and must match the value tconcurrent was compiled with (or you get to keep both pieces)"
+#elif !defined(STDMUTEX_RECURSION_CHECKS)
+#define STDMUTEX_RECURSION_CHECKS @TCONCURRENT_STDMUTEX_RECURSION_CHECKS@
+#endif
+
+#include <mingw-threads/mingw.condition_variable.h>
+#include <mingw-threads/mingw.mutex.h>
+#else
+#include <condition_variable>
+#include <mutex>
+#endif
+
+#endif // TCONCURRENT_DETAIL_STDMUTEX_HPP

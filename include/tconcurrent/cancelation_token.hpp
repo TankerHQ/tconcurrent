@@ -1,17 +1,13 @@
 #ifndef TCONCURRENT_CANCELATION_TOKEN_HPP
 #define TCONCURRENT_CANCELATION_TOKEN_HPP
 
+#include <tconcurrent/detail/stdmutex.hpp>
+
 #include <cassert>
 #include <deque>
 #include <functional>
 #include <memory>
 #include <stdexcept>
-
-#ifdef __MINGW32__
-#include <mingw-threads/mingw.mutex.h>
-#else
-#include <mutex>
-#endif
 
 namespace tconcurrent
 {
