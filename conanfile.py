@@ -42,9 +42,8 @@ class TconcurrentConan(ConanFile):
         return develop and (not cross_building) and (not emscripten)
 
     def requirements(self):
-        self.requires("Boost/1.68.0@tanker/testing")
+        self.requires("Boost/1.71.0@tanker/testing")
         self.requires("enum-flags/0.1a@tanker/testing")
-        self.requires("variant/1.3.0@tanker/testing")
         if self.is_mingw:
             self.requires("mingw-threads/1.0.0@tanker/testing")
 
