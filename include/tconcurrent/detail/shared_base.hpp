@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include <mpark/variant.hpp>
+#include <boost/variant2/variant.hpp>
 
 #include <tconcurrent/cancelation_token.hpp>
 
@@ -153,7 +153,7 @@ public:
     std::exception_ptr exc;
   };
 
-  mpark::variant<v_none, v_value, v_exception> _r;
+  boost::variant2::variant<v_none, v_value, v_exception> _r;
 
   shared_base(nocancel_tag)
   {
@@ -216,9 +216,9 @@ public:
     while (_r.index() == 0)
       _ready.wait(lock);
     if (_r.index() == 2)
-      std::rethrow_exception(mpark::get<v_exception>(_r).exc);
+      std::rethrow_exception(boost::variant2::get<v_exception>(_r).exc);
     // this may or may not move depending on Rcv being a reference or not
-    return std::move(mpark::get<v_value>(_r).value);
+    return std::move(boost::variant2::get<v_value>(_r).value);
   }
 
   std::exception_ptr const& get_exception()
@@ -228,7 +228,7 @@ public:
       _ready.wait(lock);
     if (_r.index() == 1)
       throw std::logic_error("this future has a value");
-    return mpark::get<v_exception>(_r).exc;
+    return boost::variant2::get<v_exception>(_r).exc;
   }
 
   void wait() const
