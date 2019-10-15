@@ -12,6 +12,7 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 option(WITH_COVERAGE "Enable coverage" OFF)
 
+
 # CMAKE_C_FLAGS and the like are _strings_, not lists.
 # So, we need a macro so that we can rewrite the values
 # in place, and avoid appending the flags twice
@@ -90,11 +91,6 @@ else()
     CONAN_PKG::Boost
     CONAN_PKG::enum-flags
   )
-  if (MINGW)
-    list(APPEND tconcurrent_LIBS
-      CONAN_PKG::mingw-threads
-    )
-  endif()
 endif()
 
 add_library(tconcurrent ${tconcurrent_SRC})

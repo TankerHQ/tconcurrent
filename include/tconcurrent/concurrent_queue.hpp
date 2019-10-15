@@ -2,14 +2,9 @@
 #define TCONCURRENT_CHANNEL_HPP
 
 #include <cassert>
+#include <mutex>
 #include <queue>
 #include <vector>
-
-#ifdef __MINGW32__
-#include <mingw-threads/mingw.thread.h>
-#else
-#include <mutex>
-#endif
 
 #include <tconcurrent/promise.hpp>
 

@@ -2,7 +2,9 @@
 #define TCONCURRENT_DETAIL_SHARED_BASE_HPP
 
 #include <atomic>
+#include <condition_variable>
 #include <functional>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <vector>

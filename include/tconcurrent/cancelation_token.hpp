@@ -5,13 +5,8 @@
 #include <deque>
 #include <functional>
 #include <memory>
-#include <stdexcept>
-
-#ifdef __MINGW32__
-#include <mingw-threads/mingw.mutex.h>
-#else
 #include <mutex>
-#endif
+#include <stdexcept>
 
 namespace tconcurrent
 {
