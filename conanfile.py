@@ -41,10 +41,6 @@ class TconcurrentConan(ConanFile):
         emscripten = self.settings.os == "Emscripten"
         return develop and (not cross_building) and (not emscripten)
 
-    def config_options(self):
-        if not self.is_mingw:
-            del self.options.mingw_stdmutex_recursion_checks
-
     def requirements(self):
         self.requires("Boost/1.71.0@tanker/testing")
         self.requires("enum-flags/0.1a@tanker/testing")
