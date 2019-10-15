@@ -1,8 +1,6 @@
 #ifndef TCONCURRENT_DETAIL_SHARED_BASE_HPP
 #define TCONCURRENT_DETAIL_SHARED_BASE_HPP
 
-#include <tconcurrent/detail/stdmutex.hpp>
-
 #include <atomic>
 #include <functional>
 #include <stdexcept>
