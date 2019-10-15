@@ -121,8 +121,6 @@ target_link_libraries(tconcurrent PUBLIC ${tconcurrent_LIBS})
 
 target_compile_definitions(tconcurrent PRIVATE
   TCONCURRENT_USE_THREAD_LOCAL=$<COMPILE_FEATURES:cxx_thread_local>
-  PUBLIC
-  TCONCURRENT_STDMUTEX_RECURSION_CHECKS=${TCONCURRENT_STDMUTEX_RECURSION_CHECKS}
 )
 
 install(TARGETS tconcurrent
