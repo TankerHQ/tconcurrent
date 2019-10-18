@@ -1,4 +1,4 @@
-# Generated with dmenv 0.11.1, python 3.7.4, on Darwin
+# Generated with dmenv 0.16.1, python 3.7.5, on Linux
 -e git+ssh://git@tanker.local/Tanker/ci@master#egg=ci
 appdirs==1.4.3
 asn1crypto==0.24.0
@@ -10,7 +10,7 @@ cffi==1.12.3
 chardet==3.0.4
 cli-ui==0.9.1
 colorama==0.4.1
-conan==1.18.5
+conan==1.19.2
 contextlib2==0.5.5
 cryptography==2.3.1
 deprecation==2.0.7
@@ -31,7 +31,7 @@ node-semver==0.6.1
 packaging==19.2
 patch==1.16
 path.py==12.0.1
-pip==19.2.3
+pip==19.3.1
 pluginbase==0.7
 psutil==5.6.3
 pycparser==2.19
