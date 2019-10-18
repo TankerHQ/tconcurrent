@@ -12,6 +12,7 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 option(WITH_COVERAGE "Enable coverage" OFF)
 
+
 # CMAKE_C_FLAGS and the like are _strings_, not lists.
 # So, we need a macro so that we can rewrite the values
 # in place, and avoid appending the flags twice
@@ -90,30 +91,12 @@ else()
     CONAN_PKG::Boost
     CONAN_PKG::enum-flags
   )
-  if (MINGW)
-    list(APPEND tconcurrent_LIBS
-      CONAN_PKG::mingw-threads
-    )
-  endif()
 endif()
-
-if(CMAKE_STDMUTEX_RECURSION_CHECKS)
-  set(TCONCURRENT_STDMUTEX_RECURSION_CHECKS 1)
-else()
-  set(TCONCURRENT_STDMUTEX_RECURSION_CHECKS 0)
-endif()
-
-configure_file(
-  ${PROJECT_SOURCE_DIR}/include/tconcurrent/detail/stdmutex.hpp.in
-  ${CMAKE_CURRENT_BINARY_DIR}/generated/include/tconcurrent/detail/stdmutex.hpp
-  @ONLY
-)
 
 add_library(tconcurrent ${tconcurrent_SRC})
 
 target_include_directories(tconcurrent PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated/include>
   $<INSTALL_INTERFACE:include>
 )
 
@@ -121,8 +104,6 @@ target_link_libraries(tconcurrent PUBLIC ${tconcurrent_LIBS})
 
 target_compile_definitions(tconcurrent PRIVATE
   TCONCURRENT_USE_THREAD_LOCAL=$<COMPILE_FEATURES:cxx_thread_local>
-  PUBLIC
-  TCONCURRENT_STDMUTEX_RECURSION_CHECKS=${TCONCURRENT_STDMUTEX_RECURSION_CHECKS}
 )
 
 install(TARGETS tconcurrent
@@ -132,9 +113,8 @@ install(TARGETS tconcurrent
   ARCHIVE DESTINATION lib
 )
 
-install(DIRECTORY include ${CMAKE_CURRENT_BINARY_DIR}/generated/include
+install(DIRECTORY include
   DESTINATION .
-  FILES_MATCHING PATTERN "*.hpp"
 )
 
 install(EXPORT tconcurrent

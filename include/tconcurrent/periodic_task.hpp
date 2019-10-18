@@ -1,9 +1,8 @@
 #ifndef TCONCURRENT_PERIODIC_TASK_HPP
 #define TCONCURRENT_PERIODIC_TASK_HPP
 
-#include <tconcurrent/detail/stdmutex.hpp>
-
 #include <chrono>
+#include <mutex>
 #include <type_traits>
 
 #include <tconcurrent/future.hpp>

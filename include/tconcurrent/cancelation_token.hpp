@@ -1,12 +1,11 @@
 #ifndef TCONCURRENT_CANCELATION_TOKEN_HPP
 #define TCONCURRENT_CANCELATION_TOKEN_HPP
 
-#include <tconcurrent/detail/stdmutex.hpp>
-
 #include <cassert>
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 
 namespace tconcurrent

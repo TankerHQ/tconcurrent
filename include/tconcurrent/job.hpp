@@ -1,8 +1,7 @@
 #pragma once
 
-#include <tconcurrent/detail/stdmutex.hpp>
-
 #include <functional>
+#include <mutex>
 
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/future.hpp>

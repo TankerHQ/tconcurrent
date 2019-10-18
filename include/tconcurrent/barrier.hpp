@@ -1,6 +1,7 @@
 #pragma once
 
-#include <tconcurrent/detail/stdmutex.hpp>
+#include <condition_variable>
+#include <mutex>
 
 namespace tconcurrent
 {

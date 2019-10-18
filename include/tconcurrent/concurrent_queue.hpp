@@ -1,9 +1,8 @@
 #ifndef TCONCURRENT_CHANNEL_HPP
 #define TCONCURRENT_CHANNEL_HPP
 
-#include <tconcurrent/detail/stdmutex.hpp>
-
 #include <cassert>
+#include <mutex>
 #include <queue>
 #include <vector>
 
