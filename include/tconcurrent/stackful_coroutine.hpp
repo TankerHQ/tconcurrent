@@ -192,6 +192,10 @@ inline coroutine_status run_coroutine(coroutine_control* ctrl)
   TC_SANITIZER_OPEN_SWITCH_CONTEXT(
       reinterpret_cast<char const*>(ctrl->stack.sp) - ctrl->stack.size,
       ctrl->stack.size)
+  // NOTE: Compilers are smart enough to inline all the nested templates up to
+  // coroutine user code, but not smart enough to notice we switch stack here,
+  // so exception handlers are registered before the Boost.Context switch.
+  // DO NOT let a try block be inlined, or it may catch() on the WRONG STACK.
   std::tie(ctrl->ctx, f) = ctrl->ctx({});
   TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
 
