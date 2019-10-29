@@ -1,11 +1,12 @@
 #pragma once
 
-#include <functional>
-#include <mutex>
-
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/future.hpp>
 #include <tconcurrent/promise.hpp>
+
+#include <function2/function2.hpp>
+
+#include <mutex>
 
 namespace tconcurrent
 {
@@ -17,7 +18,7 @@ public:
   job& operator=(job const&) = delete;
   job& operator=(job&&) = delete;
 
-  using future_callback = std::function<tc::future<void>()>;
+  using future_callback = fu2::function<tc::future<void>()>;
 
   job(future_callback cb) : _cb(std::move(cb))
   {
