@@ -32,6 +32,7 @@ class TconcurrentConan(ConanFile):
     def requirements(self):
         self.requires("boost/1.73.0")
         self.requires("enum-flags/0.1a")
+        self.requires("function2/4.1.0")
 
     def build_requirements(self):
         if self.should_build_tests:

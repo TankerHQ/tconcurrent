@@ -5,6 +5,8 @@
 #include <functional>
 #include <thread>
 
+#include <function2/function2.hpp>
+
 #include <tconcurrent/detail/boost_fwd.hpp>
 #include <tconcurrent/detail/export.hpp>
 #include <tconcurrent/future.hpp>
@@ -55,7 +57,7 @@ public:
    */
   void run_thread();
 
-  void post(std::function<void()> work, std::string name = {});
+  void post(fu2::unique_function<void()> work, std::string name = {});
 
   void set_error_handler(error_handler_cb cb);
   void signal_error(std::exception_ptr const& e);

@@ -3,9 +3,10 @@
 
 #include <tconcurrent/operation_canceled.hpp>
 
+#include <function2/function2.hpp>
+
 #include <cassert>
 #include <deque>
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -16,7 +17,7 @@ namespace tconcurrent
 class cancelation_token : public std::enable_shared_from_this<cancelation_token>
 {
 public:
-  using cancelation_callback = std::function<void()>;
+  using cancelation_callback = fu2::function<void()>;
 
   class scope_canceler
   {

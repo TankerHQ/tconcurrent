@@ -3,11 +3,12 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <functional>
 #include <mutex>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include <function2/function2.hpp>
 
 #include <boost/variant2/variant.hpp>
 
@@ -257,7 +258,7 @@ public:
 private:
   mutable std::mutex _mutex;
   mutable std::condition_variable _ready;
-  std::vector<std::function<void()>> _then;
+  std::vector<fu2::unique_function<void()>> _then;
 
 protected:
   cancelation_token_ptr _cancelation_token;
@@ -293,7 +294,7 @@ private:
   {
     assert(_r.index() == 0 && "state already set");
 
-    std::vector<std::function<void()>> then;
+    std::vector<fu2::unique_function<void()>> then;
     {
       std::lock_guard<std::mutex> lock{_mutex};
       setval();

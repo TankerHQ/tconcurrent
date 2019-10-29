@@ -6,7 +6,9 @@
 #include <tconcurrent/detail/util.hpp>
 #include <tconcurrent/thread_pool.hpp>
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/bind_executor.hpp>
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/post.hpp>
 
 namespace tconcurrent
 {
@@ -16,7 +18,7 @@ namespace tconcurrent
 // everywhere, we want to keep it light.
 struct thread_pool::impl
 {
-  boost::asio::io_service _io;
+  boost::asio::io_context _io;
   std::unique_ptr<boost::asio::io_service::work> _work;
   std::vector<std::thread> _threads;
   std::atomic<unsigned> _num_running_threads{0};
@@ -163,22 +165,24 @@ void thread_pool::set_task_trace_handler(task_trace_handler_cb cb)
   _p->_task_trace_handler = std::move(cb);
 }
 
-void thread_pool::post(std::function<void()> work, std::string name)
+void thread_pool::post(fu2::unique_function<void()> work, std::string name)
 {
   assert(!_p->_dead.load());
-  _p->_io.post([this, work = std::move(work), name = std::move(name)] {
-    if (_p->_task_trace_handler)
-    {
-      auto const before = std::chrono::steady_clock::now();
-      work();
-      auto const ellapsed = std::chrono::steady_clock::now() - before;
-      _p->_task_trace_handler(name, ellapsed);
-    }
-    else
-    {
-      work();
-    }
-  });
+  boost::asio::post(boost::asio::bind_executor(
+      _p->_io.get_executor(),
+      [this, work = std::move(work), name = std::move(name)]() mutable {
+        if (_p->_task_trace_handler)
+        {
+          auto const before = std::chrono::steady_clock::now();
+          work();
+          auto const ellapsed = std::chrono::steady_clock::now() - before;
+          _p->_task_trace_handler(name, ellapsed);
+        }
+        else
+        {
+          work();
+        }
+      }));
 }
 
 void thread_pool::prevent_destruction()

@@ -4,7 +4,8 @@
 #include <tconcurrent/detail/boost_fwd.hpp>
 #include <tconcurrent/detail/export.hpp>
 
-#include <functional>
+#include <function2/function2.hpp>
+
 #include <memory>
 #include <string>
 
@@ -25,7 +26,7 @@ public:
   executor& operator=(executor const&) = default;
   executor& operator=(executor&&) = default;
 
-  void post(std::function<void()> work, std::string name = {})
+  void post(fu2::unique_function<void()> work, std::string name = {})
   {
     _p->post(std::move(work), std::move(name));
   }
@@ -59,7 +60,7 @@ private:
   struct impl_base
   {
     virtual ~impl_base() = default;
-    virtual void post(std::function<void()>, std::string) = 0;
+    virtual void post(fu2::unique_function<void()>, std::string) = 0;
     virtual boost::asio::io_service& get_io_service() = 0;
     virtual bool is_single_threaded() const = 0;
     virtual bool is_in_this_context() const = 0;
@@ -74,7 +75,7 @@ private:
     {
     }
 
-    void post(std::function<void()> f, std::string name) override
+    void post(fu2::unique_function<void()> f, std::string name) override
     {
       _context.post(std::move(f), std::move(name));
     }
