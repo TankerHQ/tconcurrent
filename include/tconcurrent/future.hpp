@@ -30,17 +30,6 @@ namespace detail
 template <typename S, typename F>
 auto package(F&& f, cancelation_token_ptr token, bool cancelable)
     -> std::pair<packaged_task<S>, future<detail::result_of_t_<S>>>;
-
-template <typename T>
-struct future_value_type
-{
-  using type = T;
-};
-template <>
-struct future_value_type<void>
-{
-  using type = tvoid;
-};
 }
 
 template <typename T>
@@ -78,7 +67,7 @@ class future_base : public detail::future_unwrap<F<R>>
 public:
   using this_type = F<R>;
   using result_type = R;
-  using value_type = typename detail::future_value_type<R>::type;
+  using value_type = detail::void_to_tvoid_t<R>;
   using get_type = std::conditional_t<Ref, value_type const&, value_type>;
 
   /// Same as then(E&& e, Func&& func) with the default executor as `e`
