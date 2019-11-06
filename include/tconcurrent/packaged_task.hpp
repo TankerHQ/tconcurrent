@@ -65,9 +65,9 @@ template <typename>
 struct shared; // not defined
 
 template <typename R, typename... Args>
-struct shared<R(Args...)> : shared_base<shared_base_type<R>>
+struct shared<R(Args...)> : shared_base<void_to_tvoid_t<R>>
 {
-  using base_type = shared_base<shared_base_type<R>>;
+  using base_type = shared_base<void_to_tvoid_t<R>>;
 
   std::atomic<bool> _done{false};
   std::function<R(cancelation_token&, Args...)> _f;

@@ -12,6 +12,7 @@
 #include <boost/variant2/variant.hpp>
 
 #include <tconcurrent/cancelation_token.hpp>
+#include <tconcurrent/detail/tvoid.hpp>
 
 namespace tconcurrent
 {
@@ -21,10 +22,6 @@ struct broken_promise : std::runtime_error
   broken_promise() : runtime_error("promise is broken")
   {
   }
-};
-
-struct tvoid
-{
 };
 
 namespace detail
@@ -312,20 +309,6 @@ private:
   template <typename S>
   friend class promise_ptr;
 };
-
-template <typename T>
-struct shared_base_type_
-{
-  using type = T;
-};
-template <>
-struct shared_base_type_<void>
-{
-  using type = tvoid;
-};
-
-template <typename T>
-using shared_base_type = typename shared_base_type_<T>::type;
 }
 }
 
