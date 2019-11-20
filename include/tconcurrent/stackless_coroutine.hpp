@@ -3,6 +3,8 @@
 
 #include <tconcurrent/async.hpp>
 #include <tconcurrent/future.hpp>
+#include <tconcurrent/lazy/async.hpp>
+#include <tconcurrent/lazy/then.hpp>
 #include <tconcurrent/promise.hpp>
 
 #include <experimental/coroutine>
@@ -58,7 +60,7 @@ struct task_promise_base
   }
   auto final_suspend()
   {
-    // suspend always so that we can get the get of the coroutine when it is
+    // suspend always so that we can get the result of the coroutine when it is
     // done
     return final_awaitable{};
   }
@@ -162,9 +164,7 @@ public:
     if (coro)
     {
       if (started && !coro.done())
-      {
-        assert(!"not done");
-      }
+        assert(!"we are destroying a cotask that is not finished!");
       coro.destroy();
     }
   }
@@ -181,17 +181,16 @@ private:
 
     bool await_ready()
     {
-      assert(!coroutine.done());
+      assert(!coroutine.done() &&
+             "trying to await a coroutine that has already run");
       return coroutine.done();
     }
     decltype(auto) await_resume()
     {
       return coroutine.promise().result();
     }
-    template <typename R>
-    bool await_suspend(
-        std::experimental::coroutine_handle<detail::task_promise<R>>
-            caller_awaiter)
+    template <typename P>
+    bool await_suspend(std::experimental::coroutine_handle<P> caller_awaiter)
     {
       coroutine.promise().executor = caller_awaiter.promise().executor;
       coroutine.resume();
@@ -358,64 +357,170 @@ auto operator co_await(tc::shared_future<R>&& f)
 
 namespace tconcurrent
 {
+namespace lazy
+{
 namespace detail
 {
-template <typename F, typename R>
-struct task_control
-{
-  F cb;
-  cotask<R> cotask;
-  cancelation_token::scope_canceler canceler;
+struct sink_task;
 
-  task_control(F cb)
-    : cb(std::move(cb)), cotask([& cb = this->cb] {
-      try
-      {
-        return cb();
-      }
-      catch (...)
-      {
-        throw std::runtime_error(std::string(typeid(F).name()) +
-                                 " is not a coroutine, got exception");
-      }
-    }())
+struct sink_promise
+{
+  executor executor;
+
+  sink_promise() = default;
+  sink_promise(sink_promise const&) = delete;
+  sink_promise(sink_promise&&) = delete;
+  sink_promise& operator=(sink_promise const&) = delete;
+  sink_promise& operator=(sink_promise&&) = delete;
+
+  auto initial_suspend()
+  {
+    return std::experimental::suspend_always{};
+  }
+  auto final_suspend()
+  {
+    return std::experimental::suspend_never{};
+  }
+  void unhandled_exception()
+  {
+    std::terminate();
+  }
+
+  void return_void()
   {
   }
 
-  task_control(task_control&&) = default;
+  sink_task get_return_object();
 };
+
+struct sink_task
+{
+public:
+  using promise_type = sink_promise;
+
+  std::experimental::coroutine_handle<promise_type> coro;
+};
+
+inline sink_task sink_promise::get_return_object()
+{
+  return sink_task{
+      std::experimental::coroutine_handle<sink_promise>::from_promise(*this)};
+}
+
+template <typename R>
+struct coro_runner
+{
+  template <typename Coro, typename Awaitable>
+  static sink_task run(Coro& coro, Awaitable awaitable)
+  {
+    try
+    {
+      coro.receiver.set_value(co_await std::move(awaitable));
+    }
+    catch (...)
+    {
+      coro.receiver.set_error(std::current_exception());
+    }
+    coro.keep_alive = nullptr;
+  }
+};
+
+template <>
+struct coro_runner<void>
+{
+  template <typename Coro, typename Awaitable>
+  static sink_task run(Coro& coro, Awaitable awaitable)
+  {
+    try
+    {
+      co_await std::move(awaitable);
+      coro.receiver.set_value();
+    }
+    catch (...)
+    {
+      coro.receiver.set_error(std::current_exception());
+    }
+    coro.keep_alive = nullptr;
+  }
+};
+
+template <typename Receiver>
+struct coroutine_holder
+{
+  Receiver receiver;
+
+  std::experimental::coroutine_handle<sink_promise> coro;
+  std::shared_ptr<coroutine_holder> keep_alive;
+
+  template <typename ReceiverArg>
+  coroutine_holder(ReceiverArg&& receiver)
+    : receiver(std::forward<ReceiverArg>(receiver))
+  {
+  }
+
+  void cancel()
+  {
+#ifndef TCONCURRENT_ALLOW_CANCEL_IN_CATCH
+    ::tconcurrent::detail::assert_no_cancel_in_catch();
+#endif
+
+    if (!coro)
+      return;
+
+    auto const executor = coro.promise().executor;
+    assert((!executor || executor.is_in_this_context()) &&
+           "cancelation is not supported cross-executor");
+
+    if (coro.done())
+      return;
+
+    coro.destroy();
+    coro = nullptr;
+    receiver.set_done();
+    keep_alive = nullptr;
+  }
+};
+}
+
+template <typename E, typename Awaitable>
+auto run_resumable(E&& executor, Awaitable&& awaitable)
+{
+  using return_type = typename Awaitable::value_type;
+
+  return [executor = std::forward<E>(executor),
+          awaitable =
+              std::forward<Awaitable>(awaitable)](auto&& receiver) mutable {
+    auto coro = std::make_shared<
+        detail::coroutine_holder<std::decay_t<decltype(receiver)>>>(
+        std::forward<decltype(receiver)>(receiver));
+    coro->keep_alive = coro;
+    coro->coro =
+        detail::coro_runner<return_type>::run(*coro, std::move(awaitable)).coro;
+    coro->coro.promise().executor = std::move(executor);
+    coro->coro.resume();
+    // we just ran the coroutine, it may have died right away, so we need to
+    // check
+    if (coro->keep_alive)
+      coro->receiver.get_cancelation_token()->set_canceler(
+          [coro] { coro->cancel(); });
+  };
+}
 }
 
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
+    -> future<typename std::decay_t<decltype(cb())>::value_type>
 {
   using return_task_type = std::decay_t<decltype(cb())>;
   using return_type = typename return_task_type::value_type;
 
-  auto const fullName = name + " (" + typeid(F).name() + ")";
-
-  auto token = std::make_shared<cancelation_token>();
-
-  auto ctrl =
-      std::make_shared<detail::task_control<std::decay_t<F>, return_type>>(
-          std::forward<F>(cb));
-  ctrl->cotask.set_executor(executor);
-
-  auto pack = package_cancelable<future<return_type>()>(
-      [ctrl = std::move(ctrl), token] {
-        auto pack = package<return_type()>(
-            [ctrl] { return ctrl->cotask.get(); }, token);
-        ctrl->cotask.set_continuation(std::move(std::get<0>(pack)));
-        ctrl->cotask.run();
-        ctrl->canceler = token->make_scope_canceler(
-            [& cotask = ctrl->cotask] { cotask.cancel(); });
-        return std::move(std::get<1>(pack));
-      },
-      token);
-
-  executor.post(std::move(std::get<0>(pack)), fullName);
-
-  return std::move(std::get<1>(pack)).update_chain_name(fullName).unwrap();
+  auto task = lazy::async_then(
+      lazy::async(executor),
+      lazy::run_resumable(executor,
+                          [](std::decay_t<F> cb) -> cotask<return_type> {
+                            co_return co_await cb();
+                          }(std::forward<F>(cb))));
+  return submit_to_future<return_type>(std::move(task));
 }
 
 namespace detail
