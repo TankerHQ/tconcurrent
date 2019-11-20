@@ -1,12 +1,16 @@
 #ifndef TCONCURRENT_STACKFUL_COROUTINE_HPP
 #define TCONCURRENT_STACKFUL_COROUTINE_HPP
 
-#include <functional>
+#include <function2/function2.hpp>
 
 #include <boost/context/fiber.hpp>
 #include <boost/scope_exit.hpp>
 
 #include <tconcurrent/async.hpp>
+#include <tconcurrent/lazy/async.hpp>
+#include <tconcurrent/lazy/detail.hpp>
+#include <tconcurrent/lazy/sink_receiver.hpp>
+#include <tconcurrent/lazy/then.hpp>
 #include <tconcurrent/packaged_task.hpp>
 
 #include <tconcurrent/detail/export.hpp>
@@ -27,6 +31,14 @@
 
 namespace tconcurrent
 {
+namespace lazy
+{
+namespace detail
+{
+template <typename E, typename F>
+struct run_resumable_sender;
+}
+}
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb);
 
@@ -50,11 +62,11 @@ stack_bounds get_stack_bounds(coroutine_control* ctrl);
     void* fsholder;                                        \
     __sanitizer_start_switch_fiber(&fsholder, stack, stacksize);
 
-#define TC_SANITIZER_OPEN_RETURN_CONTEXT(ctrl)                \
-  {                                                           \
-    void* fsholder;                                           \
-    auto const stack_bounds = detail::get_stack_bounds(ctrl); \
-    __sanitizer_start_switch_fiber(                           \
+#define TC_SANITIZER_OPEN_RETURN_CONTEXT(ctrl)                               \
+  {                                                                          \
+    void* fsholder;                                                          \
+    auto const stack_bounds = ::tconcurrent::detail::get_stack_bounds(ctrl); \
+    __sanitizer_start_switch_fiber(                                          \
         &fsholder, stack_bounds.stack, stack_bounds.size);
 
 #define TC_SANITIZER_CLOSE_SWITCH_CONTEXT()                    \
@@ -64,9 +76,9 @@ stack_bounds get_stack_bounds(coroutine_control* ctrl);
 #define TC_SANITIZER_ENTER_NEW_CONTEXT() \
   __sanitizer_finish_switch_fiber(nullptr, nullptr, nullptr)
 
-#define TC_SANITIZER_EXIT_CONTEXT(ctrl)                     \
-  auto const stack_bounds = detail::get_stack_bounds(ctrl); \
-  __sanitizer_start_switch_fiber(                           \
+#define TC_SANITIZER_EXIT_CONTEXT(ctrl)                                    \
+  auto const stack_bounds = ::tconcurrent::detail::get_stack_bounds(ctrl); \
+  __sanitizer_start_switch_fiber(                                          \
       nullptr, stack_bounds.stack, stack_bounds.size);
 
 #else
@@ -127,14 +139,14 @@ private:
 
   std::function<void(coroutine_control*)> coroutine_exit_post_setup;
 
-  cancelation_token& token;
+  lazy::cancelation_token* token;
 
   bool aborted = false;
 
   coroutine_control* previous_coroutine = nullptr;
 
   template <typename E, typename F>
-  coroutine_control(std::string name, E&& e, F&& f, cancelation_token& token)
+  coroutine_control(std::string name, E&& e, F&& f)
     : name(std::move(name))
     , executor_(std::forward<E>(e))
     , salloc(boost::context::stack_traits::default_size() * 2)
@@ -144,7 +156,6 @@ private:
           salloc,
           std::forward<F>(f))
     , argctx(nullptr)
-    , token(token)
   {
   }
 
@@ -156,12 +167,14 @@ private:
   friend auto ::tconcurrent::async_resumable(std::string const& name,
                                              E&& executor,
                                              F&& cb);
+
+  template <typename E, typename F>
+  friend struct lazy::detail::run_resumable_sender;
+
 #if TCONCURRENT_SANITIZER
   friend stack_bounds get_stack_bounds(coroutine_control* ctrl);
 #endif
   friend coroutine_status run_coroutine(coroutine_control* ctrl);
-  template <typename T>
-  friend struct coroutine_finish;
 };
 
 TCONCURRENT_EXPORT
@@ -232,7 +245,7 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
  */
 inline void coroutine_control::yield()
 {
-  if (token.is_cancel_requested())
+  if (token->is_cancel_requested())
     throw operation_canceled{};
 
   await(tc::make_ready_future(), false);
@@ -258,9 +271,9 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
         std::move(awaitable).update_chain_name(this->name);
 
     auto canceler =
-        token.make_scope_canceler([this, aborted, &progressing_awaitable] {
+        token->make_scope_canceler([this, aborted, &progressing_awaitable] {
           assert_not_in_catch();
-          assert(get_default_executor().is_in_this_context());
+          assert(this->executor_.is_in_this_context());
 
           progressing_awaitable.request_cancel();
 
@@ -294,7 +307,7 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
   }
   if (*aborted)
     throw abort_coroutine{};
-  if (token.is_cancel_requested())
+  if (token->is_cancel_requested())
     throw operation_canceled{};
   return finished_awaitable.get();
 }
@@ -387,42 +400,119 @@ struct cotask_alias<void>
 };
 
 template <typename T>
-struct coroutine_finish
+struct runner
 {
-  detail::coroutine_control* cs;
-
-  auto operator()(future<cotask_impl<T>>&& fut)
+  template <typename P, typename F>
+  static auto run(P&& p, F&& cb)
   {
-    try
-    {
-      return fut.get().get();
-    }
-    catch (detail::abort_coroutine)
-    {
-      cs->aborted = true;
-      throw operation_canceled{};
-    }
+    p.set_value(cb().get());
   }
 };
 
 template <>
-struct coroutine_finish<void>
+struct runner<void>
 {
-  detail::coroutine_control* cs;
-
-  void operator()(future<void>&& fut)
+  template <typename P, typename F>
+  static auto run(P&& p, F&& cb)
   {
-    try
-    {
-      fut.get();
-    }
-    catch (detail::abort_coroutine)
-    {
-      cs->aborted = true;
-      throw operation_canceled{};
-    }
+    cb();
+    p.set_value();
   }
 };
+}
+
+namespace lazy
+{
+namespace detail
+{
+template <typename R, template <typename...> class Tuple>
+struct value_types_of
+{
+  using types = Tuple<R>;
+};
+
+template <template <typename...> class Tuple>
+struct value_types_of<void, Tuple>
+{
+  using types = Tuple<>;
+};
+
+template <typename E, typename F>
+struct run_resumable_sender
+{
+  using return_task_type = std::decay_t<decltype(std::declval<F>()())>;
+  using return_type =
+      typename tconcurrent::detail::task_return_type<return_task_type>::type;
+
+  template <template <typename...> class Tuple>
+  using value_types = typename value_types_of<return_type, Tuple>::types;
+
+  E executor;
+  F cb;
+  std::string name;
+
+  template <typename R>
+  void submit(R&& r)
+  {
+    tconcurrent::detail::coroutine_control* cs =
+        new tconcurrent::detail::coroutine_control(
+            name,
+            executor,
+            [cb = std::move(cb), &cs, r = std::forward<R>(r)](
+                tconcurrent::detail::coroutine_t&& argctx) mutable {
+              TC_SANITIZER_ENTER_NEW_CONTEXT();
+
+              // we jump to the coroutine and back a first time before the user
+              // code is run to get mycs here, and initialize argctx and token
+              // here, and ctx outside
+              auto mycs = cs;
+              mycs->argctx = &argctx;
+              mycs->token = r.get_cancelation_token();
+
+              TC_SANITIZER_OPEN_RETURN_CONTEXT(mycs);
+              *mycs->argctx = std::move(*mycs->argctx).resume();
+              TC_SANITIZER_CLOSE_SWITCH_CONTEXT();
+
+              try
+              {
+                tconcurrent::detail::runner<return_type>::run(r, std::move(cb));
+              }
+              catch (tconcurrent::detail::abort_coroutine)
+              {
+                mycs->aborted = true;
+                r.set_done();
+              }
+              catch (...)
+              {
+                r.set_error(std::current_exception());
+              }
+
+              TC_SANITIZER_EXIT_CONTEXT(mycs)
+              return std::move(argctx);
+            });
+
+    {
+      TC_SANITIZER_OPEN_SWITCH_CONTEXT(
+          reinterpret_cast<char const*>(cs->stack.sp) - cs->stack.size,
+          cs->stack.size)
+      cs->ctx = std::move(cs->ctx).resume();
+      TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
+    }
+
+    tconcurrent::detail::run_coroutine(cs);
+  };
+};
+}
+
+template <typename E, typename F, typename... Args>
+auto run_resumable(E&& executor, std::string name, F&& cb, Args&&... args)
+{
+  auto wrap = [cb = std::forward<F>(cb),
+               args = std::make_tuple(std::forward<Args>(args)...)]() mutable
+      -> decltype(auto) { return std::apply(std::move(cb), std::move(args)); };
+  return detail::run_resumable_sender<std::decay_t<E>, decltype(wrap)>{
+      std::forward<E>(executor), std::move(wrap), std::move(name)};
+}
 }
 
 template <typename T>
@@ -450,48 +540,10 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
 
   auto const fullName = name + " (" + typeid(F).name() + ")";
 
-  auto token = std::make_shared<cancelation_token>();
-  auto pack = package_cancelable<future<return_type>()>(
-      [executor, cb = std::forward<F>(cb), fullName, token]() mutable {
-        auto pack = package<return_task_type()>(std::move(cb), token);
-
-        detail::coroutine_control* cs = new detail::coroutine_control(
-            fullName,
-            executor,
-            [cb = std::move(pack.first), &cs](detail::coroutine_t&& argctx) {
-              TC_SANITIZER_ENTER_NEW_CONTEXT();
-              auto mycs = cs;
-              mycs->argctx = &argctx;
-
-              TC_SANITIZER_OPEN_RETURN_CONTEXT(mycs);
-              *mycs->argctx = std::move(*mycs->argctx).resume();
-              TC_SANITIZER_CLOSE_SWITCH_CONTEXT();
-
-              cb();
-
-              TC_SANITIZER_EXIT_CONTEXT(mycs)
-              return std::move(argctx);
-            },
-            *token);
-
-        {
-          TC_SANITIZER_OPEN_SWITCH_CONTEXT(
-              reinterpret_cast<char const*>(cs->stack.sp) - cs->stack.size,
-              cs->stack.size)
-          cs->ctx = std::move(cs->ctx).resume();
-          TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
-        }
-
-        detail::run_coroutine(cs);
-
-        return pack.second.then(tc::get_synchronous_executor(),
-                                detail::coroutine_finish<return_type>{cs});
-      },
-      token);
-
-  executor.post(std::move(std::get<0>(pack)), fullName);
-
-  return std::move(std::get<1>(pack)).update_chain_name(fullName).unwrap();
+  auto task = lazy::connect(
+      lazy::async(executor, fullName),
+      lazy::run_resumable(executor, fullName, std::forward<F>(cb)));
+  return submit_to_future<return_type>(std::move(task));
 }
 
 namespace detail
