@@ -4,6 +4,8 @@
 #include <tconcurrent/detail/shared_base.hpp>
 #include <tconcurrent/detail/util.hpp>
 #include <tconcurrent/executor.hpp>
+#include <tconcurrent/lazy/cancelation_token.hpp>
+
 #include <utility>
 
 namespace tconcurrent
@@ -37,6 +39,9 @@ auto make_ready_future(T&& val) -> future<typename std::decay<T>::type>;
 auto make_ready_future() -> future<void>;
 template <typename T, typename E>
 auto make_exceptional_future(E&& err) -> future<T>;
+
+template <typename T, typename Sender>
+future<T> submit_to_future(Sender&& task);
 
 namespace detail
 {
@@ -471,6 +476,8 @@ private:
   friend auto make_ready_future() -> future<void>;
   template <typename T, typename E>
   friend auto make_exceptional_future(E&& err) -> future<T>;
+  template <typename T, typename Sender>
+  friend future<T> submit_to_future(Sender&& task);
 
   explicit future(std::shared_ptr<detail::shared_base<value_type>> p)
     : base_type(std::move(p))
@@ -568,6 +575,71 @@ auto make_exceptional_future(E&& err) -> future<T>
   future<T> fut(std::move(sb));
   fut._cancelation_token = std::make_shared<cancelation_token>();
   return fut;
+}
+
+template <class T>
+struct shared_receiver_priv : public detail::shared_base<T>
+{
+  lazy::cancelation_token lazy_cancelation_token;
+  cancelation_token::scope_canceler canceler;
+
+  shared_receiver_priv()
+  {
+    canceler = this->get_cancelation_token()->make_scope_canceler(
+        [this] { lazy_cancelation_token.request_cancel(); });
+  }
+};
+
+template <class T>
+struct shared_receiver
+{
+  detail::promise_ptr<shared_receiver_priv<T>> shared =
+      detail::promise_ptr<shared_receiver_priv<T>>::make_shared();
+
+  auto get_cancelation_token()
+  {
+    return &shared->lazy_cancelation_token;
+  }
+  void set_value()
+  {
+    get_cancelation_token()->reset();
+    shared->set(tvoid{});
+  }
+  template <typename V>
+  void set_value(V&& val)
+  {
+    get_cancelation_token()->reset();
+    shared->set(std::forward<V>(val));
+  }
+  template <typename E>
+  void set_error(E&& e)
+  {
+    get_cancelation_token()->reset();
+    shared->set_exception(std::forward<E>(e));
+  }
+  void set_done()
+  {
+    get_cancelation_token()->reset();
+    shared->set_exception(std::make_exception_ptr(operation_canceled()));
+  }
+};
+
+template <typename T, typename Sender>
+future<T> submit_to_future(Sender&& sender)
+{
+  shared_receiver<detail::void_to_tvoid_t<T>> receiver;
+  // get the shared state now as we will move out receiver
+  auto const shared_state = receiver.shared.as_shared();
+  try
+  {
+    sender.submit(std::move(receiver));
+  }
+  catch (...)
+  {
+    shared_state->lazy_cancelation_token.reset();
+    shared_state->set_exception(std::current_exception());
+  }
+  return future<T>(shared_state);
 }
 }
 

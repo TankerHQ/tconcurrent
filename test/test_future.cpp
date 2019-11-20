@@ -6,12 +6,35 @@
 
 #include <doctest/doctest.h>
 
+#include <boost/any.hpp>
+
 #include <cstring>
 
 #include <iostream>
 #include <thread>
 
 using namespace tconcurrent;
+
+namespace
+{
+template <typename F>
+struct lambda_sender
+{
+  F f;
+
+  template <typename R>
+  void submit(R&& receiver) const
+  {
+    f(std::forward<R>(receiver));
+  }
+};
+
+template <typename F>
+auto make_sender(F&& f)
+{
+  return lambda_sender<std::decay_t<F>>{std::forward<F>(f)};
+}
+}
 
 /////////////////////////
 // ready future basics
@@ -714,3 +737,48 @@ TEST_CASE("and_then must support running on specified executor")
    }).get();
 }
 #endif
+
+/////////////////////////
+// submit_to_future
+/////////////////////////
+
+TEST_CASE("submit_to_future sending a value")
+{
+  auto const s = make_sender([](auto&& receiver) { receiver.set_value(42); });
+  auto fut = submit_to_future<int>(s);
+  CHECK(fut.is_ready());
+  CHECK(fut.get() == 42);
+}
+
+TEST_CASE("submit_to_future sending an error")
+{
+  auto const s = make_sender(
+      [](auto&& receiver) { receiver.set_error(std::make_exception_ptr(42)); });
+  auto fut = submit_to_future<int>(s);
+  CHECK(fut.is_ready());
+  CHECK_THROWS_AS(fut.get(), int);
+}
+
+TEST_CASE("submit_to_future canceled")
+{
+  auto const s = make_sender([](auto&& receiver) { receiver.set_done(); });
+  auto fut = submit_to_future<int>(s);
+  CHECK(fut.is_ready());
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+}
+
+TEST_CASE("submit_to_future and future cancel")
+{
+  boost::any hold;
+  auto const s = make_sender([&](auto&& receiver) {
+    receiver.get_cancelation_token()->set_canceler(
+        [receiver]() mutable { receiver.set_done(); });
+    // keep the receiver alive or the future will be aborted with promise_broken
+    hold = receiver;
+  });
+  auto fut = submit_to_future<int>(s);
+  CHECK(!fut.is_ready());
+  fut.request_cancel();
+  CHECK(fut.is_ready());
+  CHECK_THROWS_AS(fut.get(), operation_canceled);
+}
