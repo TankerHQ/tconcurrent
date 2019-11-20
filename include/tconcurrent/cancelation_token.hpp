@@ -1,6 +1,8 @@
 #ifndef TCONCURRENT_CANCELATION_TOKEN_HPP
 #define TCONCURRENT_CANCELATION_TOKEN_HPP
 
+#include <tconcurrent/operation_canceled.hpp>
+
 #include <cassert>
 #include <deque>
 #include <functional>
@@ -10,14 +12,6 @@
 
 namespace tconcurrent
 {
-
-struct operation_canceled : std::exception
-{
-  const char* what() const noexcept override
-  {
-    return "operation was canceled";
-  }
-};
 
 class cancelation_token : public std::enable_shared_from_this<cancelation_token>
 {
