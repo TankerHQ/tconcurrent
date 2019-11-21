@@ -223,7 +223,7 @@ public:
    */
   void request_cancel()
   {
-    auto const& token = _p->get_cancelation_token();
+    auto const token = _p->get_cancelation_token();
     if (token)
       token->request_cancel();
   }
@@ -233,7 +233,7 @@ public:
   auto make_canceler()
   {
     return [_p = this->_p] {
-      auto const& token = _p->get_cancelation_token();
+      auto const token = _p->get_cancelation_token();
       if (token)
         token->request_cancel();
     };
