@@ -446,16 +446,6 @@ inline cotask<void> wrap_task()
 }
 }
 
-/** Create a resumable function and schedule it
- *
- * \param name (optional) the name of the coroutine, only used for debugging
- * purposes
- * \param cb the callback to run. Its signature should be:
- *
- *     cotask<T> func();
- *
- * \return the future corresponding to the result of the callback
- */
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
 {

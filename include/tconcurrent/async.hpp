@@ -16,7 +16,7 @@ namespace tconcurrent
  *     T func();
  *     T func(cancelation_token&);
  *
- * \return the future corresponding to the result of the function
+ * \return a future<T> corresponding to the result of the function
  */
 template <typename E, typename F>
 auto async(std::string const& name, E&& executor, F&& f)
@@ -30,12 +30,14 @@ auto async(std::string const& name, E&& executor, F&& f)
   return std::move(std::get<1>(pack)).update_chain_name(name);
 }
 
+/// See async(std::string const& name, E&& executor, F&& f)
 template <typename F>
 auto async(std::string const& name, F&& f)
 {
   return async(name, get_default_executor(), std::forward<F>(f));
 }
 
+/// See async(std::string const& name, E&& executor, F&& f)
 template <typename E,
           typename F,
           typename = std::enable_if_t<
@@ -45,6 +47,7 @@ auto async(E&& executor, F&& f)
   return async({}, std::forward<E>(executor), std::forward<F>(f));
 }
 
+/// See async(std::string const& name, E&& executor, F&& f)
 template <typename F>
 auto async(F&& f)
 {
