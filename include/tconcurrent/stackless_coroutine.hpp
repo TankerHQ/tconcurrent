@@ -10,8 +10,7 @@
 namespace tconcurrent
 {
 template <typename E, typename F>
-auto async_resumable(std::string const& name, E&& executor, F&& cb)
-    -> future<typename std::decay_t<decltype(cb())>::value_type>;
+auto async_resumable(std::string const& name, E&& executor, F&& cb);
 
 template <typename T>
 class cotask;
@@ -254,8 +253,7 @@ private:
   }
 
   template <typename E, typename F>
-  friend auto async_resumable(std::string const& name, E&& executor, F&& cb)
-      ->future<typename std::decay_t<decltype(cb())>::value_type>;
+  friend auto async_resumable(std::string const& name, E&& executor, F&& cb);
   friend detail::task_promise<T>;
 };
 
@@ -389,7 +387,6 @@ struct task_control
 
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
-    -> future<typename std::decay_t<decltype(cb())>::value_type>
 {
   using return_task_type = std::decay_t<decltype(cb())>;
   using return_type = typename return_task_type::value_type;
