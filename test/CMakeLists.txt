@@ -7,6 +7,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 endif()
 
 set(test_tconcurrent_SRC
+  test_asio.cpp
   test_async.cpp
   test_async_wait.cpp
   test_concurrent_queue.cpp
