@@ -107,6 +107,8 @@ private:
 };
 
 class thread_pool;
+TCONCURRENT_EXPORT thread_pool& get_global_single_thread();
+TCONCURRENT_EXPORT thread_pool& get_global_thread_pool();
 TCONCURRENT_EXPORT executor get_default_executor();
 TCONCURRENT_EXPORT executor get_background_executor();
 
