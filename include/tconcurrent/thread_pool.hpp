@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <functional>
-#include <memory>
 #include <thread>
 
 #include <tconcurrent/detail/boost_fwd.hpp>
@@ -62,9 +61,24 @@ public:
   void signal_error(std::exception_ptr const& e);
   void set_task_trace_handler(task_trace_handler_cb cb);
 
+  /** Make the thread_pool leak.
+   *
+   * The thread pool will continue to run after the destructor and this class
+   * will continue to work (though it is probably undefined behavior to call an
+   * object after it was destroyed).
+   *
+   * This is useful for thread_pools that run during all the program life time
+   * (static). Especially when integrating in a GC-ed language like Java which
+   * might not run the garbage collector before the static destruction. In this
+   * case, the thread_pool continues to receive and execute work after the
+   * static destruction.
+   */
+  void prevent_destruction();
+
 private:
   struct impl;
-  std::unique_ptr<impl> _p;
+  impl* _p;
+  bool _prevent_destruction = false;
 };
 }
 

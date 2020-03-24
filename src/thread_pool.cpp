@@ -11,6 +11,9 @@
 namespace tconcurrent
 {
 
+// We do a pimpl to avoid exposing boost asio whose header can take up to a
+// second to parse on some machines. Since this file is usually included
+// everywhere, we want to keep it light.
 struct thread_pool::impl
 {
   boost::asio::io_service _io;
@@ -55,8 +58,27 @@ thread_pool::thread_pool() : _p(new impl)
 
 thread_pool::~thread_pool()
 {
-  _p->_dead = true;
-  stop();
+  if (!_prevent_destruction)
+  {
+    _p->_dead = true;
+    stop();
+
+    // When calling exit() any non-main thread is likely to be terminated
+    // (especially on Windows), destructors will not run and the program may be
+    // interrupted at any point. As a result tconcurrent could deadlock in Boost
+    // Asio's IOCP code.
+    if (_p->_num_running_threads.load())
+    {
+      std::cerr
+          << "WARNING: It seems one of tconcurrent's threads died. Do NOT call "
+             "exit() or terminate live threads, this may result in a deadlock!"
+          << std::endl;
+    }
+    else
+    {
+      delete _p;
+    }
+  }
 }
 
 bool thread_pool::is_in_this_context() const
@@ -118,18 +140,6 @@ void thread_pool::stop()
   for (auto& th : _p->_threads)
     th.join();
   _p->_threads.clear();
-  // When calling exit() any non-main thread is likely to be terminated
-  // (especially on Windows), destructors will not run and the program may be
-  // interrupted at any point. As a result tconcurrent could deadlock in Boost
-  // Asio's IOCP code.
-  if (_p->_num_running_threads.load())
-  {
-    std::cerr
-        << "WARNING: It seems one of tconcurrent's threads died. Do NOT call "
-           "exit() or terminate live threads, this may result in a deadlock!"
-        << std::endl;
-    (void)_p.release();
-  }
 }
 
 bool thread_pool::is_running() const
@@ -169,5 +179,10 @@ void thread_pool::post(std::function<void()> work, std::string name)
       work();
     }
   });
+}
+
+void thread_pool::prevent_destruction()
+{
+  _prevent_destruction = true;
 }
 }
