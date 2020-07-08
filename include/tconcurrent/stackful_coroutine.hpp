@@ -3,7 +3,7 @@
 
 #include <functional>
 
-#include <boost/context/execution_context_v2.hpp>
+#include <boost/context/fiber.hpp>
 #include <boost/scope_exit.hpp>
 
 #include <tconcurrent/async.hpp>
@@ -95,8 +95,7 @@ struct abort_coroutine
 template <typename T>
 struct coroutine_finish;
 
-using coroutine_controller = std::function<void(class coroutine_control*)>;
-using coroutine_t = boost::context::execution_context<coroutine_controller>;
+using coroutine_t = boost::context::fiber;
 
 enum class coroutine_status
 {
@@ -131,6 +130,8 @@ private:
 
   coroutine_t ctx;
   coroutine_t* argctx;
+
+  std::function<void(coroutine_control*)> coroutine_exit_post_setup;
 
   cancelation_token& token;
 
@@ -187,12 +188,10 @@ inline coroutine_status run_coroutine(coroutine_control* ctrl)
   }
   BOOST_SCOPE_EXIT_END
 
-  coroutine_controller f;
-
   TC_SANITIZER_OPEN_SWITCH_CONTEXT(
       reinterpret_cast<char const*>(ctrl->stack.sp) - ctrl->stack.size,
       ctrl->stack.size)
-  std::tie(ctrl->ctx, f) = ctrl->ctx({});
+  ctrl->ctx = std::move(ctrl->ctx).resume();
   TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
 
   // if coroutine just finished
@@ -204,7 +203,12 @@ inline coroutine_status run_coroutine(coroutine_control* ctrl)
     ctrl = nullptr;
     return status;
   }
-  f(ctrl);
+
+  if (ctrl->coroutine_exit_post_setup)
+  {
+    ctrl->coroutine_exit_post_setup(ctrl);
+    ctrl->coroutine_exit_post_setup = nullptr;
+  }
   return coroutine_status::waiting;
 }
 
@@ -274,22 +278,25 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
                  "tc::detail::abort_coroutine must never be caught");
         });
 
-    TC_SANITIZER_OPEN_RETURN_CONTEXT(this)
-    *argctx = std::get<0>((*argctx)(
-        [&aborted, &progressing_awaitable, &finished_awaitable, &awaitable](
-            coroutine_control* ctrl) {
-          progressing_awaitable.then(
-              ctrl->executor_,
-              [aborted, &finished_awaitable, ctrl](std::decay_t<Awaitable> f) {
-                // cancel was called, the coroutine is already dead and the
-                // memory free
-                if (*aborted)
-                  return;
+    coroutine_exit_post_setup = [&aborted,
+                                 &progressing_awaitable,
+                                 &finished_awaitable,
+                                 &awaitable](coroutine_control* ctrl) {
+      progressing_awaitable.then(
+          ctrl->executor_,
+          [aborted, &finished_awaitable, ctrl](std::decay_t<Awaitable> f) {
+            // cancel was called, the coroutine is already dead and the
+            // memory free
+            if (*aborted)
+              return;
 
-                finished_awaitable = std::move(f);
-                run_coroutine(ctrl);
-              });
-        }));
+            finished_awaitable = std::move(f);
+            run_coroutine(ctrl);
+          });
+    };
+
+    TC_SANITIZER_OPEN_RETURN_CONTEXT(this)
+    *argctx = std::move(*argctx).resume();
     TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
   }
   if (*aborted)
@@ -458,35 +465,31 @@ auto async_resumable(std::string const& name, E&& executor, F&& cb)
         detail::coroutine_control* cs = new detail::coroutine_control(
             fullName,
             executor,
-            [cb = std::move(pack.first), &cs](
-                detail::coroutine_t argctx,
-                detail::coroutine_controller const&) {
+            [cb = std::move(pack.first), &cs](detail::coroutine_t&& argctx) {
               TC_SANITIZER_ENTER_NEW_CONTEXT();
               auto mycs = cs;
               mycs->argctx = &argctx;
 
               TC_SANITIZER_OPEN_RETURN_CONTEXT(mycs);
-              *mycs->argctx =
-                  std::move(std::get<0>(argctx(&detail::run_coroutine)));
+              *mycs->argctx = std::move(*mycs->argctx).resume();
               TC_SANITIZER_CLOSE_SWITCH_CONTEXT();
 
               cb();
 
               TC_SANITIZER_EXIT_CONTEXT(mycs)
-              return argctx;
+              return std::move(argctx);
             },
             *token);
 
-        detail::coroutine_controller f;
         {
           TC_SANITIZER_OPEN_SWITCH_CONTEXT(
               reinterpret_cast<char const*>(cs->stack.sp) - cs->stack.size,
               cs->stack.size)
-          std::tie(cs->ctx, f) = cs->ctx({});
+          cs->ctx = std::move(cs->ctx).resume();
           TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
         }
 
-        f(cs);
+        detail::run_coroutine(cs);
 
         return pack.second.then(tc::get_synchronous_executor(),
                                 detail::coroutine_finish<return_type>{cs});
