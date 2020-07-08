@@ -4,14 +4,6 @@
 #include <memory>
 #include <tconcurrent/future.hpp>
 
-#if defined(_MSC_VER)
-#define NOINLINE __declspec(noinline)
-#elif defined(__GNUC__)
-#define NOINLINE __attribute__((noinline))
-#else
-#error Your compiler *must* support a noinline attribute
-#endif
-
 namespace tconcurrent
 {
 
@@ -109,9 +101,7 @@ struct shared<R(Args...)> : shared_base<shared_base_type<R>>
     assert(_f);
   }
 
-  // NOTE: This is a load-bearing noinline, see the comment in run_coroutine
   template <typename... A>
-  NOINLINE
   void operator()(A&&... args)
   {
     if (_done.exchange(true))
