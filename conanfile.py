@@ -36,12 +36,12 @@ class TconcurrentConan(ConanFile):
         return develop and (not cross_building) and (not emscripten)
 
     def requirements(self):
-        self.requires("Boost/1.71.0@tanker/testing")
-        self.requires("enum-flags/0.1a@tanker/testing")
+        self.requires("boost/1.73.0")
+        self.requires("enum-flags/0.1a")
 
     def build_requirements(self):
         if self.should_build_tests:
-            self.build_requires("doctest/2.2.3@tanker/testing")
+            self.build_requires("doctest/2.3.8")
 
     def configure(self):
         if self.settings.os != "Emscripten" and self.options["Boost"].without_context:

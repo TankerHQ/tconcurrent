@@ -73,7 +73,7 @@ set(tconcurrent_LIBS
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   list(APPEND tconcurrent_LIBS
-    CONAN_PKG::Boost
+    CONAN_PKG::boost
     CONAN_PKG::enum-flags
   )
   list(APPEND tconcurrent_SRC
@@ -88,7 +88,7 @@ else()
     src/thread_pool.cpp
   )
   list(APPEND tconcurrent_LIBS
-    CONAN_PKG::Boost
+    CONAN_PKG::boost
     CONAN_PKG::enum-flags
   )
 endif()

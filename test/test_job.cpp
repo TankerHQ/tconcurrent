@@ -4,7 +4,7 @@
 #include <tconcurrent/barrier.hpp>
 #include <tconcurrent/stepper.hpp>
 
-#include <doctest.h>
+#include <doctest/doctest.h>
 
 using namespace tconcurrent;
 
