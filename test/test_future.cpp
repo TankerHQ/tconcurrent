@@ -4,7 +4,7 @@
 #include <tconcurrent/thread_pool.hpp>
 #endif
 
-#include <doctest.h>
+#include <doctest/doctest.h>
 
 #include <cstring>
 

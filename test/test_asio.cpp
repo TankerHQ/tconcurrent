@@ -4,7 +4,7 @@
 
 #include <boost/asio/steady_timer.hpp>
 
-#include <doctest.h>
+#include <doctest/doctest.h>
 
 using namespace tconcurrent;
 
