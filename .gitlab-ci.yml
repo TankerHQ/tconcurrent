@@ -28,33 +28,6 @@ build/windows:
   script:
     - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile vs2019-release
 
-
-.deploy:
-  stage: deploy
-  except:
-    - schedules
-  when: manual
-  only:
-    - tags
-
-deploy/linux:
-  extends: .deploy
-  tags: [linux]
-  script:
-    - poetry run python run-ci.py --isolate-conan-user-home deploy
-
-deploy/macos:
-  extends: .deploy
-  tags: [macos]
-  script:
-    - poetry run python run-ci.py --isolate-conan-user-home deploy
-
-deploy/windows:
-  extends: .deploy
-  tags: [windows]
-  script:
-    - poetry run python run-ci.py --isolate-conan-user-home deploy
-
 coverage:
   stage: build
   only:
