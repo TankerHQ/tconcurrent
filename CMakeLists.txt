@@ -102,9 +102,27 @@ target_include_directories(tconcurrent PUBLIC
 
 target_link_libraries(tconcurrent PUBLIC ${tconcurrent_LIBS})
 
-target_compile_definitions(tconcurrent PRIVATE
-  TCONCURRENT_USE_THREAD_LOCAL=$<COMPILE_FEATURES:cxx_thread_local>
-)
+# In CMake 3.15, an optimization was introduced to avoid testing C++ supported features
+# Unfortunately, some of those features (e.g. thread_local) require runtime components.
+# Thus, the detection yields a wrong result on 32-bit iOS Simulators
+# Those checks are based on a manual testing of all archs/ios versions
+if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.15 AND APPLE)
+  set(_use_thread_local 1)
+  if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386" AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS 10.0)
+    set(_use_thread_local 0)
+  elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS 8.0)
+    set(_use_thread_local 0)
+  elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm" AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS 9.0)
+    set(_use_thread_local 0)
+  endif()
+  target_compile_definitions(tconcurrent PRIVATE
+    TCONCURRENT_USE_THREAD_LOCAL=${_use_thread_local}
+  )
+else()
+  target_compile_definitions(tconcurrent PRIVATE
+    TCONCURRENT_USE_THREAD_LOCAL=$<COMPILE_FEATURES:cxx_thread_local>
+  )
+endif()
 
 install(TARGETS tconcurrent
   EXPORT tconcurrent
