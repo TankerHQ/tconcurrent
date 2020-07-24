@@ -4,10 +4,10 @@ import sys
 
 from path import Path
 
-import ci
-import ci.cpp
-import ci.conan
-import ci.git
+import tankerci
+import tankerci.cpp
+import tankerci.conan
+import tankerci.git
 
 
 def main() -> None:
@@ -28,13 +28,13 @@ def main() -> None:
 
     args = parser.parse_args()
     if args.home_isolation:
-        ci.conan.set_home_isolation()
+        tankerci.conan.set_home_isolation()
 
-    ci.conan.update_config()
+    tankerci.conan.update_config()
 
     if args.command == "build-and-test":
         src_path = Path.getcwd()
-        build_path = "."  # ci.cpp.Builder runs ctest from the build directory
+        build_path = "."  # tankerci.cpp.Builder runs ctest from the build directory
         # fmt: off
         ctest_flags = [
             "--build-and-test",
@@ -49,10 +49,10 @@ def main() -> None:
             # When a macOS runner runs the tests, the ones waiting for a specific time will wait longer than requested.
             # Thus the tests fail. Funny thing is that they pass when running them by hand, on the slave...
             ctest_flags.append("--test-case-exclude=*[waiting]*")
-        built_path = ci.cpp.build(args.profile, coverage=args.coverage)
-        ci.cpp.check(built_path, coverage=args.coverage, ctest_flags=ctest_flags)
+        built_path = tankerci.cpp.build(args.profile, coverage=args.coverage)
+        tankerci.cpp.check(built_path, coverage=args.coverage, ctest_flags=ctest_flags)
     elif args.command == "mirror":
-        ci.git.mirror(github_url="git@github.com:TankerHQ/tconcurrent")
+        tankerci.git.mirror(github_url="git@github.com:TankerHQ/tconcurrent")
     else:
         parser.print_help()
         sys.exit(1)
