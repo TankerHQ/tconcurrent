@@ -22,7 +22,7 @@ detail::coroutine_control*& get_current_coroutine_ptr()
   return *p;
 }
 
-#ifdef TCONCURRENT_SANITIZER
+#if TCONCURRENT_SANITIZER
 namespace
 {
 thread_local void* thread_stack;

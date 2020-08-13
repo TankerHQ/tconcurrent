@@ -1,7 +1,7 @@
 #ifndef TCONCURRENT_COROUTINE_HPP
 #define TCONCURRENT_COROUTINE_HPP
 
-#ifdef TCONCURRENT_COROUTINES_TS
+#if TCONCURRENT_COROUTINES_TS
 #include <tconcurrent/stackless_coroutine.hpp>
 #else
 #include <tconcurrent/stackful_coroutine.hpp>
