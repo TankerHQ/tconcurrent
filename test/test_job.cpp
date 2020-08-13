@@ -188,8 +188,7 @@ TEST_CASE("canceling should be synchronous on single thread")
     fut.request_cancel();
     CHECK(fut.is_ready());
     CHECK(called == 0);
-  })
-      .get();
+  }).get();
 }
 
 TEST_CASE("destroying should cancel future jobs")

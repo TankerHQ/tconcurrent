@@ -157,8 +157,7 @@ TEST_CASE("coroutine nested cotask<T&>")
              int i = 0;
              int& ii = TC_AWAIT([&]() -> cotask<int&> { TC_RETURN(i); }());
              CHECK(&i == &ii);
-           })
-               .get();
+           }).get();
 }
 
 TEST_CASE("coroutine nested void cotask")
@@ -204,8 +203,7 @@ TEST_CASE("coroutine cancel before run")
     f.request_cancel();
     REQUIRE(f.is_ready());
     CHECK_THROWS_AS(f.get(), operation_canceled);
-  })
-      .get();
+  }).get();
   CHECK(0 == called);
 }
 
@@ -266,8 +264,7 @@ TEST_CASE("coroutine cancel propagation")
     CHECK(prom.get_cancelation_token().is_cancel_requested());
     CHECK(f.is_ready());
     CHECK(1 == called);
-  })
-      .get();
+  }).get();
   prom.set_value({});
   CHECK_THROWS_AS(f.get(), operation_canceled);
 }

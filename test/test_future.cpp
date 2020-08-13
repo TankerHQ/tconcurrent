@@ -698,9 +698,9 @@ TEST_CASE("then must support running on specified executor")
   tp.start(1);
   auto f = make_ready_future();
 
-  f.then(executor(tp),
-         [&](future<void> const&) { CHECK(tp.is_in_this_context()); })
-      .get();
+  f.then(executor(tp), [&](future<void> const&) {
+     CHECK(tp.is_in_this_context());
+   }).get();
 }
 
 TEST_CASE("and_then must support running on specified executor")
@@ -709,7 +709,8 @@ TEST_CASE("and_then must support running on specified executor")
   tp.start(1);
   auto f = make_ready_future();
 
-  f.and_then(executor(tp), [&](tvoid) { CHECK(tp.is_in_this_context()); })
-      .get();
+  f.and_then(executor(tp), [&](tvoid) {
+     CHECK(tp.is_in_this_context());
+   }).get();
 }
 #endif

@@ -76,8 +76,8 @@ future<void> async_wait(executor, std::chrono::steady_clock::duration delay)
   data->timeout_id = EM_ASM_(
       {
         id = Module.tconcurrent_last_timeout_id++;
-        Module.tconcurrent_timeouts[id] =
-            setTimeout(function() { Module._tc_async_wait_do_call($0); }, $1);
+        Module.tconcurrent_timeouts[id] = setTimeout(
+            function() { Module._tc_async_wait_do_call($0); }, $1);
         return id;
       },
       ppdata,
