@@ -280,8 +280,7 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
 
     coroutine_exit_post_setup = [&aborted,
                                  &progressing_awaitable,
-                                 &finished_awaitable,
-                                 &awaitable](coroutine_control* ctrl) {
+                                 &finished_awaitable](coroutine_control* ctrl) {
       progressing_awaitable.then(
           ctrl->executor_,
           [aborted, &finished_awaitable, ctrl](std::decay_t<Awaitable> f) {
