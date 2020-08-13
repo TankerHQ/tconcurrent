@@ -58,7 +58,8 @@ struct future_unwrap
 };
 
 template <template <typename> class Fut1,
-          template <typename> class Fut2,
+          template <typename>
+          class Fut2,
           typename R>
 struct future_unwrap<Fut1<Fut2<R>>>
 {
@@ -503,7 +504,8 @@ tc::future<void> detail::future_base<F, R, Ref>::to_void()
 }
 
 template <template <typename> class Fut1,
-          template <typename> class Fut2,
+          template <typename>
+          class Fut2,
           typename R>
 Fut2<R> detail::future_unwrap<Fut1<Fut2<R>>>::unwrap()
 {

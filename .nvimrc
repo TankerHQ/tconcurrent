@@ -1,7 +1,7 @@
-let g:clang_format_path='clang-format-6.0'
+let g:clang_format_path='clang-format-9'
 function! Formatonsave()
   "let l:formatdiff = 0
   let l:lines = 'all'
-  pyf ~/.vim/clang-format.py
+  py3f ~/.vim/clang-format.py
 endfunction
 autocmd BufWritePre *.h,*.cc,*.cpp,*.hpp,*.c call Formatonsave()

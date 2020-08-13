@@ -33,6 +33,5 @@ TEST_CASE("canceling async before it runs should prevent run")
     fut.request_cancel();
     REQUIRE(fut.is_ready());
     CHECK_THROWS_AS(fut.get(), operation_canceled);
-  })
-      .get();
+  }).get();
 }

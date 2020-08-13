@@ -129,6 +129,30 @@ TEST_CASE("coroutine wait, cb on heap")
   CHECK(42 == f.get());
 }
 
+TEST_CASE("coroutine wait ready shared future")
+{
+  auto ready = make_ready_future(42).to_shared();
+  auto f = async_resumable([&]() -> cotask<int> {
+    CHECK(42 == TC_AWAIT(ready));
+    CHECK(42 == TC_AWAIT(ready));
+    TC_RETURN(42);
+  });
+  CHECK(42 == f.get());
+}
+
+TEST_CASE("coroutine wait non-ready shared future")
+{
+  promise<int> prom;
+  auto f = async_resumable([&]() -> cotask<int> {
+    auto fut = prom.get_future().to_shared();
+    CHECK(42 == TC_AWAIT(fut));
+    CHECK(42 == TC_AWAIT(fut));
+    TC_RETURN(42);
+  });
+  prom.set_value(42);
+  CHECK(42 == f.get());
+}
+
 TEST_CASE("coroutine nested")
 {
   promise<int> prom;
@@ -157,8 +181,7 @@ TEST_CASE("coroutine nested cotask<T&>")
              int i = 0;
              int& ii = TC_AWAIT([&]() -> cotask<int&> { TC_RETURN(i); }());
              CHECK(&i == &ii);
-           })
-               .get();
+           }).get();
 }
 
 TEST_CASE("coroutine nested void cotask")
@@ -204,8 +227,7 @@ TEST_CASE("coroutine cancel before run")
     f.request_cancel();
     REQUIRE(f.is_ready());
     CHECK_THROWS_AS(f.get(), operation_canceled);
-  })
-      .get();
+  }).get();
   CHECK(0 == called);
 }
 
@@ -266,8 +288,7 @@ TEST_CASE("coroutine cancel propagation")
     CHECK(prom.get_cancelation_token().is_cancel_requested());
     CHECK(f.is_ready());
     CHECK(1 == called);
-  })
-      .get();
+  }).get();
   prom.set_value({});
   CHECK_THROWS_AS(f.get(), operation_canceled);
 }
