@@ -11,13 +11,7 @@
 
 #include <tconcurrent/detail/export.hpp>
 
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer)
-#define TCONCURRENT_SANITIZER
-#endif
-#endif
-
-#ifdef TCONCURRENT_SANITIZER
+#if TCONCURRENT_SANITIZER
 #include <sanitizer/common_interface_defs.h>
 #endif
 
@@ -27,7 +21,7 @@
 #define TCONCURRENT_NODISCARD
 #endif
 
-#ifdef TCONCURRENT_ALLOW_CANCEL_IN_CATCH
+#if TCONCURRENT_ALLOW_CANCEL_IN_CATCH
 #error TCONCURRENT_ALLOW_CANCEL_IN_CATCH is not allowed when compiling in the non-coroutines-TS mode.
 #endif
 
@@ -41,7 +35,7 @@ namespace detail
 
 class coroutine_control;
 
-#ifdef TCONCURRENT_SANITIZER
+#if TCONCURRENT_SANITIZER
 
 struct stack_bounds
 {
@@ -162,7 +156,7 @@ private:
   friend auto ::tconcurrent::async_resumable(std::string const& name,
                                              E&& executor,
                                              F&& cb);
-#ifdef TCONCURRENT_SANITIZER
+#if TCONCURRENT_SANITIZER
   friend stack_bounds get_stack_bounds(coroutine_control* ctrl);
 #endif
   friend coroutine_status run_coroutine(coroutine_control* ctrl);

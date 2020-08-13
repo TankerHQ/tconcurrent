@@ -8,25 +8,19 @@ class TconcurrentConan(ConanFile):
     options = {
         "shared": [True, False],
         "fPIC": [True, False],
-        "sanitizer": ["address", None],
         "coroutinests": [True, False],
         "coverage": [True, False],
+        "with_sanitizer_support": [True, False],
     }
     default_options = (
         "shared=False",
         "fPIC=True",
-        "sanitizer=None",
         "coroutinests=False",
         "coverage=False",
+        "with_sanitizer_support=False",
     )
     exports_sources = "CMakeLists.txt", "src/*", "include/*", "test/*"
     generators = "cmake"
-
-    @property
-    def sanitizer_flag(self):
-        if self.options.sanitizer:
-            return "-fsanitize=%s" % self.options.sanitizer
-        return None
 
     @property
     def should_build_tests(self):
@@ -57,8 +51,7 @@ class TconcurrentConan(ConanFile):
 
     def build(self):
         cmake = CMake(self)
-        if self.options.sanitizer:
-            cmake.definitions["CONAN_CXX_FLAGS"] = self.sanitizer_flag
+        cmake.definitions["TCONCURRENT_SANITIZER"] = self.options.with_sanitizer_support
         cmake.definitions["BUILD_SHARED_LIBS"] = self.options.shared
         cmake.definitions["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.fPIC
         cmake.definitions["BUILD_TESTING"] = self.should_build_tests
@@ -69,9 +62,8 @@ class TconcurrentConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["tconcurrent"]
-        if self.options.sanitizer:
-            self.cpp_info.exelinkflags = [self.sanitizer_flag]
-            self.cpp_info.sharedlinkflags = [self.sanitizer_flag]
+        if self.options.with_sanitizer_support:
+            cmake.cpp_info.defines.append("TCONCURRENT_SANITIZER=1")
         if self.options.coroutinests:
             self.cpp_info.defines.append("TCONCURRENT_COROUTINES_TS=1")
             self.cpp_info.cppflags.append("-fcoroutines-ts")
