@@ -129,6 +129,30 @@ TEST_CASE("coroutine wait, cb on heap")
   CHECK(42 == f.get());
 }
 
+TEST_CASE("coroutine wait ready shared future")
+{
+  auto ready = make_ready_future(42).to_shared();
+  auto f = async_resumable([&]() -> cotask<int> {
+    CHECK(42 == TC_AWAIT(ready));
+    CHECK(42 == TC_AWAIT(ready));
+    TC_RETURN(42);
+  });
+  CHECK(42 == f.get());
+}
+
+TEST_CASE("coroutine wait non-ready shared future")
+{
+  promise<int> prom;
+  auto f = async_resumable([&]() -> cotask<int> {
+    auto fut = prom.get_future().to_shared();
+    CHECK(42 == TC_AWAIT(fut));
+    CHECK(42 == TC_AWAIT(fut));
+    TC_RETURN(42);
+  });
+  prom.set_value(42);
+  CHECK(42 == f.get());
+}
+
 TEST_CASE("coroutine nested")
 {
   promise<int> prom;

@@ -155,7 +155,7 @@ private:
   }
 
   template <typename Awaitable>
-  typename std::decay_t<Awaitable>::value_type await(Awaitable&& awaitable,
+  typename std::decay_t<Awaitable>::value_type await(Awaitable awaitable,
                                                      bool early_return);
 
   template <typename E, typename F>
@@ -246,7 +246,7 @@ inline void coroutine_control::yield()
 
 template <typename Awaitable>
 typename std::decay_t<Awaitable>::value_type coroutine_control::await(
-    Awaitable&& awaitable, bool early_return)
+    Awaitable awaitable, bool early_return)
 {
   assert_not_in_catch();
 
