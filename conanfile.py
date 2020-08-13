@@ -63,7 +63,7 @@ class TconcurrentConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["tconcurrent"]
         if self.options.with_sanitizer_support:
-            cmake.cpp_info.defines.append("TCONCURRENT_SANITIZER=1")
+            self.cpp_info.defines.append("TCONCURRENT_SANITIZER=1")
         if self.options.coroutinests:
             self.cpp_info.defines.append("TCONCURRENT_COROUTINES_TS=1")
             self.cpp_info.cppflags.append("-fcoroutines-ts")
