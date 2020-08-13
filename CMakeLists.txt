@@ -11,7 +11,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 option(WITH_COVERAGE "Enable coverage" OFF)
-
+option(TCONCURRENT_SANITIZER "Enable sanitizer support" OFF)
 
 # CMAKE_C_FLAGS and the like are _strings_, not lists.
 # So, we need a macro so that we can rewrite the values
@@ -94,6 +94,10 @@ else()
 endif()
 
 add_library(tconcurrent ${tconcurrent_SRC})
+
+if(TCONCURRENT_SANITIZER)
+  target_compile_definitions(tconcurrent PUBLIC TCONCURRENT_SANITIZER)
+endif()
 
 target_include_directories(tconcurrent PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

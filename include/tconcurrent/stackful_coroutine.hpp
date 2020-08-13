@@ -11,12 +11,6 @@
 
 #include <tconcurrent/detail/export.hpp>
 
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer)
-#define TCONCURRENT_SANITIZER
-#endif
-#endif
-
 #ifdef TCONCURRENT_SANITIZER
 #include <sanitizer/common_interface_defs.h>
 #endif
