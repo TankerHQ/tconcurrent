@@ -10,8 +10,8 @@ tankerci = "*"
 
 
 [[tool.poetry.source]]
-name = "tanker.local"
-url = "http://tanker.local:8181"
+name = "gitlab"
+url = "https://gitlab.com/api/v4/projects/20917546/packages/pypi/simple"
 
 [build-system]
 requires = ["poetry>=0.12"]
