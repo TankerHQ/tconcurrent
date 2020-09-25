@@ -38,8 +38,6 @@ class TconcurrentConan(ConanFile):
             self.build_requires("doctest/2.3.8")
 
     def configure(self):
-        if self.settings.os != "Emscripten" and self.options["Boost"].without_context:
-            raise Exception("tconcurrent requires Boost.Context")
         if self.options.coroutinests and self.settings.compiler != "clang":
             raise Exception("Coroutines TS is only supported by clang at the moment")
 
