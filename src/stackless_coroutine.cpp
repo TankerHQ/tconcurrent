@@ -9,7 +9,7 @@ namespace detail
 {
 void assert_no_cancel_in_catch()
 {
-  if (std::uncaught_exception() || std::current_exception())
+  if (std::uncaught_exceptions() || std::current_exception())
   {
     std::cerr << "Fatal error: it is not possible to switch coroutine (with "
                  "TC_AWAIT) in a catch clause. This will cause undefined "
@@ -23,7 +23,7 @@ void assert_no_cancel_in_catch()
 
 void assert_no_co_await_in_catch()
 {
-  if (std::uncaught_exception() || std::current_exception())
+  if (std::uncaught_exceptions() || std::current_exception())
   {
     std::cerr << "Fatal error: it is not possible to switch coroutine (with "
                  "TC_AWAIT) in a catch clause."
