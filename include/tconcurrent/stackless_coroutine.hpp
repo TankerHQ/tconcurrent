@@ -283,14 +283,14 @@ inline cotask<void> task_promise<void>::get_return_object()
           *this)};
 }
 
-template <template <typename> class F, typename R>
+template <typename FutRef>
 struct future_awaiter
 {
-  F<R>&& input;
-  F<R> output;
+  FutRef input;
+  std::decay_t<FutRef> output;
   std::shared_ptr<bool> dead = std::make_shared<bool>(false);
 
-  future_awaiter(F<R>&& o) : input(std::move(o))
+  future_awaiter(FutRef o) : input(static_cast<FutRef>(o))
   {
   }
 
@@ -317,7 +317,7 @@ struct future_awaiter
 
     if (input.is_ready())
     {
-      output = std::move(input);
+      output = static_cast<FutRef>(input);
       return true;
     }
     return false;
@@ -345,15 +345,14 @@ struct future_awaiter
 template <typename R>
 auto operator co_await(tc::future<R>&& f)
 {
-  return tc::detail::future_awaiter<tc::future, R>{
+  return tc::detail::future_awaiter<tc::future<R>&&>{
       static_cast<tc::future<R>&&>(f)};
 }
 
 template <typename R>
-auto operator co_await(tc::shared_future<R>&& f)
+auto operator co_await(tc::shared_future<R>& f)
 {
-  return tc::detail::future_awaiter<tc::shared_future, R>{
-      static_cast<tc::shared_future<R>&&>(f)};
+  return tc::detail::future_awaiter<tc::shared_future<R>&>{f};
 }
 
 namespace tconcurrent
