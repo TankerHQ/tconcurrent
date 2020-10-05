@@ -7,6 +7,7 @@
 #include <boost/scope_exit.hpp>
 
 #include <tconcurrent/async.hpp>
+#include <tconcurrent/detail/tvoid.hpp>
 #include <tconcurrent/lazy/async.hpp>
 #include <tconcurrent/lazy/detail.hpp>
 #include <tconcurrent/lazy/sink_receiver.hpp>
@@ -121,8 +122,7 @@ public:
   coroutine_control& operator=(coroutine_control&&) = delete;
 
   template <typename Awaitable>
-  typename std::decay_t<Awaitable>::value_type operator()(
-      Awaitable&& awaitable);
+  auto operator()(Awaitable&& awaitable);
 
   void yield();
 
@@ -159,9 +159,19 @@ private:
   {
   }
 
+  template <typename Sender>
+  auto await(Sender sender,
+             bool early_return,
+             detail::void_t<typename std::decay_t<Sender>::template value_types<
+                 std::tuple>>** = nullptr);
   template <typename Awaitable>
-  typename std::decay_t<Awaitable>::value_type await(Awaitable awaitable,
-                                                     bool early_return);
+  typename std::decay_t<Awaitable>::value_type await(
+      Awaitable awaitable,
+      bool early_return,
+      // SFINAE to check if it looks like a future
+      // I originally wrote something to test if then() existed, but I didn't
+      // manage to make it work
+      detail::void_t<typename std::decay_t<Awaitable>::value_type>** = nullptr);
 
   template <typename E, typename F>
   friend auto ::tconcurrent::async_resumable(std::string const& name,
@@ -232,8 +242,7 @@ inline coroutine_status run_coroutine(coroutine_control* ctrl)
  * \throw the exception contained in \p awaitable if there is one
  */
 template <typename Awaitable>
-typename std::decay_t<Awaitable>::value_type coroutine_control::operator()(
-    Awaitable&& awaitable)
+auto coroutine_control::operator()(Awaitable&& awaitable)
 {
   return await(std::forward<Awaitable>(awaitable), true);
 }
@@ -251,9 +260,153 @@ inline void coroutine_control::yield()
   await(tc::make_ready_future(), false);
 }
 
+template <typename T>
+struct await_receiver_state
+{
+  struct v_none
+  {
+  };
+  struct v_value
+  {
+    T value;
+  };
+  struct v_exception
+  {
+    std::exception_ptr exc;
+  };
+
+  coroutine_control* ctrl;
+  lazy::cancelation_token cancelation_token;
+  boost::variant2::variant<v_none, v_exception, v_value> result;
+};
+
+template <class T>
+struct await_receiver_base
+{
+  using state_type = await_receiver_state<T>;
+
+  state_type* _state;
+  executor _executor;
+
+  // atomic because we don't want the compiler to reorder instructions
+  std::shared_ptr<std::atomic<bool>> _aborted =
+      std::make_shared<std::atomic<bool>>(false);
+
+  auto get_cancelation_token()
+  {
+    return &_state->cancelation_token;
+  }
+  template <typename V>
+  void _set(V&& v)
+  {
+    _executor.post(
+        [state = _state, aborted = _aborted, v = std::forward<V>(v)] {
+          // cancel was called, the coroutine is already dead and the memory
+          // free
+          if (*aborted)
+            return;
+
+          state->cancelation_token.reset();
+          state->result.template emplace<std::decay_t<V>>(std::move(v));
+
+          run_coroutine(state->ctrl);
+        });
+  }
+  template <typename E>
+  void set_error(E&& e)
+  {
+    _set(typename state_type::v_exception{std::forward<E>(e)});
+  }
+  void set_done()
+  {
+    _set(typename state_type::v_exception{
+        std::make_exception_ptr(operation_canceled())});
+  }
+};
+
+template <class T>
+struct await_receiver : await_receiver_base<T>
+{
+  await_receiver(await_receiver_state<T>* state, executor e)
+    : await_receiver_base<T>{state, std::move(e)}
+  {
+  }
+
+  void set_value(T&& v)
+  {
+    this->_set(typename await_receiver_state<T>::v_value{std::forward<T>(v)});
+  }
+};
+
+template <>
+struct await_receiver<void> : await_receiver_base<tvoid>
+{
+  await_receiver(state_type* state, executor e)
+    : await_receiver_base<tvoid>{state, std::move(e)}
+  {
+  }
+
+  void set_value()
+  {
+    this->_set(await_receiver_state<tvoid>::v_value{{}});
+  }
+};
+
+template <typename Sender>
+auto coroutine_control::await(
+    Sender sender,
+    bool early_return,
+    detail::void_t<
+        typename std::decay_t<Sender>::template value_types<std::tuple>>**)
+{
+  assert_not_in_catch();
+
+  using return_type = lazy::detail::extract_single_value_type_t<Sender>;
+  using state_type = typename await_receiver<return_type>::state_type;
+
+  state_type state{this};
+  await_receiver<return_type> receiver(&state, executor_);
+
+  auto canceler = token->make_scope_canceler(
+      [this, &state, aborted = receiver._aborted]() mutable {
+        assert_not_in_catch();
+        assert(this->executor_.is_in_this_context());
+
+        state.cancelation_token.request_cancel();
+
+        *aborted = true;
+        // run the coroutine one last time so that it can abort
+        auto const status = run_coroutine(this);
+        (void)status;
+        assert(status == coroutine_status::aborted &&
+               "tc::detail::abort_coroutine must never be caught");
+      });
+
+  coroutine_exit_post_setup = [sender = std::move(sender),
+                               &receiver](coroutine_control* ctrl) mutable {
+    sender.submit(receiver);
+  };
+
+  TC_SANITIZER_OPEN_RETURN_CONTEXT(this)
+  *argctx = std::move(*argctx).resume();
+  TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
+  if (*receiver._aborted)
+    throw abort_coroutine{};
+  if (token->is_cancel_requested())
+    throw operation_canceled{};
+  if (auto const exc =
+          boost::variant2::get_if<typename state_type::v_exception>(
+              &state.result))
+    std::rethrow_exception(exc->exc);
+  return std::move(
+      boost::variant2::get<typename state_type::v_value>(state.result).value);
+}
+
 template <typename Awaitable>
 typename std::decay_t<Awaitable>::value_type coroutine_control::await(
-    Awaitable awaitable, bool early_return)
+    Awaitable awaitable,
+    bool early_return,
+    detail::void_t<typename std::decay_t<Awaitable>::value_type>**)
 {
   assert_not_in_catch();
 

@@ -392,3 +392,20 @@ TEST_CASE("coroutine void by lazy run_resumable")
   lazy::cancelation_token c;
   CHECK_NOTHROW(lazy::sync_wait(std::move(sender), c));
 }
+
+TEST_CASE("coroutine await lazy sender")
+{
+  auto sender =
+      lazy::then(lazy::async(get_default_executor()), [] { return 42; });
+  auto f = async_resumable(
+      [sender]() mutable -> cotask<int> { TC_RETURN(TC_AWAIT(sender)); });
+  CHECK(42 == f.get());
+}
+
+TEST_CASE("coroutine await lazy sender void")
+{
+  auto sender = lazy::async(get_default_executor());
+  auto f =
+      async_resumable([sender]() mutable -> cotask<void> { TC_AWAIT(sender); });
+  CHECK_NOTHROW(f.get());
+}

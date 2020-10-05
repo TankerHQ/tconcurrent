@@ -2,12 +2,15 @@
 #define TCONCURRENT_STACKLESS_COROUTINE_HPP
 
 #include <tconcurrent/async.hpp>
+#include <tconcurrent/detail/tvoid.hpp>
 #include <tconcurrent/future.hpp>
 #include <tconcurrent/lazy/async.hpp>
+#include <tconcurrent/lazy/detail.hpp>
 #include <tconcurrent/lazy/then.hpp>
 #include <tconcurrent/promise.hpp>
 
 #include <experimental/coroutine>
+#include <optional>
 
 namespace tconcurrent
 {
@@ -338,6 +341,157 @@ struct future_awaiter
                });
   }
 };
+
+template <typename SenderAwaiter>
+struct receiver_base
+{
+  SenderAwaiter& awaiter;
+  std::shared_ptr<lazy::cancelation_token> cancelation_token;
+
+  template <typename E>
+  void set_error(E&& e)
+  {
+    if (cancelation_token->is_cancel_requested())
+      return;
+    awaiter.err = std::forward<E>(e);
+    awaiter.resume();
+  }
+
+  void set_done()
+  {
+    if (cancelation_token->is_cancel_requested())
+      return;
+    awaiter.resume();
+  }
+
+  auto get_cancelation_token()
+  {
+    return cancelation_token.get();
+  }
+};
+
+template <typename Sender>
+struct sender_awaiter_base
+{
+  Sender&& sender;
+  std::exception_ptr err;
+  executor executor;
+  std::experimental::coroutine_handle<> continuation;
+  std::shared_ptr<lazy::cancelation_token> cancelation_token =
+      std::make_shared<lazy::cancelation_token>();
+
+  sender_awaiter_base(Sender&& o) : sender(std::forward<Sender>(o))
+  {
+  }
+
+  sender_awaiter_base(sender_awaiter_base&& o) = default;
+
+  sender_awaiter_base(sender_awaiter_base const&) = delete;
+  sender_awaiter_base& operator=(sender_awaiter_base&&) = delete;
+  sender_awaiter_base& operator=(sender_awaiter_base const&) = delete;
+
+  ~sender_awaiter_base()
+  {
+    if (cancelation_token)
+      cancelation_token->request_cancel();
+  }
+
+  bool await_ready()
+  {
+    // We can't be ready right away since the task hasn't started, it's lazy
+    return false;
+  }
+
+  void resume()
+  {
+    executor.post([this, cancelation_token = this->cancelation_token] {
+      if (cancelation_token->is_cancel_requested())
+        return;
+      continuation.resume();
+    });
+  }
+};
+
+template <typename Sender, typename T>
+struct sender_awaiter : sender_awaiter_base<Sender>
+{
+  struct receiver : receiver_base<sender_awaiter>
+  {
+    template <typename U>
+    void set_value(U&& u)
+    {
+      if (this->cancelation_token->is_cancel_requested())
+        return;
+      this->awaiter.value = std::forward<U>(u);
+      this->awaiter.resume();
+    }
+  };
+
+  using value_type = T;
+  template <template <typename...> class Tuple>
+  using value_types = Tuple<value_type>;
+
+  std::optional<value_type> value;
+
+  using sender_awaiter_base<Sender>::sender_awaiter_base;
+
+  auto await_resume()
+  {
+    if (this->err)
+      std::rethrow_exception(this->err);
+    else if (value)
+      return *value;
+    else
+      throw operation_canceled{};
+  }
+  template <typename P>
+  void await_suspend(std::experimental::coroutine_handle<P> coro)
+  {
+    this->executor = coro.promise().executor;
+    this->continuation = coro;
+    this->sender.submit(receiver{*this, this->cancelation_token});
+  }
+};
+
+template <typename Sender>
+struct sender_awaiter<Sender, void> : sender_awaiter_base<Sender>
+{
+  struct receiver : receiver_base<sender_awaiter>
+  {
+    void set_value()
+    {
+      if (this->cancelation_token->is_cancel_requested())
+        return;
+      this->awaiter.has_value = true;
+      this->awaiter.resume();
+    }
+  };
+
+  using value_type = void;
+  template <template <typename...> class Tuple>
+  using value_types = Tuple<value_type>;
+
+  bool has_value = false;
+
+  using sender_awaiter_base<Sender>::sender_awaiter_base;
+
+  auto await_resume()
+  {
+    if (this->err)
+      std::rethrow_exception(this->err);
+    else if (has_value)
+      return;
+    else
+      throw operation_canceled{};
+  }
+  template <typename P>
+  void await_suspend(std::experimental::coroutine_handle<P> coro)
+  {
+    this->executor = coro.promise().executor;
+    this->continuation = coro;
+    this->sender.submit(receiver{*this, this->cancelation_token});
+  }
+};
 }
 }
 
@@ -352,6 +506,17 @@ template <typename R>
 auto operator co_await(tc::shared_future<R>& f)
 {
   return tc::detail::future_awaiter<tc::shared_future<R>&>{f};
+}
+
+template <typename Sender,
+          typename SFINAE = ::tconcurrent::detail::void_t<
+              typename std::decay_t<Sender>::template value_types<std::tuple>>>
+auto operator co_await(Sender&& sender)
+{
+  using return_type = tconcurrent::lazy::detail::extract_single_value_type_t<
+      std::decay_t<Sender>>;
+  return tc::detail::sender_awaiter<Sender, return_type>(
+      std::forward<Sender>(sender));
 }
 
 namespace tconcurrent
