@@ -300,6 +300,14 @@ public:
     return ret;
   }
 
+  /** Update the name that will be propagated to then and and_then
+   */
+  this_type& update_chain_name(std::string name) &
+  {
+    _chain_name = std::move(name);
+    return *this;
+  }
+
 protected:
   using shared_type = detail::shared_base<value_type>;
   using shared_pointer = std::shared_ptr<shared_type>;

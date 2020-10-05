@@ -79,6 +79,7 @@ struct task_promise_base
   std::function<void()> cont;
   std::exception_ptr exc;
   executor executor;
+  std::string name;
 };
 
 template <typename T>
@@ -195,6 +196,7 @@ private:
     template <typename P>
     bool await_suspend(std::experimental::coroutine_handle<P> caller_awaiter)
     {
+      coroutine.promise().name = caller_awaiter.promise().name;
       coroutine.promise().executor = caller_awaiter.promise().executor;
       coroutine.resume();
       if (coroutine.done())
@@ -376,6 +378,7 @@ struct sender_awaiter_base
   Sender&& sender;
   std::exception_ptr err;
   executor executor;
+  std::string name;
   std::experimental::coroutine_handle<> continuation;
   std::shared_ptr<lazy::cancelation_token> cancelation_token =
       std::make_shared<lazy::cancelation_token>();
@@ -404,11 +407,13 @@ struct sender_awaiter_base
 
   void resume()
   {
-    executor.post([this, cancelation_token = this->cancelation_token] {
-      if (cancelation_token->is_cancel_requested())
-        return;
-      continuation.resume();
-    });
+    executor.post(
+        [this, cancelation_token = this->cancelation_token] {
+          if (cancelation_token->is_cancel_requested())
+            return;
+          continuation.resume();
+        },
+        name);
   }
 };
 
@@ -448,6 +453,7 @@ struct sender_awaiter : sender_awaiter_base<Sender>
   void await_suspend(std::experimental::coroutine_handle<P> coro)
   {
     this->executor = coro.promise().executor;
+    this->name = coro.promise().name;
     this->continuation = coro;
     this->sender.submit(receiver{*this, this->cancelation_token});
   }
@@ -488,6 +494,7 @@ struct sender_awaiter<Sender, void> : sender_awaiter_base<Sender>
   void await_suspend(std::experimental::coroutine_handle<P> coro)
   {
     this->executor = coro.promise().executor;
+    this->name = coro.promise().name;
     this->continuation = coro;
     this->sender.submit(receiver{*this, this->cancelation_token});
   }
@@ -530,6 +537,7 @@ struct sink_task;
 struct sink_promise
 {
   executor executor;
+  std::string name;
 
   sink_promise() = default;
   sink_promise(sink_promise const&) = delete;
@@ -665,6 +673,7 @@ struct run_resumable_sender
   using value_types = typename value_types_of<return_type, Tuple>::types;
 
   executor executor;
+  std::string name;
   Awaitable awaitable;
 
   template <typename R>
@@ -676,6 +685,7 @@ struct run_resumable_sender
     coro->coro =
         detail::coro_runner<return_type>::run(*coro, std::move(awaitable)).coro;
     coro->coro.promise().executor = std::move(executor);
+    coro->coro.promise().name = std::move(name);
     coro->coro.resume();
     // we just ran the coroutine, it may have died right away, so we need to
     // check
@@ -692,7 +702,7 @@ auto run_resumable(E&& executor, std::string name, F&& f, Args&&... args)
   auto awaitable = std::forward<F>(f)(std::forward<Args>(args)...);
 
   return detail::run_resumable_sender<std::decay_t<E>, decltype(awaitable)>{
-      std::forward<E>(executor), std::move(awaitable)};
+      std::forward<E>(executor), std::move(name), std::move(awaitable)};
 }
 }
 
