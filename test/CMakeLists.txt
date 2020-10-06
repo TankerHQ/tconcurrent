@@ -15,9 +15,11 @@ set(test_tconcurrent_SRC
   test_future_group.cpp
   test_job.cpp
   test_lazy.cpp
+  test_lazy_task_canceler.cpp
   test_packaged_task.cpp
   test_periodic_task.cpp
   test_semaphore.cpp
+  test_task_canceler.cpp
   test_when.cpp
 )
 

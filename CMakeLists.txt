@@ -59,7 +59,7 @@ set(tconcurrent_SRC
   include/tconcurrent/stackful_coroutine.hpp
   include/tconcurrent/stackless_coroutine.hpp
   include/tconcurrent/stepper.hpp
-  include/tconcurrent/task_auto_canceler.hpp
+  include/tconcurrent/task_canceler.hpp
   include/tconcurrent/thread_pool.hpp
   include/tconcurrent/when.hpp
   src/barrier.cpp
