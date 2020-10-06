@@ -7,12 +7,7 @@ namespace boost
 {
 namespace asio
 {
-#if BOOST_VERSION < 106600
-class io_service;
-#else
 class io_context;
-using io_service = io_context;
-#endif
 }
 
 namespace system

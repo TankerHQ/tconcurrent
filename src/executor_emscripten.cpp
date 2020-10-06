@@ -32,7 +32,7 @@ public:
         new auto(std::move(f)));
   }
 
-  boost::asio::io_service& get_io_service()
+  boost::asio::io_context& get_io_service()
   {
     throw std::runtime_error("no io service on this executor");
   }

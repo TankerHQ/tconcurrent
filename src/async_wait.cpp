@@ -20,7 +20,7 @@ struct async_wait_data
   std::atomic<bool> fired{false};
 
   template <typename Delay>
-  async_wait_data(boost::asio::io_service& io, Delay delay) : timer(io, delay)
+  async_wait_data(boost::asio::io_context& io, Delay delay) : timer(io, delay)
   {
   }
 };

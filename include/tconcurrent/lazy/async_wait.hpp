@@ -5,7 +5,7 @@
 
 #include <tconcurrent/executor.hpp>
 
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/steady_timer.hpp>
 
 #include <atomic>
@@ -25,7 +25,7 @@ struct async_wait_data
   std::atomic<bool> fired{false};
 
   template <typename Delay, typename ReceiverArg>
-  async_wait_data(boost::asio::io_service& io,
+  async_wait_data(boost::asio::io_context& io,
                   Delay delay,
                   ReceiverArg&& receiver)
     : timer(io, delay), receiver(std::forward<ReceiverArg>(receiver))
@@ -35,7 +35,7 @@ struct async_wait_data
 
 struct async_wait_sender
 {
-  boost::asio::io_service* io_service;
+  boost::asio::io_context* io_context;
   std::chrono::steady_clock::duration delay;
 
   template <typename R>
@@ -43,7 +43,7 @@ struct async_wait_sender
   {
     auto const data = std::make_shared<
         detail::async_wait_data<std::decay_t<decltype(receiver)>>>(
-        *io_service, delay, std::forward<decltype(receiver)>(receiver));
+        *io_context, delay, std::forward<decltype(receiver)>(receiver));
 
     data->timer.async_wait([data](boost::system::error_code const&) mutable {
       if (data->fired.exchange(true))

@@ -19,7 +19,7 @@ namespace tconcurrent
 struct thread_pool::impl
 {
   boost::asio::io_context _io;
-  std::unique_ptr<boost::asio::io_service::work> _work;
+  std::unique_ptr<boost::asio::io_context::work> _work;
   std::vector<std::thread> _threads;
   std::atomic<unsigned> _num_running_threads{0};
   std::atomic<bool> _dead{false};
@@ -93,7 +93,7 @@ bool thread_pool::is_single_threaded() const
   return _p->_threads.size() == 1;
 }
 
-boost::asio::io_service& thread_pool::get_io_service()
+boost::asio::io_context& thread_pool::get_io_service()
 {
   return _p->_io;
 }
@@ -103,7 +103,7 @@ void thread_pool::start(unsigned int thread_count)
   if (_p->_work)
     throw std::runtime_error("the threadpool is already running");
 
-  _p->_work = std::make_unique<boost::asio::io_service::work>(_p->_io);
+  _p->_work = std::make_unique<boost::asio::io_context::work>(_p->_io);
   for (unsigned int i = 0; i < thread_count; ++i)
     _p->_threads.emplace_back([this] { run_thread(); });
 }

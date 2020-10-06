@@ -50,7 +50,7 @@ public:
   bool is_in_this_context() const;
   bool is_single_threaded() const;
 
-  boost::asio::io_service& get_io_service();
+  boost::asio::io_context& get_io_service();
 
   /** Call this function to become a worker of this threadpool
    * This call will not return until the threadpool is destroyed.

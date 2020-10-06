@@ -31,7 +31,7 @@ public:
     _p->post(std::move(work), std::move(name));
   }
 
-  boost::asio::io_service& get_io_service()
+  boost::asio::io_context& get_io_service()
   {
     return _p->get_io_service();
   }
@@ -61,7 +61,7 @@ private:
   {
     virtual ~impl_base() = default;
     virtual void post(fu2::unique_function<void()>, std::string) = 0;
-    virtual boost::asio::io_service& get_io_service() = 0;
+    virtual boost::asio::io_context& get_io_service() = 0;
     virtual bool is_single_threaded() const = 0;
     virtual bool is_in_this_context() const = 0;
     virtual void signal_error(std::exception_ptr const& e) = 0;
@@ -80,7 +80,7 @@ private:
       _context.post(std::move(f), std::move(name));
     }
 
-    boost::asio::io_service& get_io_service() override
+    boost::asio::io_context& get_io_service() override
     {
       return _context.get_io_service();
     }
