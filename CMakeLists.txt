@@ -4,7 +4,7 @@ project(tconcurrent)
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup(TARGETS)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
@@ -69,13 +69,12 @@ set(tconcurrent_SRC
 )
 
 set(tconcurrent_LIBS
+  CONAN_PKG::boost
+  CONAN_PKG::enum-flags
+  CONAN_PKG::function2
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-  list(APPEND tconcurrent_LIBS
-    CONAN_PKG::boost
-    CONAN_PKG::enum-flags
-  )
   list(APPEND tconcurrent_SRC
     src/async_wait_emscripten.cpp
     src/executor_emscripten.cpp
@@ -86,10 +85,6 @@ else()
     src/executor.cpp
     src/stackful_coroutine.cpp
     src/thread_pool.cpp
-  )
-  list(APPEND tconcurrent_LIBS
-    CONAN_PKG::boost
-    CONAN_PKG::enum-flags
   )
 endif()
 

@@ -32,14 +32,13 @@ class TconcurrentConan(ConanFile):
     def requirements(self):
         self.requires("boost/1.73.0")
         self.requires("enum-flags/0.1a")
+        self.requires("function2/4.1.0")
 
     def build_requirements(self):
         if self.should_build_tests:
             self.build_requires("doctest/2.3.8")
 
     def configure(self):
-        if self.settings.os != "Emscripten" and self.options["Boost"].without_context:
-            raise Exception("tconcurrent requires Boost.Context")
         if self.options.coroutinests and self.settings.compiler != "clang":
             raise Exception("Coroutines TS is only supported by clang at the moment")
 
@@ -52,6 +51,7 @@ class TconcurrentConan(ConanFile):
     def build(self):
         cmake = CMake(self)
         cmake.definitions["TCONCURRENT_SANITIZER"] = self.options.with_sanitizer_support
+        cmake.definitions["TCONCURRENT_COROUTINES_TS"] = self.options.coroutinests
         cmake.definitions["BUILD_SHARED_LIBS"] = self.options.shared
         cmake.definitions["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.fPIC
         cmake.definitions["BUILD_TESTING"] = self.should_build_tests

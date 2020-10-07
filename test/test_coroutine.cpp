@@ -2,6 +2,7 @@
 
 #include <tconcurrent/async_wait.hpp>
 #include <tconcurrent/coroutine.hpp>
+#include <tconcurrent/lazy/sync_wait.hpp>
 #include <tconcurrent/promise.hpp>
 #include <tconcurrent/stepper.hpp>
 
@@ -365,4 +366,46 @@ TEST_CASE("coroutine await move-only type")
   });
   prom.set_value(std::make_unique<int>(42));
   finished.get();
+}
+
+TEST_CASE("coroutine by lazy run_resumable")
+{
+  auto sender = lazy::run_resumable(
+      get_default_executor(),
+      {},
+      [](int i) -> cotask<int> { TC_RETURN(i); },
+      42);
+  static_assert(std::is_same_v<decltype(sender)::value_types<std::tuple>,
+                               std::tuple<int>>,
+                "run_resumable must deduce the correct type from the lambda");
+  lazy::cancelation_token c;
+  CHECK(42 == lazy::sync_wait(std::move(sender), c));
+}
+
+TEST_CASE("coroutine void by lazy run_resumable")
+{
+  auto sender = lazy::run_resumable(
+      get_default_executor(), {}, []() -> cotask<void> { TC_RETURN(); });
+  static_assert(
+      std::is_same_v<decltype(sender)::value_types<std::tuple>, std::tuple<>>,
+      "run_resumable must deduce the correct type from the lambda");
+  lazy::cancelation_token c;
+  CHECK_NOTHROW(lazy::sync_wait(std::move(sender), c));
+}
+
+TEST_CASE("coroutine await lazy sender")
+{
+  auto sender =
+      lazy::then(lazy::async(get_default_executor()), [] { return 42; });
+  auto f = async_resumable(
+      [sender]() mutable -> cotask<int> { TC_RETURN(TC_AWAIT(sender)); });
+  CHECK(42 == f.get());
+}
+
+TEST_CASE("coroutine await lazy sender void")
+{
+  auto sender = lazy::async(get_default_executor());
+  auto f =
+      async_resumable([sender]() mutable -> cotask<void> { TC_AWAIT(sender); });
+  CHECK_NOTHROW(f.get());
 }

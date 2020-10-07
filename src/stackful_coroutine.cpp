@@ -79,7 +79,7 @@ stack_bounds get_stack_bounds(coroutine_control* ctrl)
 
 void assert_not_in_catch()
 {
-  if (std::uncaught_exception() || std::current_exception())
+  if (std::uncaught_exceptions() || std::current_exception())
   {
     std::cerr << "Fatal error: it is not possible to switch coroutine (with "
                  "TC_AWAIT, or canceling a coroutine) while the stack is being "

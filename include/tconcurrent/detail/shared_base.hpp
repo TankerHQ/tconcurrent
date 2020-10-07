@@ -3,15 +3,17 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <functional>
 #include <mutex>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include <function2/function2.hpp>
+
 #include <boost/variant2/variant.hpp>
 
 #include <tconcurrent/cancelation_token.hpp>
+#include <tconcurrent/detail/tvoid.hpp>
 
 namespace tconcurrent
 {
@@ -21,10 +23,6 @@ struct broken_promise : std::runtime_error
   broken_promise() : runtime_error("promise is broken")
   {
   }
-};
-
-struct tvoid
-{
 };
 
 namespace detail
@@ -260,7 +258,7 @@ public:
 private:
   mutable std::mutex _mutex;
   mutable std::condition_variable _ready;
-  std::vector<std::function<void()>> _then;
+  std::vector<fu2::unique_function<void()>> _then;
 
 protected:
   cancelation_token_ptr _cancelation_token;
@@ -296,7 +294,7 @@ private:
   {
     assert(_r.index() == 0 && "state already set");
 
-    std::vector<std::function<void()>> then;
+    std::vector<fu2::unique_function<void()>> then;
     {
       std::lock_guard<std::mutex> lock{_mutex};
       setval();
@@ -312,20 +310,6 @@ private:
   template <typename S>
   friend class promise_ptr;
 };
-
-template <typename T>
-struct shared_base_type_
-{
-  using type = T;
-};
-template <>
-struct shared_base_type_<void>
-{
-  using type = tvoid;
-};
-
-template <typename T>
-using shared_base_type = typename shared_base_type_<T>::type;
 }
 }
 
