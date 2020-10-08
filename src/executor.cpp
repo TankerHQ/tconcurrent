@@ -18,30 +18,32 @@ thread_pool& get_global_thread_pool()
 
 namespace
 {
-void start_thread_pool(unsigned int thread_count)
+thread_pool& start_thread_pool(unsigned int thread_count)
 {
   auto& tp = get_global_thread_pool();
   if (!tp.is_running())
     tp.start(thread_count);
+  return tp;
 }
 
-void start_single_thread()
+thread_pool& start_single_thread()
 {
   auto& tp = get_global_single_thread();
   if (!tp.is_running())
     tp.start(1);
+  return tp;
 }
 }
 
 executor get_default_executor()
 {
-  start_single_thread();
-  return get_global_single_thread();
+  static auto& tp = start_single_thread();
+  return tp;
 }
 
 executor get_background_executor()
 {
-  start_thread_pool(std::thread::hardware_concurrency());
-  return get_global_thread_pool();
+  static auto& tp = start_thread_pool(std::thread::hardware_concurrency());
+  return tp;
 }
 }
