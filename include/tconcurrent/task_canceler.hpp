@@ -1,7 +1,6 @@
-#ifndef TCONCURRENT_TASK_AUTO_CANCELER_HPP
-#define TCONCURRENT_TASK_AUTO_CANCELER_HPP
+#ifndef TCONCURRENT_TASK_CANCELER_HPP
+#define TCONCURRENT_TASK_CANCELER_HPP
 
-#include <cassert>
 #include <vector>
 
 #include <tconcurrent/future.hpp>
@@ -9,40 +8,44 @@
 
 namespace tconcurrent
 {
-class task_auto_canceler
+class task_canceler
 {
 public:
-  ~task_auto_canceler()
+  ~task_canceler()
   {
-    auto const fut = terminate();
-    if (!fut.is_ready())
-    {
-      assert(false &&
-             "destructing a task_auto_canceler that could not be canceled");
-      return;
-    }
+    terminate(true);
   }
 
-  template <typename Future>
-  void add(Future&& future)
+  template <typename Func>
+  decltype(std::declval<Func>()().to_shared()) run(Func&& func)
   {
     lock_guard _(_mutex);
 
     if (_terminating)
-      throw std::runtime_error(
-          "adding a future to terminating task_auto_canceler");
+    {
+      throw std::runtime_error("adding a task to terminating task_canceler");
+    }
 
-    if (future.is_ready())
-      return;
+    auto future = func().to_shared();
 
-    collect();
-    _futures.emplace_back(future.to_void());
+    if (!future.is_ready())
+    {
+      collect();
+      _futures.emplace_back(future.to_void());
+    }
+
+    return future;
+  }
+
+  tc::future<void> terminate()
+  {
+    return terminate(false);
   }
 
 private:
   using lock_guard = std::lock_guard<std::mutex>;
   std::mutex _mutex;
-  std::vector<tc::future<void>> _futures;
+  std::vector<tc::shared_future<void>> _futures;
   bool _terminating{false};
 
   /// Remove ready futures from vector
@@ -55,11 +58,12 @@ private:
         _futures.end());
   }
 
-  future<void> terminate()
+  tc::future<void> terminate(bool terminating)
   {
     lock_guard _(_mutex);
 
-    _terminating = true;
+    if (terminating)
+      _terminating = true;
     for (auto& fut : _futures)
       fut.request_cancel();
     auto ret = when_all(std::make_move_iterator(_futures.begin()),
