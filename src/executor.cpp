@@ -6,18 +6,30 @@ namespace tconcurrent
 {
 namespace
 {
+thread_pool* global_single_thread = nullptr;
+thread_pool* global_thread_pool = nullptr;
+}
+
 thread_pool& get_global_single_thread()
 {
-  static thread_pool tp;
-  return tp;
+  static auto _ = [] { return global_single_thread = new thread_pool; }();
+  return *global_single_thread;
 }
 
 thread_pool& get_global_thread_pool()
 {
-  static thread_pool tp;
-  return tp;
+  static auto _ = [] { return global_thread_pool = new thread_pool; }();
+  return *global_thread_pool;
 }
 
+void shutdown()
+{
+  delete global_single_thread;
+  delete global_thread_pool;
+}
+
+namespace
+{
 thread_pool& start_thread_pool(unsigned int thread_count)
 {
   auto& tp = get_global_thread_pool();
