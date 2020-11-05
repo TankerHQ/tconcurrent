@@ -4,6 +4,8 @@
 
 namespace tconcurrent
 {
+namespace
+{
 thread_pool& get_global_single_thread()
 {
   static thread_pool tp;
@@ -16,8 +18,6 @@ thread_pool& get_global_thread_pool()
   return tp;
 }
 
-namespace
-{
 thread_pool& start_thread_pool(unsigned int thread_count)
 {
   auto& tp = get_global_thread_pool();
