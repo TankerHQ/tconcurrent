@@ -2,7 +2,6 @@
 #define TCONCURRENT_THREAD_POOL_H
 
 #include <atomic>
-#include <functional>
 #include <memory>
 #include <thread>
 
