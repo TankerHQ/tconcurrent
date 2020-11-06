@@ -1,4 +1,3 @@
-#include <atomic>
 #include <iostream>
 
 #include <boost/thread/tss.hpp>
@@ -18,7 +17,6 @@ struct thread_pool::impl
   boost::asio::io_context _io;
   std::unique_ptr<boost::asio::io_context::work> _work;
   std::vector<std::thread> _threads;
-  std::atomic<unsigned> _num_running_threads{0};
   std::atomic<bool> _dead{false};
 
   error_handler_cb _error_cb{detail::default_error_cb};
@@ -89,14 +87,13 @@ void thread_pool::start(unsigned int thread_count)
 void thread_pool::run_thread()
 {
   SET_THREAD_LOCAL(current_executor, this);
-  ++_p->_num_running_threads;
   while (true)
   {
     try
     {
       _p->_io.run();
       SET_THREAD_LOCAL(current_executor, nullptr);
-      break;
+      return;
     }
     catch (...)
     {
@@ -111,7 +108,6 @@ void thread_pool::run_thread()
       }
     }
   }
-  --_p->_num_running_threads;
 }
 
 void thread_pool::stop()
@@ -120,18 +116,6 @@ void thread_pool::stop()
   for (auto& th : _p->_threads)
     th.join();
   _p->_threads.clear();
-  // When calling exit() any non-main thread is likely to be terminated
-  // (especially on Windows), destructors will not run and the program may be
-  // interrupted at any point. As a result tconcurrent could deadlock in Boost
-  // Asio's IOCP code.
-  if (_p->_num_running_threads.load())
-  {
-    std::cerr
-        << "WARNING: It seems one of tconcurrent's threads died. Do NOT call "
-           "exit() or terminate live threads, this may result in a deadlock!"
-        << std::endl;
-    (void)_p.release();
-  }
 }
 
 bool thread_pool::is_running() const
