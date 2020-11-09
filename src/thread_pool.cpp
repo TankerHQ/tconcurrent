@@ -1,4 +1,3 @@
-#include <atomic>
 #include <iostream>
 
 #include <boost/thread/tss.hpp>
@@ -13,15 +12,11 @@
 namespace tconcurrent
 {
 
-// We do a pimpl to avoid exposing boost asio whose header can take up to a
-// second to parse on some machines. Since this file is usually included
-// everywhere, we want to keep it light.
 struct thread_pool::impl
 {
   boost::asio::io_context _io;
   std::unique_ptr<boost::asio::io_context::work> _work;
   std::vector<std::thread> _threads;
-  std::atomic<unsigned> _num_running_threads{0};
   std::atomic<bool> _dead{false};
 
   error_handler_cb _error_cb{detail::default_error_cb};
@@ -60,27 +55,8 @@ thread_pool::thread_pool() : _p(new impl)
 
 thread_pool::~thread_pool()
 {
-  if (!_prevent_destruction)
-  {
-    _p->_dead = true;
-    stop();
-
-    // When calling exit() any non-main thread is likely to be terminated
-    // (especially on Windows), destructors will not run and the program may be
-    // interrupted at any point. As a result tconcurrent could deadlock in Boost
-    // Asio's IOCP code.
-    if (_p->_num_running_threads.load())
-    {
-      std::cerr
-          << "WARNING: It seems one of tconcurrent's threads died. Do NOT call "
-             "exit() or terminate live threads, this may result in a deadlock!"
-          << std::endl;
-    }
-    else
-    {
-      delete _p;
-    }
-  }
+  _p->_dead = true;
+  stop();
 }
 
 bool thread_pool::is_in_this_context() const
@@ -111,14 +87,13 @@ void thread_pool::start(unsigned int thread_count)
 void thread_pool::run_thread()
 {
   SET_THREAD_LOCAL(current_executor, this);
-  ++_p->_num_running_threads;
   while (true)
   {
     try
     {
       _p->_io.run();
       SET_THREAD_LOCAL(current_executor, nullptr);
-      break;
+      return;
     }
     catch (...)
     {
@@ -133,7 +108,6 @@ void thread_pool::run_thread()
       }
     }
   }
-  --_p->_num_running_threads;
 }
 
 void thread_pool::stop()
@@ -183,10 +157,5 @@ void thread_pool::post(fu2::unique_function<void()> work, std::string name)
           work();
         }
       }));
-}
-
-void thread_pool::prevent_destruction()
-{
-  _prevent_destruction = true;
 }
 }
