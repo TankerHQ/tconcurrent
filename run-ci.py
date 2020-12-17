@@ -1,8 +1,8 @@
 import argparse
 import os
+from pathlib import Path
 import sys
 
-from path import Path
 
 import tankerci
 import tankerci.cpp
@@ -33,7 +33,7 @@ def main() -> None:
     tankerci.conan.update_config()
 
     if args.command == "build-and-test":
-        src_path = Path.getcwd()
+        src_path = Path.cwd()
         build_path = "."  # tankerci.cpp.Builder runs ctest from the build directory
         # fmt: off
         ctest_flags = [
