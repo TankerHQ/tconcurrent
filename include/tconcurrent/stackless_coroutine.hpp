@@ -157,7 +157,7 @@ public:
   cotask(cotask const&) = delete;
   cotask& operator=(cotask const&) = delete;
 
-  cotask(cotask && o) : coro(o.coro), started(o.started)
+  cotask(cotask&& o) : coro(o.coro), started(o.started)
   {
     o.coro = nullptr;
   }
@@ -173,7 +173,7 @@ public:
     }
   }
 
-  auto operator co_await()&&
+  auto operator co_await() &&
   {
     return typename cotask<T>::awaitable{coro};
   }
@@ -223,13 +223,13 @@ private:
   }
 
   template <typename E>
-  void set_executor(E && executor)
+  void set_executor(E&& executor)
   {
     coro.promise().executor = std::forward<E>(executor);
   }
 
   template <typename F>
-  void set_continuation(F && cont)
+  void set_continuation(F&& cont)
   {
     coro.promise().cont = std::forward<F>(cont);
   }

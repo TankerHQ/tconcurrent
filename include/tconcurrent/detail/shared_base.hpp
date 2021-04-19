@@ -78,7 +78,7 @@ public:
     return _ptr;
   }
 
-  decltype(auto) operator-> () const
+  decltype(auto) operator->() const
   {
     return _ptr.operator->();
   }
@@ -87,7 +87,7 @@ public:
     return _ptr.operator*();
   }
 
-  operator std::shared_ptr<S> const&() const
+  operator std::shared_ptr<S> const &() const
   {
     return _ptr;
   }
