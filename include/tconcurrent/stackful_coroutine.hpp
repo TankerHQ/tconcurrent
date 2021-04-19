@@ -137,7 +137,7 @@ private:
   coroutine_t ctx;
   coroutine_t* argctx;
 
-  std::function<void(coroutine_control*)> coroutine_exit_post_setup;
+  fu2::unique_function<void(coroutine_control*)> coroutine_exit_post_setup;
 
   lazy::cancelation_token* token;
 
