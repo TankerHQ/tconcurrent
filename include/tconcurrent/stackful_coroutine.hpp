@@ -42,6 +42,8 @@ struct run_resumable_sender;
 }
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb);
+template <typename F>
+auto dispatch_on_thread_context(F&& f);
 
 namespace detail
 {
@@ -137,6 +139,7 @@ private:
   coroutine_t ctx;
   coroutine_t* argctx;
 
+  fu2::unique_function<void()> work_for_thread_context;
   fu2::unique_function<void(coroutine_control*)> coroutine_exit_post_setup;
 
   lazy::cancelation_token* token;
@@ -173,10 +176,15 @@ private:
       // manage to make it work
       detail::void_t<typename std::decay_t<Awaitable>::value_type>** = nullptr);
 
+  template <typename F>
+  auto dispatch_on_thread_context(F&& work);
+
   template <typename E, typename F>
   friend auto ::tconcurrent::async_resumable(std::string const& name,
                                              E&& executor,
                                              F&& cb);
+  template <typename F>
+  friend auto ::tconcurrent::dispatch_on_thread_context(F&& f);
 
   template <typename E, typename F>
   friend struct lazy::detail::run_resumable_sender;
@@ -205,11 +213,22 @@ inline coroutine_status run_coroutine(coroutine_control* ctrl)
   }
   BOOST_SCOPE_EXIT_END
 
-  TC_SANITIZER_OPEN_SWITCH_CONTEXT(
-      reinterpret_cast<char const*>(ctrl->stack.sp) - ctrl->stack.size,
-      ctrl->stack.size)
-  ctrl->ctx = std::move(ctrl->ctx).resume();
-  TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
+  while (true)
+  {
+    TC_SANITIZER_OPEN_SWITCH_CONTEXT(
+        reinterpret_cast<char const*>(ctrl->stack.sp) - ctrl->stack.size,
+        ctrl->stack.size)
+    ctrl->ctx = std::move(ctrl->ctx).resume();
+    TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
+    if (ctrl->work_for_thread_context)
+    {
+      ptr = nullptr;
+      ctrl->work_for_thread_context();
+      ptr = ctrl;
+    }
+    else
+      break;
+  }
 
   // if coroutine just finished
   if (!ctrl->ctx)
@@ -464,6 +483,25 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
     throw operation_canceled{};
   return finished_awaitable.get();
 }
+
+template <typename F>
+auto coroutine_control::dispatch_on_thread_context(F&& work)
+{
+  using return_type = decltype(work());
+
+  assert(!work_for_thread_context);
+  auto pack = ::tconcurrent::package<return_type()>(std::forward<F>(work));
+  work_for_thread_context = [f = std::move(pack.first)]() { f(); };
+
+  TC_SANITIZER_OPEN_RETURN_CONTEXT(this)
+  *argctx = std::move(*argctx).resume();
+  TC_SANITIZER_CLOSE_SWITCH_CONTEXT()
+
+  work_for_thread_context = nullptr;
+
+  assert(pack.second.is_ready());
+  return pack.second.get();
+}
 }
 
 using awaiter = detail::coroutine_control;
@@ -683,6 +721,28 @@ inline cotask<void> wrap_task()
 {
   return cotask<void>();
 }
+}
+
+template <typename F>
+auto dispatch_on_thread_context(F&& f)
+{
+  auto const ctrl = detail::get_current_coroutine_ptr();
+  if (ctrl)
+  {
+    if constexpr (std::is_same_v<decltype(f()), void>)
+    {
+      ctrl->dispatch_on_thread_context(std::forward<F>(f));
+      return;
+    }
+    else
+    {
+      return ctrl->dispatch_on_thread_context(std::forward<F>(f));
+    }
+  }
+  else
+  {
+    return f();
+  }
 }
 
 template <typename E, typename F>

@@ -43,6 +43,61 @@ TEST_CASE("coroutine on executor")
 }
 #endif
 
+TEST_CASE("coroutine run on main thread")
+{
+  auto const stack_frame = tc::async([] {
+                             int dummy;
+                             // This arithmetic operation silences a warning
+                             // from clang saying that we are returning the
+                             // address of a local variable.
+                             auto const ptr =
+                                 reinterpret_cast<intptr_t>(&dummy) + 1;
+                             return ptr;
+                           }).get();
+  auto f = async_resumable([&]() -> cotask<void> {
+    auto const result = tc::dispatch_on_thread_context([&] {
+      int dummy;
+      auto const nested_stack_frame = reinterpret_cast<intptr_t>(&dummy);
+
+      auto const diff = nested_stack_frame - stack_frame;
+      // check that the stack frame is close to the main one
+      CHECK(std::abs(diff) < 0x1000);
+
+      return 42;
+    });
+    CHECK(result == 42);
+    TC_RETURN();
+  });
+  CHECK_NOTHROW(f.get());
+}
+
+TEST_CASE("coroutine run on main thread with void return type")
+{
+  // This is just a compilation test
+  tc::dispatch_on_thread_context([] {});
+}
+
+namespace
+{
+struct move_only
+{
+  move_only() = default;
+  move_only(move_only&&) = default;
+  move_only& operator=(move_only&&) = default;
+  move_only(move_only const&) = delete;
+  move_only& operator=(move_only const&) = delete;
+  void operator()()
+  {
+  }
+};
+}
+
+TEST_CASE("coroutine run on main thread with a move-only lambda")
+{
+  // This is just a compilation test
+  tc::dispatch_on_thread_context(move_only{});
+}
+
 TEST_CASE("coroutine wait ready")
 {
   auto ready = make_ready_future();

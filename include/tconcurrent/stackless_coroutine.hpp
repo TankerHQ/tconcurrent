@@ -706,6 +706,12 @@ auto run_resumable(E&& executor, std::string name, F&& f, Args&&... args)
 }
 }
 
+template <typename F>
+auto dispatch_on_thread_context(F&& f)
+{
+  return f();
+}
+
 template <typename E, typename F>
 auto async_resumable(std::string const& name, E&& executor, F&& cb)
 {
