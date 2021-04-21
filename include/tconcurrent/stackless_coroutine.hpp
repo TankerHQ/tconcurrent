@@ -76,7 +76,7 @@ struct task_promise_base
     if (exc)
       std::rethrow_exception(std::move(exc));
   }
-  std::function<void()> cont;
+  fu2::function<void()> cont;
   std::exception_ptr exc;
   executor executor;
   std::string name;
