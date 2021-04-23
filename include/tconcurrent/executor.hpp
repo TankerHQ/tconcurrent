@@ -108,15 +108,6 @@ private:
 };
 
 class thread_pool;
-TCONCURRENT_EXPORT thread_pool& get_global_single_thread();
-TCONCURRENT_EXPORT thread_pool& get_global_thread_pool();
-/** Waits for all work to finish on global threads and stop them.
- *
- * Call this to avoid leaking resources. It is undefined behavior to use the
- * global threads after calling shutdown(). This includes having a future that
- * completes and executes a continuation on a global tconcurrent's thread.
- */
-TCONCURRENT_EXPORT void shutdown();
 TCONCURRENT_EXPORT executor get_default_executor();
 TCONCURRENT_EXPORT executor get_background_executor();
 
