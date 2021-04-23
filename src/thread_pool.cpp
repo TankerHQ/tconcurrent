@@ -58,7 +58,7 @@ thread_pool::thread_pool() : _p(new impl)
 thread_pool::~thread_pool()
 {
   _p->_dead = true;
-  stop();
+  stop(true);
 }
 
 bool thread_pool::is_in_this_context() const
@@ -114,9 +114,11 @@ void thread_pool::run_thread()
   --_p->_num_running_threads;
 }
 
-void thread_pool::stop()
+void thread_pool::stop(bool cancel_work)
 {
   _p->_work = nullptr;
+  if (cancel_work)
+    _p->_io.stop();
   for (auto& th : _p->_threads)
     th.join();
   _p->_threads.clear();
