@@ -76,7 +76,7 @@ struct task_promise_base
     if (exc)
       std::rethrow_exception(std::move(exc));
   }
-  std::function<void()> cont;
+  fu2::function<void()> cont;
   std::exception_ptr exc;
   executor executor;
   std::string name;
@@ -157,7 +157,7 @@ public:
   cotask(cotask const&) = delete;
   cotask& operator=(cotask const&) = delete;
 
-  cotask(cotask && o) : coro(o.coro), started(o.started)
+  cotask(cotask&& o) : coro(o.coro), started(o.started)
   {
     o.coro = nullptr;
   }
@@ -173,7 +173,7 @@ public:
     }
   }
 
-  auto operator co_await()&&
+  auto operator co_await() &&
   {
     return typename cotask<T>::awaitable{coro};
   }
@@ -223,13 +223,13 @@ private:
   }
 
   template <typename E>
-  void set_executor(E && executor)
+  void set_executor(E&& executor)
   {
     coro.promise().executor = std::forward<E>(executor);
   }
 
   template <typename F>
-  void set_continuation(F && cont)
+  void set_continuation(F&& cont)
   {
     coro.promise().cont = std::forward<F>(cont);
   }
@@ -704,6 +704,12 @@ auto run_resumable(E&& executor, std::string name, F&& f, Args&&... args)
   return detail::run_resumable_sender<std::decay_t<E>, decltype(awaitable)>{
       std::forward<E>(executor), std::move(name), std::move(awaitable)};
 }
+}
+
+template <typename F>
+auto dispatch_on_thread_context(F&& f)
+{
+  return f();
 }
 
 template <typename E, typename F>

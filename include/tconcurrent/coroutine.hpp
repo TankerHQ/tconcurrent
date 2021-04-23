@@ -35,6 +35,21 @@ auto async_resumable(std::string const& name, F&& cb)
 {
   return async_resumable(name, get_default_executor(), std::forward<F>(cb));
 }
+
+/** Run a callable on the thread context.
+ *
+ * When called from a stackful coroutine, this function will switch to the
+ * thread context and default stack, run the function, and switch back to the
+ * coroutine context. When called from a stackless coroutine, or from out of a
+ * coroutine, it will just call \p f.
+ *
+ * This function is not a suspension or cancelation point.
+ *
+ * \returns the value returned by \p f
+ * \throws the exception thrown by \p f
+ */
+template <typename F>
+auto dispatch_on_thread_context(F&& f);
 }
 
 #endif

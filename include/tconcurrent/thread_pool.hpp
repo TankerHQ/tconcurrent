@@ -28,11 +28,9 @@ void default_error_cb(std::exception_ptr const&);
 class TCONCURRENT_EXPORT thread_pool
 {
 public:
-  using error_handler_cb = std::function<void(std::exception_ptr const&)>;
-  using task_trace_handler_cb = std::function<void(
+  using error_handler_cb = fu2::function<void(std::exception_ptr const&)>;
+  using task_trace_handler_cb = fu2::function<void(
       std::string const& name, std::chrono::steady_clock::duration dur)>;
-
-  using canceler = std::function<void()>;
 
   thread_pool(thread_pool const&) = delete;
   thread_pool(thread_pool&&) = delete;

@@ -70,7 +70,7 @@ struct shared<R(Args...)> : shared_base<void_to_tvoid_t<R>>
   using base_type = shared_base<void_to_tvoid_t<R>>;
 
   std::atomic<bool> _done{false};
-  std::function<R(cancelation_token&, Args...)> _f;
+  fu2::unique_function<R(cancelation_token&, Args...)> _f;
   bool _cancelable;
 
   template <typename F>
