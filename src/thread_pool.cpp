@@ -1,3 +1,4 @@
+#include <atomic>
 #include <iostream>
 
 #include <boost/thread/tss.hpp>
@@ -17,6 +18,7 @@ struct thread_pool::impl
   boost::asio::io_context _io;
   std::unique_ptr<boost::asio::io_context::work> _work;
   std::vector<std::thread> _threads;
+  std::atomic<unsigned> _num_running_threads{0};
   std::atomic<bool> _dead{false};
 
   error_handler_cb _error_cb{detail::default_error_cb};
@@ -87,13 +89,14 @@ void thread_pool::start(unsigned int thread_count)
 void thread_pool::run_thread()
 {
   SET_THREAD_LOCAL(current_executor, this);
+  ++_p->_num_running_threads;
   while (true)
   {
     try
     {
       _p->_io.run();
       SET_THREAD_LOCAL(current_executor, nullptr);
-      return;
+      break;
     }
     catch (...)
     {
@@ -108,6 +111,7 @@ void thread_pool::run_thread()
       }
     }
   }
+  --_p->_num_running_threads;
 }
 
 void thread_pool::stop()
@@ -116,6 +120,22 @@ void thread_pool::stop()
   for (auto& th : _p->_threads)
     th.join();
   _p->_threads.clear();
+
+  // It is very important to at least terminate all threads we started because
+  // otherwise a dlclose() call may unmap the library making the lonely thread
+  // crash when woken up.
+  // However, on Windows, when tconcurrent is loaded as part of a shared
+  // library, when main() completes, or when exit() is called, all non-main
+  // thread will be immediately killed. This is a problem because our worker
+  // threads are most likely stuck in a critical section and killing them there
+  // will make the io_context destructor deadlock. This code will detect that
+  // threads were killed and not attempt to destroy the io_context.
+  // On Windows, if the library has a thread running, FreeLibrary() is a no-op,
+  // so we don't have the dlclose() issue described above.
+  if (_p->_num_running_threads.load())
+  {
+    (void)_p.release();
+  }
 }
 
 bool thread_pool::is_running() const
