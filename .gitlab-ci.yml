@@ -17,7 +17,7 @@ build/linux:
   extends: .build
   tags: [linux]
   script:
-    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile gcc8-release
+    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile linux-release
 
 build/macos:
   extends: .build
@@ -36,8 +36,8 @@ coverage:
   only:
     - schedules
   script:
-    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile gcc8 --coverage
-    - mv build/gcc8/x86_64/Release/coverage coverage
+    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile linux-debug --coverage
+    - mv build/linux-debug/x86_64/Release/coverage coverage
   tags:
     - linux
   artifacts:
