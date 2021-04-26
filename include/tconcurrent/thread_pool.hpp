@@ -41,7 +41,7 @@ public:
   ~thread_pool();
 
   void start(unsigned int thread_count);
-  void stop();
+  void stop(bool cancel_work = false);
 
   bool is_running() const;
 
