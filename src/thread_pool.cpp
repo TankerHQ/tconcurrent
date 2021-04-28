@@ -1,5 +1,6 @@
 #include <atomic>
 #include <iostream>
+#include <optional>
 
 #include <boost/thread/tss.hpp>
 
@@ -15,8 +16,11 @@ namespace tconcurrent
 
 struct thread_pool::impl
 {
+  using executor_type = boost::asio::io_context::executor_type;
+  using work_guard = boost::asio::executor_work_guard<executor_type>;
+
   boost::asio::io_context _io;
-  std::unique_ptr<boost::asio::io_context::work> _work;
+  std::optional<work_guard> _work;
   std::vector<std::thread> _threads;
   std::atomic<unsigned> _num_running_threads{0};
   std::atomic<bool> _dead{false};
@@ -81,7 +85,7 @@ void thread_pool::start(unsigned int thread_count)
   if (_p->_work)
     throw std::runtime_error("the threadpool is already running");
 
-  _p->_work = std::make_unique<boost::asio::io_context::work>(_p->_io);
+  _p->_work.emplace(boost::asio::make_work_guard(_p->_io.get_executor()));
   for (unsigned int i = 0; i < thread_count; ++i)
     _p->_threads.emplace_back([this] { run_thread(); });
 }
@@ -116,7 +120,7 @@ void thread_pool::run_thread()
 
 void thread_pool::stop(bool cancel_work)
 {
-  _p->_work = nullptr;
+  _p->_work = std::nullopt;
   if (cancel_work)
     _p->_io.stop();
   for (auto& th : _p->_threads)
@@ -142,7 +146,7 @@ void thread_pool::stop(bool cancel_work)
 
 bool thread_pool::is_running() const
 {
-  return _p->_work != nullptr;
+  return _p->_work != std::nullopt;
 }
 
 void thread_pool::set_error_handler(error_handler_cb cb)
