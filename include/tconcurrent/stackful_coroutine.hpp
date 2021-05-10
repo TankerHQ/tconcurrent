@@ -94,7 +94,7 @@ stack_bounds get_stack_bounds(coroutine_control* ctrl);
 
 #endif
 
-void assert_not_in_catch();
+void assert_not_in_catch(char const* reason);
 
 /// Thrown inside a coroutine to stop it
 struct abort_coroutine
@@ -378,7 +378,7 @@ auto coroutine_control::await(
     detail::void_t<
         typename std::decay_t<Sender>::template value_types<std::tuple>>**)
 {
-  assert_not_in_catch();
+  assert_not_in_catch("awaiting a sender");
 
   using return_type = lazy::detail::extract_single_value_type_t<Sender>;
   using state_type = typename await_receiver<return_type>::state_type;
@@ -388,7 +388,7 @@ auto coroutine_control::await(
 
   auto canceler = token->make_scope_canceler(
       [this, &state, aborted = receiver._aborted]() mutable {
-        assert_not_in_catch();
+        assert_not_in_catch("canceling a coroutine awaiting on a sender");
         assert(this->executor_.is_in_this_context());
 
         state.cancelation_token.request_cancel();
@@ -427,7 +427,7 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
     bool early_return,
     detail::void_t<typename std::decay_t<Awaitable>::value_type>**)
 {
-  assert_not_in_catch();
+  assert_not_in_catch("awaiting a future");
 
   using FutureType = std::decay_t<Awaitable>;
 
@@ -444,7 +444,7 @@ typename std::decay_t<Awaitable>::value_type coroutine_control::await(
 
     auto canceler =
         token->make_scope_canceler([this, aborted, &progressing_awaitable] {
-          assert_not_in_catch();
+          assert_not_in_catch("canceling a coroutine awaiting a future");
           assert(this->executor_.is_in_this_context());
 
           progressing_awaitable.request_cancel();

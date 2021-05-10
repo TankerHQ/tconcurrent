@@ -77,14 +77,35 @@ stack_bounds get_stack_bounds(coroutine_control* ctrl)
 #endif
 #endif
 
-void assert_not_in_catch()
+void assert_not_in_catch(char const* reason)
 {
   if (std::uncaught_exceptions() || std::current_exception())
   {
-    std::cerr << "Fatal error: it is not possible to switch coroutine (with "
-                 "TC_AWAIT, or canceling a coroutine) while the stack is being "
-                 "unwound (i.e. in a destructor) or in a catch clause."
-              << std::endl;
+    std::cerr << "Fatal error: it is not possible to switch coroutine while "
+                 "the stack is being unwound (i.e. in a destructor) or in a "
+                 "catch clause. We tried to switch stack because: "
+              << reason << std::endl;
+
+    auto const exc = std::current_exception();
+
+    try
+    {
+      std::rethrow_exception(exc);
+    }
+    catch (std::exception const& e)
+    {
+      std::cerr << "Exception: " << typeid(e).name() << ": " << e.what()
+                << std::endl;
+    }
+    catch (detail::abort_coroutine const& e)
+    {
+      std::cerr << "Exception: tconcurrent coroutine abortion" << std::endl;
+    }
+    catch (...)
+    {
+      std::cerr << "Exception: unknown" << std::endl;
+    }
+
     std::terminate();
   }
 }
