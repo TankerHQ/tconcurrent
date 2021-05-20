@@ -9,6 +9,30 @@
 
 namespace tconcurrent
 {
+namespace lazy
+{
+/** Return a sender that will run the resumable function.
+ *
+ * \p cb must be stateless! All state must be passed through \p args
+ *
+ * Note that the function will first run synchronously when the sender is
+ * invoked. The executor is only used when resuming the coroutine execution.
+ *
+ * \param executor the executor on which the task will resume
+ * \param name the name of the task, for debugging purposes.
+ * \param cb the callback to run. Its signature should be:
+ *
+ *     cotask<T> func();
+ *
+ * \param args the arguments to pass to \p cb
+ *
+ * \return a sender that will run the callback and call the receiver with the
+ * result
+ */
+template <typename E, typename F, typename... Args>
+auto run_resumable(E&& executor, std::string name, F&& cb, Args&&... args);
+}
+
 /** Schedule a resumable function
  *
  * \param name (optional) the name of the task, for debugging purposes.
