@@ -40,8 +40,6 @@ template <typename E, typename F>
 struct run_resumable_sender;
 }
 }
-template <typename E, typename F>
-auto async_resumable(std::string const& name, E&& executor, F&& cb);
 template <typename F>
 auto dispatch_on_thread_context(F&& f);
 
@@ -179,10 +177,6 @@ private:
   template <typename F>
   auto dispatch_on_thread_context(F&& work);
 
-  template <typename E, typename F>
-  friend auto ::tconcurrent::async_resumable(std::string const& name,
-                                             E&& executor,
-                                             F&& cb);
   template <typename F>
   friend auto ::tconcurrent::dispatch_on_thread_context(F&& f);
 

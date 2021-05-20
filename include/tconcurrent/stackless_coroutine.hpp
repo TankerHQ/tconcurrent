@@ -14,9 +14,6 @@
 
 namespace tconcurrent
 {
-template <typename E, typename F>
-auto async_resumable(std::string const& name, E&& executor, F&& cb);
-
 template <typename T>
 class cotask;
 
@@ -257,8 +254,6 @@ private:
     return coro.promise().result();
   }
 
-  template <typename E, typename F>
-  friend auto async_resumable(std::string const& name, E&& executor, F&& cb);
   friend detail::task_promise<T>;
 };
 
