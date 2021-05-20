@@ -761,6 +761,15 @@ struct yielder
   {
   }
 };
+
+template <typename T>
+struct task_return_type;
+
+template <typename T>
+struct task_return_type<cotask<T>>
+{
+  using type = T;
+};
 }
 }
 
