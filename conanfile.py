@@ -8,14 +8,14 @@ class TconcurrentConan(ConanFile):
     options = {
         "shared": [True, False],
         "fPIC": [True, False],
-        "coroutinests": [True, False],
+        "with_coroutines_ts": [True, False],
         "coverage": [True, False],
         "with_sanitizer_support": [True, False],
     }
     default_options = (
         "shared=False",
         "fPIC=True",
-        "coroutinests=False",
+        "with_coroutines_ts=False",
         "coverage=False",
         "with_sanitizer_support=False",
     )
@@ -39,7 +39,7 @@ class TconcurrentConan(ConanFile):
             self.build_requires("doctest/2.3.8")
 
     def configure(self):
-        if self.options.coroutinests and self.settings.compiler != "clang":
+        if self.options.with_coroutines_ts and self.settings.compiler != "clang":
             raise Exception("Coroutines TS is only supported by clang at the moment")
 
     def imports(self):
@@ -51,7 +51,7 @@ class TconcurrentConan(ConanFile):
     def build(self):
         cmake = CMake(self)
         cmake.definitions["TCONCURRENT_SANITIZER"] = self.options.with_sanitizer_support
-        cmake.definitions["TCONCURRENT_COROUTINES_TS"] = self.options.coroutinests
+        cmake.definitions["TCONCURRENT_COROUTINES_TS"] = self.options.with_coroutines_ts
         cmake.definitions["BUILD_SHARED_LIBS"] = self.options.shared
         cmake.definitions["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.fPIC
         cmake.definitions["BUILD_TESTING"] = self.should_build_tests
@@ -64,9 +64,8 @@ class TconcurrentConan(ConanFile):
         self.cpp_info.libs = ["tconcurrent"]
         if self.options.with_sanitizer_support:
             self.cpp_info.defines.append("TCONCURRENT_SANITIZER=1")
-        if self.options.coroutinests:
+        if self.options.with_coroutines_ts:
             self.cpp_info.defines.append("TCONCURRENT_COROUTINES_TS=1")
-            self.cpp_info.cppflags.append("-fcoroutines-ts")
 
     def package_id(self):
-        del self.info.options.coroutinests
+        del self.info.options.with_coroutines_ts
