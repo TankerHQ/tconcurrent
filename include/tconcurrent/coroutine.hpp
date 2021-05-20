@@ -31,6 +31,29 @@ namespace lazy
  */
 template <typename E, typename F, typename... Args>
 auto run_resumable(E&& executor, std::string name, F&& cb, Args&&... args);
+
+/** Return a sender that will run the resumable function on the provided
+ * executor.
+ *
+ * This functions differs with run_resumable in two points:
+ *
+ * - When the sender is invoked, the function will run on the provided executor
+ * - The function is allowed to capture state
+ */
+template <typename E, typename F>
+auto async_resumable(E&& executor, std::string const& name, F&& cb);
+
+/** Return a sender that will run the resumable function on the default
+ * executor.
+ *
+ * This is a convinience function that calls async_resumable with the default
+ * executor.
+ */
+template <typename F>
+auto async_resumable(F&& cb)
+{
+  return async_resumable(tc::get_default_executor(), {}, std::forward<F>(cb));
+}
 }
 
 /** Schedule a resumable function
@@ -44,7 +67,14 @@ auto run_resumable(E&& executor, std::string name, F&& cb, Args&&... args);
  * \return a future<T> corresponding to the result of the callback
  */
 template <typename E, typename F>
-auto async_resumable(std::string const& name, E&& executor, F&& cb);
+auto async_resumable(std::string const& name, E&& executor, F&& cb)
+{
+  using return_task_type = std::decay_t<decltype(cb())>;
+  using return_type = typename detail::task_return_type<return_task_type>::type;
+
+  return submit_to_future<return_type>(lazy::async_resumable(
+      std::forward<E>(executor), name, std::forward<F>(cb)));
+}
 
 /// See auto async_resumable(std::string const& name, E&& executor, F&& cb)
 template <typename F>
