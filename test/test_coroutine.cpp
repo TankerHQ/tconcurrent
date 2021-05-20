@@ -448,6 +448,17 @@ TEST_CASE("coroutine void by lazy run_resumable")
   CHECK_NOTHROW(lazy::sync_wait(std::move(sender), c));
 }
 
+TEST_CASE("coroutine by lazy async_resumable")
+{
+  auto sender =
+      lazy::async_resumable([i = 42]() -> cotask<int> { TC_RETURN(i); });
+  static_assert(std::is_same_v<decltype(sender)::value_types<std::tuple>,
+                               std::tuple<int>>,
+                "run_resumable must deduce the correct type from the lambda");
+  lazy::cancelation_token c;
+  CHECK(42 == lazy::sync_wait(std::move(sender), c));
+}
+
 TEST_CASE("coroutine await lazy sender")
 {
   auto sender =

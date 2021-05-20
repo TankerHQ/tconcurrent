@@ -40,8 +40,6 @@ template <typename E, typename F>
 struct run_resumable_sender;
 }
 }
-template <typename E, typename F>
-auto async_resumable(std::string const& name, E&& executor, F&& cb);
 template <typename F>
 auto dispatch_on_thread_context(F&& f);
 
@@ -179,10 +177,6 @@ private:
   template <typename F>
   auto dispatch_on_thread_context(F&& work);
 
-  template <typename E, typename F>
-  friend auto ::tconcurrent::async_resumable(std::string const& name,
-                                             E&& executor,
-                                             F&& cb);
   template <typename F>
   friend auto ::tconcurrent::dispatch_on_thread_context(F&& f);
 
@@ -704,6 +698,16 @@ auto run_resumable(E&& executor, std::string name, F&& cb, Args&&... args)
   return detail::run_resumable_sender<std::decay_t<E>, decltype(wrap)>{
       std::forward<E>(executor), std::move(wrap), std::move(name)};
 }
+
+template <typename E, typename F>
+auto async_resumable(E&& executor, std::string const& name, F&& cb)
+{
+  auto fullName = name + " (" + typeid(F).name() + ")";
+
+  return lazy::connect(
+      lazy::async(executor, fullName),
+      lazy::run_resumable(executor, std::move(fullName), std::forward<F>(cb)));
+}
 }
 
 template <typename T>
@@ -743,20 +747,6 @@ auto dispatch_on_thread_context(F&& f)
   {
     return f();
   }
-}
-
-template <typename E, typename F>
-auto async_resumable(std::string const& name, E&& executor, F&& cb)
-{
-  using return_task_type = std::decay_t<decltype(cb())>;
-  using return_type = typename detail::task_return_type<return_task_type>::type;
-
-  auto const fullName = name + " (" + typeid(F).name() + ")";
-
-  auto task = lazy::connect(
-      lazy::async(executor, fullName),
-      lazy::run_resumable(executor, fullName, std::forward<F>(cb)));
-  return submit_to_future<return_type>(std::move(task));
 }
 
 namespace detail

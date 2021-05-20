@@ -14,9 +14,6 @@
 
 namespace tconcurrent
 {
-template <typename E, typename F>
-auto async_resumable(std::string const& name, E&& executor, F&& cb);
-
 template <typename T>
 class cotask;
 
@@ -257,8 +254,6 @@ private:
     return coro.promise().result();
   }
 
-  template <typename E, typename F>
-  friend auto async_resumable(std::string const& name, E&& executor, F&& cb);
   friend detail::task_promise<T>;
 };
 
@@ -704,31 +699,30 @@ auto run_resumable(E&& executor, std::string name, F&& f, Args&&... args)
   return detail::run_resumable_sender<std::decay_t<E>, decltype(awaitable)>{
       std::forward<E>(executor), std::move(name), std::move(awaitable)};
 }
+
+template <typename E, typename F>
+auto async_resumable(E&& executor, std::string const& name, F&& cb)
+{
+  using return_task_type = std::decay_t<decltype(cb())>;
+  using return_type = typename return_task_type::value_type;
+
+  auto fullName = name + " (" + typeid(F).name() + ")";
+
+  return lazy::connect(lazy::async(executor, fullName),
+                       lazy::run_resumable(
+                           executor,
+                           std::move(fullName),
+                           [](std::decay_t<F> cb) -> cotask<return_type> {
+                             co_return co_await cb();
+                           },
+                           std::forward<F>(cb)));
+}
 }
 
 template <typename F>
 auto dispatch_on_thread_context(F&& f)
 {
   return f();
-}
-
-template <typename E, typename F>
-auto async_resumable(std::string const& name, E&& executor, F&& cb)
-{
-  using return_task_type = std::decay_t<decltype(cb())>;
-  using return_type = typename return_task_type::value_type;
-
-  auto const fullName = name + " (" + typeid(F).name() + ")";
-
-  auto task = lazy::connect(lazy::async(executor, fullName),
-                            lazy::run_resumable(
-                                executor,
-                                fullName,
-                                [](std::decay_t<F> cb) -> cotask<return_type> {
-                                  co_return co_await cb();
-                                },
-                                std::forward<F>(cb)));
-  return submit_to_future<return_type>(std::move(task));
 }
 
 namespace detail
@@ -765,6 +759,15 @@ struct yielder
   void await_resume() noexcept
   {
   }
+};
+
+template <typename T>
+struct task_return_type;
+
+template <typename T>
+struct task_return_type<cotask<T>>
+{
+  using type = T;
 };
 }
 }
