@@ -1,5 +1,4 @@
 import argparse
-import os
 from pathlib import Path
 import sys
 
@@ -23,8 +22,6 @@ def main() -> None:
     build_and_test_parser = subparsers.add_parser("build-and-test")
     build_and_test_parser.add_argument("--profile", required=True)
     build_and_test_parser.add_argument("--coverage", action="store_true")
-
-    subparsers.add_parser("mirror")
 
     args = parser.parse_args()
     if args.home_isolation:
@@ -51,8 +48,6 @@ def main() -> None:
             ctest_flags.append("--test-case-exclude=*[waiting]*")
         built_path = tankerci.cpp.build(args.profile, coverage=args.coverage)
         tankerci.cpp.check(built_path, coverage=args.coverage, ctest_flags=ctest_flags)
-    elif args.command == "mirror":
-        tankerci.git.mirror(github_url="git@github.com:TankerHQ/tconcurrent")
     else:
         parser.print_help()
         sys.exit(1)
