@@ -15,7 +15,9 @@ stages:
 
 build/linux:
   extends: .build
-  tags: [linux]
+  tags:
+    - linux
+    - tanker
   script:
     - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile linux-release
 
@@ -40,6 +42,7 @@ coverage:
     - mv build/linux-debug/x86_64/Release/coverage coverage
   tags:
     - linux
+    - tanker
   artifacts:
     paths:
       - coverage/
