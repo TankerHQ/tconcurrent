@@ -27,6 +27,7 @@ public:
   template <typename... V>
   void set_value(V...)
   {
+    _cancelation_token->reset();
   }
   template <typename E>
   void set_error(E&& e)
@@ -35,6 +36,7 @@ public:
   }
   void set_done()
   {
+    _cancelation_token->reset();
   }
 
 private:
