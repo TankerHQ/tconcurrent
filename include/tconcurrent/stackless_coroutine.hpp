@@ -699,7 +699,7 @@ struct run_resumable_sender
 template <typename E, typename F, typename... Args>
 auto run_resumable(E&& executor, std::string name, F&& f, Args&&... args)
 {
-  auto awaitable = std::forward<F>(f)(std::forward<Args>(args)...);
+  auto awaitable = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
 
   return detail::run_resumable_sender<std::decay_t<E>, decltype(awaitable)>{
       std::forward<E>(executor), std::move(name), std::move(awaitable)};
