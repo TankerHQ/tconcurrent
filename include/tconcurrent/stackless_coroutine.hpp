@@ -32,7 +32,8 @@ struct task_promise_base
     }
 
     template <typename P>
-    void await_suspend(std::experimental::coroutine_handle<P> coroutine)
+    void await_suspend(
+        std::experimental::coroutine_handle<P> coroutine) noexcept
     {
       task_promise_base& promise = coroutine.promise();
       if (!promise.cont)
@@ -58,7 +59,7 @@ struct task_promise_base
     // suspend always so that we don't start the task until it's awaited
     return std::experimental::suspend_always{};
   }
-  auto final_suspend()
+  auto final_suspend() noexcept
   {
     // suspend always so that we can get the result of the coroutine when it is
     // done
@@ -544,7 +545,7 @@ struct sink_promise
   {
     return std::experimental::suspend_always{};
   }
-  auto final_suspend()
+  auto final_suspend() noexcept
   {
     return std::experimental::suspend_never{};
   }
