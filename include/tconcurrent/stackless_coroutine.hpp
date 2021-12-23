@@ -349,6 +349,7 @@ struct receiver_base
   template <typename E>
   void set_error(E&& e)
   {
+    this->cancelation_token->reset();
     if (cancelation_token->is_cancel_requested())
       return;
     awaiter.err = std::forward<E>(e);
@@ -357,6 +358,7 @@ struct receiver_base
 
   void set_done()
   {
+    this->cancelation_token->reset();
     if (cancelation_token->is_cancel_requested())
       return;
     awaiter.resume();
@@ -421,6 +423,7 @@ struct sender_awaiter : sender_awaiter_base<Sender>
     template <typename U>
     void set_value(U&& u)
     {
+      this->cancelation_token->reset();
       if (this->cancelation_token->is_cancel_requested())
         return;
       this->awaiter.value = std::forward<U>(u);
@@ -462,6 +465,7 @@ struct sender_awaiter<Sender, void> : sender_awaiter_base<Sender>
   {
     void set_value()
     {
+      this->cancelation_token->reset();
       if (this->cancelation_token->is_cancel_requested())
         return;
       this->awaiter.has_value = true;
