@@ -10,7 +10,6 @@
 #include <tconcurrent/detail/tvoid.hpp>
 #include <tconcurrent/lazy/async.hpp>
 #include <tconcurrent/lazy/detail.hpp>
-#include <tconcurrent/lazy/sink_receiver.hpp>
 #include <tconcurrent/lazy/then.hpp>
 #include <tconcurrent/packaged_task.hpp>
 

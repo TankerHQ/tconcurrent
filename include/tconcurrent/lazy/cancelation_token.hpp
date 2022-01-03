@@ -42,8 +42,12 @@ public:
     if (_canceled)
       return;
     _canceled = true;
-    if (_cancel)
-      _cancel();
+    // We must not call _cancel directly because it can call this object's
+    // destructor. Instead, make a copy to keep the function alive the time of
+    // the call.
+    auto canceler = _cancel;
+    if (canceler)
+      canceler();
   }
   bool is_cancel_requested() const
   {

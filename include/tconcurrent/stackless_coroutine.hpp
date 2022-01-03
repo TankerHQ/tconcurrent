@@ -32,7 +32,8 @@ struct task_promise_base
     }
 
     template <typename P>
-    void await_suspend(std::experimental::coroutine_handle<P> coroutine)
+    void await_suspend(
+        std::experimental::coroutine_handle<P> coroutine) noexcept
     {
       task_promise_base& promise = coroutine.promise();
       if (!promise.cont)
@@ -58,7 +59,7 @@ struct task_promise_base
     // suspend always so that we don't start the task until it's awaited
     return std::experimental::suspend_always{};
   }
-  auto final_suspend()
+  auto final_suspend() noexcept
   {
     // suspend always so that we can get the result of the coroutine when it is
     // done
@@ -348,6 +349,7 @@ struct receiver_base
   template <typename E>
   void set_error(E&& e)
   {
+    this->cancelation_token->reset();
     if (cancelation_token->is_cancel_requested())
       return;
     awaiter.err = std::forward<E>(e);
@@ -356,6 +358,7 @@ struct receiver_base
 
   void set_done()
   {
+    this->cancelation_token->reset();
     if (cancelation_token->is_cancel_requested())
       return;
     awaiter.resume();
@@ -420,6 +423,7 @@ struct sender_awaiter : sender_awaiter_base<Sender>
     template <typename U>
     void set_value(U&& u)
     {
+      this->cancelation_token->reset();
       if (this->cancelation_token->is_cancel_requested())
         return;
       this->awaiter.value = std::forward<U>(u);
@@ -461,6 +465,7 @@ struct sender_awaiter<Sender, void> : sender_awaiter_base<Sender>
   {
     void set_value()
     {
+      this->cancelation_token->reset();
       if (this->cancelation_token->is_cancel_requested())
         return;
       this->awaiter.has_value = true;
@@ -544,7 +549,7 @@ struct sink_promise
   {
     return std::experimental::suspend_always{};
   }
-  auto final_suspend()
+  auto final_suspend() noexcept
   {
     return std::experimental::suspend_never{};
   }
@@ -694,7 +699,7 @@ struct run_resumable_sender
 template <typename E, typename F, typename... Args>
 auto run_resumable(E&& executor, std::string name, F&& f, Args&&... args)
 {
-  auto awaitable = std::forward<F>(f)(std::forward<Args>(args)...);
+  auto awaitable = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
 
   return detail::run_resumable_sender<std::decay_t<E>, decltype(awaitable)>{
       std::forward<E>(executor), std::move(name), std::move(awaitable)};

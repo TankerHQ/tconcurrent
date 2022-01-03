@@ -36,7 +36,7 @@ class TconcurrentConan(ConanFile):
 
     def build_requirements(self):
         if self.should_build_tests:
-            self.build_requires("doctest/2.3.8")
+            self.build_requires("doctest/2.4.6")
 
     def configure(self):
         if self.options.with_coroutines_ts and self.settings.compiler != "clang":
