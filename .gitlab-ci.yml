@@ -21,11 +21,17 @@ build/linux:
   script:
     - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile linux-release
 
-build/macos:
+build/macos/arm:
   extends: .build
-  tags: [macos]
+  tags: [macos, arm]
   script:
-    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile macos-release
+    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile macos-armv8-release
+
+build/macos/x86_64:
+  extends: .build
+  tags: [macos, x86_64]
+  script:
+    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile macos-x86_64-release
 
 build/windows:
   extends: .build
