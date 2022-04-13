@@ -134,10 +134,10 @@ It is not legal to call `TC_AWAIT` in a `catch` clause. This will not compile
 with the coroutines-TS on compliant compilers. In stackful mode, such a code
 will trigger an assertion failure.
 
-It is also not legal to call `TC_AWAIT` in a destructor since a destructor
+Due to a limitation in Boost Context, canceling a coroutine from a `catch`
+clause is also impossible and will trigger an assertion failure. Note that this
+works fine with the stackless coroutines.
+
+It is not legal either to call `TC_AWAIT` in a destructor since a destructor
 cannot return a `cotask`. In stackless mode, it will not compile. In stackful
 mode, it may trigger undefined behavior.
-
-Due to a limitation in Boost Context, canceling a coroutine from a `catch`
-clause is impossible and will trigger an assertion failure. Note that this works
-fine with the stackless coroutines.
