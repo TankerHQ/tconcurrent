@@ -30,7 +30,7 @@ class TconcurrentConan(ConanFile):
         return develop and (not cross_building) and (not emscripten)
 
     def requirements(self):
-        self.requires("boost/1.77.0-r1")
+        self.requires("boost/1.78.0-r3")
         self.requires("enum-flags/0.1a")
         self.requires("function2/4.1.0")
 
