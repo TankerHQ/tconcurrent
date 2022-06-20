@@ -4,8 +4,8 @@ import sys
 
 
 import tankerci
-import tankerci.cpp
 import tankerci.conan
+import tankerci.cpp
 import tankerci.git
 
 
