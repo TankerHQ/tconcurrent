@@ -64,7 +64,10 @@ def main() -> None:
                     coverage=args.coverage,
                     make_package=True,
                     )
-            tankerci.cpp.check(built_path, coverage=args.coverage, ctest_flags=ctest_flags)
+
+            # Definitely not supported with Visual Studio, because it tries to use Ninja
+            if sys.platform != "win32":
+                tankerci.cpp.check(built_path, coverage=args.coverage, ctest_flags=ctest_flags)
     else:
         parser.print_help()
         sys.exit(1)
