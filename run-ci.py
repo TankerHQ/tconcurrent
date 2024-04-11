@@ -37,8 +37,6 @@ def main() -> None:
     if args.home_isolation:
         user_home = Path.cwd() / ".cache" / "conan" / args.remote
 
-    tankerci.conan.update_config()
-
     if args.command == "build-and-test":
         src_path = Path.cwd()
         build_path = "."  # tankerci.cpp.Builder runs ctest from the build directory

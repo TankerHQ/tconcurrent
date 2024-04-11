@@ -1,8 +1,6 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.10)
 
 project(tconcurrent)
-include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-conan_basic_setup(TARGETS)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -36,6 +34,9 @@ if(${WITH_COVERAGE})
   endif()
 endif()
 
+find_package(Boost CONFIG REQUIRED)
+find_package(enum-flags CONFIG REQUIRED)
+find_package(function2 CONFIG REQUIRED)
 
 set(tconcurrent_SRC
   include/tconcurrent/async.hpp
@@ -69,9 +70,9 @@ set(tconcurrent_SRC
 )
 
 set(tconcurrent_LIBS
-  CONAN_PKG::boost
-  CONAN_PKG::enum-flags
-  CONAN_PKG::function2
+  Boost
+  enum-flags::enum-flags
+  function2::function2
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")

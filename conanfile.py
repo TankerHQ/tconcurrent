@@ -1,4 +1,6 @@
-from conans import tools, CMake, ConanFile
+from conans import tools, ConanFile
+from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps
+from conan.tools.env import VirtualBuildEnv
 
 
 class TconcurrentConan(ConanFile):
@@ -20,7 +22,7 @@ class TconcurrentConan(ConanFile):
         "with_sanitizer_support=False",
     )
     exports_sources = "CMakeLists.txt", "src/*", "include/*", "test/*"
-    generators = "cmake"
+    generators = "CMakeDeps", "VirtualBuildEnv"
 
     @property
     def should_build_tests(self):
@@ -36,7 +38,7 @@ class TconcurrentConan(ConanFile):
 
     def build_requirements(self):
         if self.should_build_tests:
-            self.build_requires("doctest/2.4.6-r1")
+            self.test_requires("doctest/2.4.6-r1")
 
     def configure(self):
         if self.options.with_coroutines_ts and self.settings.compiler != "clang":
@@ -48,17 +50,28 @@ class TconcurrentConan(ConanFile):
         self.copy("*.dylib", dst="bin", src="lib")
         self.copy("*.so*", dst="bin", src="lib")
 
+    def generate(self):
+        vbe = VirtualBuildEnv(self)
+        vbe.generate()
+
+        ct = CMakeToolchain(self)
+        ct.variables["TCONCURRENT_SANITIZER"] = self.options.with_sanitizer_support
+        ct.variables["TCONCURRENT_COROUTINES_TS"] = self.options.with_coroutines_ts
+        ct.variables["BUILD_SHARED_LIBS"] = self.options.shared
+        ct.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.fPIC
+        ct.variables["BUILD_TESTING"] = self.should_build_tests
+        ct.variables["WITH_COVERAGE"] = self.options.coverage
+        ct.generate()
+
+        cd = CMakeDeps(self)
+        cd.generate()
+
     def build(self):
         cmake = CMake(self)
-        cmake.definitions["TCONCURRENT_SANITIZER"] = self.options.with_sanitizer_support
-        cmake.definitions["TCONCURRENT_COROUTINES_TS"] = self.options.with_coroutines_ts
-        cmake.definitions["BUILD_SHARED_LIBS"] = self.options.shared
-        cmake.definitions["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.fPIC
-        cmake.definitions["BUILD_TESTING"] = self.should_build_tests
-        cmake.definitions["WITH_COVERAGE"] = self.options.coverage
         cmake.configure()
         cmake.build()
-        cmake.install()
+        if self.should_install and self.develop:
+            cmake.install()
 
     def package_info(self):
         self.cpp_info.libs = ["tconcurrent"]
