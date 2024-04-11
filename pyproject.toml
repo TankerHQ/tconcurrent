@@ -3,11 +3,12 @@ name = "tconcurrent"
 version = "0.0.0"
 description = "C++ async framework"
 authors = ["Tanker team <tech@tanker.io>"]
+package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.12"
 
-tankerci = { version = ">= 2022.6.4317", source = "gitlab" }
+tankerci = { version = "== 2024.4.5172", source = "gitlab" }
 
 [[tool.poetry.source]]
 name = "gitlab"
