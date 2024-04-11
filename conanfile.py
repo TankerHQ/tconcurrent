@@ -30,13 +30,13 @@ class TconcurrentConan(ConanFile):
         return develop and (not cross_building) and (not emscripten)
 
     def requirements(self):
-        self.requires("boost/1.78.0-r3")
-        self.requires("enum-flags/0.1a")
-        self.requires("function2/4.1.0")
+        self.requires("boost/1.83.0-r2")
+        self.requires("enum-flags/0.1a-r3")
+        self.requires("function2/4.1.0-r2")
 
     def build_requirements(self):
         if self.should_build_tests:
-            self.build_requires("doctest/2.4.6")
+            self.build_requires("doctest/2.4.6-r1")
 
     def configure(self):
         if self.options.with_coroutines_ts and self.settings.compiler != "clang":
