@@ -1,3 +1,16 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+      variables:
+        CONAN_REMOTE: "artifactory"
+    - if: $CI_COMMIT_REF_NAME =~ /\Arelease\/.+\z/
+      variables:
+        CONAN_REMOTE: "artifactory"
+    - when: always
+      variables:
+        CONAN_REMOTE: "artifactory-staging"
+
+
 image: registry.gitlab.com/tankerhq/docker/native:latest
 
 before_script:
@@ -19,32 +32,32 @@ build/linux:
     - linux
     - compilation
   script:
-    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile linux-release
+    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --remote $CONAN_REMOTE --profile linux-x86_64
 
 build/macos/arm:
   extends: .build
   tags: [macos, arm]
   script:
-    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile macos-armv8-release
+    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --remote $CONAN_REMOTE --profile macos-armv8
 
 build/macos/x86_64:
   extends: .build
   tags: [macos, x86_64]
   script:
-    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile macos-x86_64-release
+    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --remote $CONAN_REMOTE --profile macos-x86_64
 
 build/windows:
   extends: .build
   tags: [windows]
   script:
-    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile vs2019-release
+    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --remote $CONAN_REMOTE --profile windows-x86_64
 
 coverage:
   stage: build
   only:
     - schedules
   script:
-    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --profile linux-debug --coverage
+    - poetry run python run-ci.py --isolate-conan-user-home build-and-test --coverage --remote $CONAN_REMOTE --profile linux-x86_64 debug
     - mv build/linux-debug/x86_64/Release/coverage coverage
   tags:
     - linux
