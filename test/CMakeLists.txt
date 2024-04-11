@@ -1,7 +1,9 @@
+find_package(doctest CONFIG REQUIRED)
+
 add_library(tconcurrent_doctest_main STATIC
   main.cpp
 )
-target_link_libraries(tconcurrent_doctest_main PUBLIC CONAN_PKG::doctest)
+target_link_libraries(tconcurrent_doctest_main PUBLIC doctest::doctest)
 if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   target_compile_definitions(tconcurrent_doctest_main PUBLIC DOCTEST_CONFIG_NO_POSIX_SIGNALS)
 endif()
