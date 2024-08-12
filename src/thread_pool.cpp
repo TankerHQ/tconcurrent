@@ -151,7 +151,8 @@ void thread_pool::stop(bool cancel_work)
 void thread_pool::stop_before_fork()
 {
   assert(!_p->_num_threads_before_fork);
-  _p->_num_threads_before_fork.store(_p->_num_running_threads);
+  // NOTE: We shouldn't use _num_running_threads as it has a delay
+  _p->_num_threads_before_fork.store(_p->_threads.size());
 
   // Note that this can't _p.release(), that only happens on Windows during
   // process exit, so _p will still be valid in resume_after_fork
