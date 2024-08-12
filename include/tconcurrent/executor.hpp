@@ -51,6 +51,16 @@ public:
     return _p->signal_error(e);
   }
 
+  void stop_before_fork()
+  {
+    return _p->stop_before_fork();
+  }
+
+  void resume_after_fork()
+  {
+    return _p->resume_after_fork();
+  }
+
   explicit operator bool() const
   {
     return !!_p;
@@ -65,6 +75,8 @@ private:
     virtual bool is_single_threaded() const = 0;
     virtual bool is_in_this_context() const = 0;
     virtual void signal_error(std::exception_ptr const& e) = 0;
+    virtual void stop_before_fork() = 0;
+    virtual void resume_after_fork() = 0;
   };
 
   template <typename T>
@@ -98,6 +110,16 @@ private:
     void signal_error(std::exception_ptr const& e) override
     {
       return _context.signal_error(e);
+    }
+
+    void stop_before_fork() override
+    {
+      return _context.stop_before_fork();
+    }
+
+    void resume_after_fork() override
+    {
+      return _context.resume_after_fork();
     }
 
   private:

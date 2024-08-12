@@ -25,6 +25,10 @@ struct thread_pool::impl
   std::atomic<unsigned> _num_running_threads{0};
   std::atomic<bool> _dead{false};
 
+  // We need to be fork-safe, which means stopping all our threads before
+  // a fork and restoring them after, so that they restart from a clean state
+  std::atomic<unsigned> _num_threads_before_fork{0};
+
   error_handler_cb _error_cb{detail::default_error_cb};
   task_trace_handler_cb _task_trace_handler;
 };
@@ -142,6 +146,29 @@ void thread_pool::stop(bool cancel_work)
   {
     (void)_p.release();
   }
+}
+
+void thread_pool::stop_before_fork()
+{
+  assert(!_p->_num_threads_before_fork);
+  _p->_num_threads_before_fork.store(_p->_num_running_threads);
+
+  // Note that this can't _p.release(), that only happens on Windows during
+  // process exit, so _p will still be valid in resume_after_fork
+  stop(true);
+}
+
+void thread_pool::resume_after_fork()
+{
+  unsigned num_threads = _p->_num_threads_before_fork.load();
+  auto error_cb = std::move(_p->_error_cb);
+  auto task_trace_handler_cb = std::move(_p->_task_trace_handler);
+
+  // Fresh start
+  _p.reset(new impl);
+  _p->_error_cb = std::move(error_cb);
+  _p->_task_trace_handler = std::move(task_trace_handler_cb);
+  this->start(num_threads);
 }
 
 bool thread_pool::is_running() const

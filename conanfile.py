@@ -70,8 +70,7 @@ class TconcurrentConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
-        if self.should_install and self.develop:
-            cmake.install()
+        cmake.install()
 
     def package_info(self):
         self.cpp_info.libs = ["tconcurrent"]

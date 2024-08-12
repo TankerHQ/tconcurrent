@@ -43,6 +43,9 @@ public:
   void start(unsigned int thread_count);
   void stop(bool cancel_work = false);
 
+  void stop_before_fork();
+  void resume_after_fork();
+
   bool is_running() const;
 
   bool is_in_this_context() const;
