@@ -150,7 +150,14 @@ void thread_pool::stop(bool cancel_work)
 
 void thread_pool::stop_before_fork()
 {
-  assert(!_p->_num_threads_before_fork);
+  // If called multiple times, just keep our saved state
+  if (_p->_num_threads_before_fork.load())
+  {
+    printf("@@@ stop_before_fork skip, already stopped\n");
+    return;
+  }
+  printf("@@@ stop_before_fork saving %d threads\n", _p->_threads.size());
+
   // NOTE: We shouldn't use _num_running_threads as it has a delay
   _p->_num_threads_before_fork.store(_p->_threads.size());
 
@@ -161,7 +168,16 @@ void thread_pool::stop_before_fork()
 
 void thread_pool::resume_after_fork()
 {
+  // If we weren't stopped, just keep running
+  if (!_p->_threads.empty())
+  {
+    printf("@@@ resume_after_fork skip, already started\n");
+    return;
+  }
+  printf("@@@ resume_after_fork resuming %d threads\n", _p->_num_threads_before_fork.load());
+
   unsigned num_threads = _p->_num_threads_before_fork.load();
+
   auto error_cb = std::move(_p->_error_cb);
   auto task_trace_handler_cb = std::move(_p->_task_trace_handler);
 
