@@ -2,6 +2,12 @@
 #include <iostream>
 #include <optional>
 
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
 #include <boost/thread/tss.hpp>
 
 #include <tconcurrent/detail/util.hpp>
@@ -153,10 +159,12 @@ void thread_pool::stop_before_fork()
   // If called multiple times, just keep our saved state
   if (_p->_num_threads_before_fork.load())
   {
-    printf("@@@ stop_before_fork skip, already stopped\n");
+    printf("@@@ PID=%d stop_before_fork skip, already stopped\n", getpid());
+    fflush(stdout);
     return;
   }
-  printf("@@@ stop_before_fork saving %d threads\n", _p->_threads.size());
+  printf("@@@ PID=%d stop_before_fork saving %ul threads\n", getpid(), _p->_threads.size());
+  fflush(stdout);
 
   // NOTE: We shouldn't use _num_running_threads as it has a delay
   _p->_num_threads_before_fork.store(_p->_threads.size());
@@ -171,10 +179,12 @@ void thread_pool::resume_after_fork()
   // If we weren't stopped, just keep running
   if (!_p->_threads.empty())
   {
-    printf("@@@ resume_after_fork skip, already started\n");
+    printf("@@@ PID=%d resume_after_fork skip, already started\n", getpid());
+    fflush(stdout);
     return;
   }
-  printf("@@@ resume_after_fork resuming %d threads\n", _p->_num_threads_before_fork.load());
+  printf("@@@ PID=%d resume_after_fork resuming %d threads\n", getpid(), _p->_num_threads_before_fork.load());
+  fflush(stdout);
 
   unsigned num_threads = _p->_num_threads_before_fork.load();
 
